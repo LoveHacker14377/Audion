@@ -10,6 +10,7 @@
     "opener:default",
     "dialog:default",
     "fs:default",
+    "global-shortcut:allow-register",
     "fs:allow-read",
     {
       "identifier": "fs:allow-read-file",

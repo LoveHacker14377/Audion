@@ -44,9 +44,11 @@
     }
 
     $: isSearching = $searchQuery.length > 0;
+    import GlobalShortcuts from "./GlobalShortcuts.svelte";
 </script>
 
 <main class="main-view">
+    <GlobalShortcuts />
     <!-- Search Bar -->
     <div class="search-bar">
         <div class="search-input-wrapper">
