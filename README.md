@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" alt="Audion Logo" width="128" height="128">
+  <img width="850" height="230" alt="AudionBanner" src="https://github.com/user-attachments/assets/8649842c-118a-4b24-a987-6bb4be6a9036" />
 </p>
-
-<h1 align="center">Audion</h1>
 
 <p align="center">
   <strong>A modern, local music player with a Spotify-inspired interface</strong>
