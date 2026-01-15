@@ -726,6 +726,16 @@
                     color: #ffffff !important;
                 }
             `
+        },
+        // ═══════════════════════════════════════════════════════════════════
+        // CUSTOM THEME - User defined colors
+        // ═══════════════════════════════════════════════════════════════════
+        custom: {
+            name: 'Custom',
+            icon: '🎨',
+            description: 'Design your own theme',
+            vars: {}, // Dynamic
+            customStyles: ''
         }
     };
 
@@ -736,6 +746,13 @@
     const ThemeCustomizer = {
         name: 'Theme Customizer',
         currentTheme: 'native',
+        customColors: {
+            '--bg-base': '#121212',
+            '--bg-elevated': '#181818',
+            '--bg-surface': '#282828',
+            '--accent-primary': '#1DB954',
+            '--text-primary': '#ffffff'
+        },
         uiElement: null,
         isOpen: false,
 
@@ -743,7 +760,7 @@
             console.log('[ThemeCustomizer] Initializing...');
             this.api = api;
 
-            // Load saved theme
+            // Load saved theme and custom colors
             this.loadSavedTheme();
 
             // Inject styles
@@ -769,6 +786,17 @@
             try {
                 console.log('[ThemeCustomizer] Loading saved theme...');
                 const savedTheme = await this.api.storage.get('selectedTheme');
+
+                // Load custom colors
+                const savedColors = await this.api.storage.get('customColors');
+                if (savedColors) {
+                    try {
+                        this.customColors = { ...this.customColors, ...JSON.parse(savedColors) };
+                    } catch (e) {
+                        console.error('[ThemeCustomizer] Failed to parse custom colors', e);
+                    }
+                }
+
                 console.log(`[ThemeCustomizer] Retrieved saved theme: "${savedTheme}"`);
 
                 let themeToLoad = savedTheme;
@@ -796,6 +824,8 @@
 
             try {
                 await this.api.storage.set('selectedTheme', themeId);
+                // Save custom colors if we are in custom mode or just generally
+                await this.api.storage.set('customColors', JSON.stringify(this.customColors));
             } catch (err) {
                 console.error('[ThemeCustomizer] Failed to save theme:', err);
             }
@@ -817,8 +847,8 @@
                     border: 1px solid var(--border-color);
                     border-radius: 16px;
                     padding: 24px;
-                    width: 520px;
-                    max-height: 80vh;
+                    width: 600px;
+                    max-height: 85vh;
                     overflow-y: auto;
                     z-index: 10001;
                     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -900,6 +930,7 @@
                     display: grid;
                     grid-template-columns: repeat(2, 1fr);
                     gap: 12px;
+                    margin-bottom: 24px;
                 }
 
                 .theme-card {
@@ -978,6 +1009,82 @@
                     font-size: 16px;
                 }
 
+                /* Custom Color Controls */
+                #custom-theme-controls {
+                    background: var(--bg-surface);
+                    padding: 16px;
+                    border-radius: 12px;
+                    display: none;
+                    animation: slideDown 0.3s ease;
+                    border: 1px solid var(--border-color);
+                }
+
+                #custom-theme-controls.visible {
+                    display: block;
+                }
+
+                .color-control-group {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 16px;
+                }
+
+                .color-input-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+
+                .color-label {
+                    font-size: 12px;
+                    color: var(--text-secondary);
+                    font-weight: 500;
+                }
+
+                .color-input-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    background: var(--bg-base);
+                    padding: 8px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                }
+
+                input[type="color"] {
+                    -webkit-appearance: none;
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    background: none;
+                }
+
+                input[type="color"]::-webkit-color-swatch-wrapper {
+                    padding: 0;
+                }
+
+                input[type="color"]::-webkit-color-swatch {
+                    border: none;
+                    border-radius: 6px;
+                    border: 1px solid var(--border-color);
+                }
+
+                input[type="text"].color-text {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-primary);
+                    font-family: monospace;
+                    font-size: 13px;
+                    width: 100%;
+                }
+
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
                 /* Player bar button */
                 #theme-picker-btn {
                     margin-right: 4px;
@@ -1006,13 +1113,21 @@
 
             // Generate theme cards
             const themeCards = Object.entries(THEMES).map(([id, theme]) => {
-                const bgColor = theme.vars['--bg-base'];
-                const accentColor = theme.vars['--accent-primary'];
-                const surfaceColor = theme.vars['--bg-surface'];
+                let bgColor, accentColor, surfaceColor;
+
+                if (id === 'custom') {
+                    bgColor = this.customColors['--bg-base'];
+                    accentColor = this.customColors['--accent-primary'];
+                    surfaceColor = this.customColors['--bg-surface'];
+                } else {
+                    bgColor = theme.vars['--bg-base'] || '#000';
+                    accentColor = theme.vars['--accent-primary'] || '#fff';
+                    surfaceColor = theme.vars['--bg-surface'] || '#222';
+                }
 
                 return `
                     <div class="theme-card ${this.currentTheme === id ? 'active' : ''}" data-theme="${id}">
-                        <div class="theme-preview" style="background: ${bgColor}">
+                        <div class="theme-preview" style="background: ${bgColor}; --preview-bg: ${bgColor}">
                             <div class="theme-preview-bar" style="background: ${accentColor}; height: 70%"></div>
                             <div class="theme-preview-bar" style="background: ${surfaceColor}; height: 50%"></div>
                             <div class="theme-preview-bar" style="background: ${accentColor}; height: 85%"></div>
@@ -1036,6 +1151,40 @@
                 <div class="theme-grid">
                     ${themeCards}
                 </div>
+                
+                <div id="custom-theme-controls" class="${this.currentTheme === 'custom' ? 'visible' : ''}">
+                    <div style="margin-bottom: 16px; font-weight: 600; color: var(--text-primary);">Custom Colors</div>
+                    <div class="color-control-group">
+                        <div class="color-input-wrapper">
+                            <label class="color-label">Accent Color</label>
+                            <div class="color-input-container">
+                                <input type="color" id="custom-accent" value="${this.customColors['--accent-primary']}">
+                                <input type="text" class="color-text" value="${this.customColors['--accent-primary']}" readonly>
+                            </div>
+                        </div>
+                        <div class="color-input-wrapper">
+                            <label class="color-label">Text Color</label>
+                            <div class="color-input-container">
+                                <input type="color" id="custom-text" value="${this.customColors['--text-primary']}">
+                                <input type="text" class="color-text" value="${this.customColors['--text-primary']}" readonly>
+                            </div>
+                        </div>
+                        <div class="color-input-wrapper">
+                            <label class="color-label">Background</label>
+                            <div class="color-input-container">
+                                <input type="color" id="custom-bg" value="${this.customColors['--bg-base']}">
+                                <input type="text" class="color-text" value="${this.customColors['--bg-base']}" readonly>
+                            </div>
+                        </div>
+                        <div class="color-input-wrapper">
+                            <label class="color-label">Surface / Cards</label>
+                            <div class="color-input-container">
+                                <input type="color" id="custom-surface" value="${this.customColors['--bg-surface']}">
+                                <input type="text" class="color-text" value="${this.customColors['--bg-surface']}" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             `;
 
             document.body.appendChild(panel);
@@ -1049,8 +1198,72 @@
                     const themeId = card.dataset.theme;
                     this.applyTheme(themeId, true);
                     this.updateActiveCard(themeId);
+
+                    // Toggle custom controls
+                    const controls = document.getElementById('custom-theme-controls');
+                    if (themeId === 'custom') {
+                        controls.classList.add('visible');
+                    } else {
+                        controls.classList.remove('visible');
+                    }
                 });
             });
+
+            // Bind color pickers
+            this.bindColorPicker('custom-accent', '--accent-primary');
+            this.bindColorPicker('custom-text', '--text-primary');
+            this.bindColorPicker('custom-bg', '--bg-base');
+            this.bindColorPicker('custom-surface', '--bg-surface');
+        },
+
+        bindColorPicker(elementId, varName) {
+            const input = document.getElementById(elementId);
+            if (!input) return;
+
+            input.addEventListener('input', (e) => {
+                const color = e.target.value;
+                // Update text display
+                input.nextElementSibling.value = color;
+
+                // Update state
+                this.customColors[varName] = color;
+
+                // If custom theme is active, apply immediately
+                if (this.currentTheme === 'custom') {
+                    // Also update derived colors if needed
+                    if (varName === '--bg-base') {
+                        // Estimate elevated/highlight
+                        this.customColors['--bg-elevated'] = this.adjustColor(color, 5);
+                    }
+
+                    this.applyTheme('custom', false); // Don't save on every drag
+                }
+            });
+
+            input.addEventListener('change', () => {
+                // Save on release
+                if (this.currentTheme === 'custom') {
+                    this.saveTheme('custom');
+                }
+            });
+        },
+
+        // Simple utility to lighten color (for elevated backgrounds)
+        adjustColor(hex, percent) {
+            // Very basic hex adjustment
+            try {
+                let r = parseInt(hex.slice(1, 3), 16);
+                let g = parseInt(hex.slice(3, 5), 16);
+                let b = parseInt(hex.slice(5, 7), 16);
+
+                r = Math.min(255, Math.floor(r * (100 + percent) / 100));
+                g = Math.min(255, Math.floor(g * (100 + percent) / 100));
+                b = Math.min(255, Math.floor(b * (100 + percent) / 100));
+
+                return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            } catch (e) {
+                return hex;
+            }
         },
 
         createPlayerBarButton() {
@@ -1123,7 +1336,22 @@
             if (themeId !== 'native') {
                 // Apply CSS variables
                 const root = document.documentElement;
-                Object.entries(theme.vars).forEach(([key, value]) => {
+
+                let varsToApply = theme.vars;
+
+                // Merging strategy for custom
+                if (themeId === 'custom') {
+                    varsToApply = {
+                        ...this.customColors,
+                        '--accent-hover': this.adjustColor(this.customColors['--accent-primary'], 10),
+                        '--accent-subtle': `${this.customColors['--accent-primary']}26`, // 15% opacity roughly
+                        '--text-secondary': this.adjustColor(this.customColors['--text-primary'], -30),
+                        '--text-subdued': this.adjustColor(this.customColors['--text-primary'], -50),
+                        '--border-color': `${this.customColors['--text-primary']}33`, // 20% opacity
+                    };
+                }
+
+                Object.entries(varsToApply).forEach(([key, value]) => {
                     root.style.setProperty(key, value);
                 });
 
@@ -1143,6 +1371,9 @@
             }
 
             this.currentTheme = themeId;
+
+            // Sync UI state
+            this.updateActiveCard(themeId);
 
             if (save) {
                 this.saveTheme(themeId);
