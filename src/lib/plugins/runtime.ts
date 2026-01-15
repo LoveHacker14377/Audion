@@ -119,6 +119,9 @@ export class PluginRuntime {
           eventListeners: new Map()
         };
 
+        // Register plugin BEFORE calling init() so storage APIs work during initialization
+        this.plugins.set(manifest.name, plugin);
+
         // Call init if available
         if (instance?.init) {
           try {

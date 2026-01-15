@@ -38,7 +38,7 @@ const defaultTheme: ThemeState = {
 // Load theme from localStorage
 function loadTheme(): ThemeState {
     if (typeof window === 'undefined') return defaultTheme;
-    
+
     try {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
         if (stored) {
@@ -47,14 +47,14 @@ function loadTheme(): ThemeState {
     } catch (error) {
         console.error('[Theme] Failed to load:', error);
     }
-    
+
     return defaultTheme;
 }
 
 // Save theme to localStorage
 function saveTheme(state: ThemeState): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
         localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
@@ -64,11 +64,12 @@ function saveTheme(state: ThemeState): void {
 
 // Create theme store
 function createThemeStore() {
-    const { subscribe, set, update } = writable<ThemeState>(loadTheme());
-    
+    // Start with default theme - actual theme is loaded in initialize() when browser is ready
+    const { subscribe, set, update } = writable<ThemeState>(defaultTheme);
+
     return {
         subscribe,
-        
+
         setMode(mode: ThemeMode) {
             update(state => {
                 const newState = { ...state, mode };
@@ -77,7 +78,7 @@ function createThemeStore() {
                 return newState;
             });
         },
-        
+
         setAccentColor(color: string) {
             update(state => {
                 const newState = { ...state, accentColor: color };
@@ -86,7 +87,7 @@ function createThemeStore() {
                 return newState;
             });
         },
-        
+
         addCustomColor(color: string) {
             update(state => {
                 if (state.customAccentColors.includes(color)) return state;
@@ -96,7 +97,7 @@ function createThemeStore() {
                 return newState;
             });
         },
-        
+
         initialize() {
             const state = loadTheme();
             set(state);
@@ -130,16 +131,16 @@ function darkenColor(hex: string, percent: number): string {
 // Apply theme to CSS variables
 export function applyTheme(state: ThemeState): void {
     if (typeof document === 'undefined') return;
-    
+
     const root = document.documentElement;
-    const isDark = state.mode === 'dark' || 
+    const isDark = state.mode === 'dark' ||
         (state.mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    
+
     // Apply accent colors
     root.style.setProperty('--accent-primary', state.accentColor);
     root.style.setProperty('--accent-hover', lightenColor(state.accentColor, 15));
     root.style.setProperty('--accent-subtle', state.accentColor + '20');
-    
+
     if (isDark) {
         // Dark theme
         root.style.setProperty('--bg-base', '#121212');
@@ -163,7 +164,7 @@ export function applyTheme(state: ThemeState): void {
         root.style.setProperty('--text-subdued', '#8a8a8a');
         root.style.setProperty('--border-color', '#d0d0d0');
     }
-    
+
     // Add theme attribute to root for CSS selectors
     root.setAttribute('data-theme', isDark ? 'dark' : 'light');
 }
