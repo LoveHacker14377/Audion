@@ -11,7 +11,11 @@
     import { goToPlaylists } from "$lib/stores/view";
     import { loadPlaylists, playlists } from "$lib/stores/library";
     import TrackList from "./TrackList.svelte";
-    import { playlistCovers, setPlaylistCover, removePlaylistCover } from "$lib/stores/playlistCovers";
+    import {
+        playlistCovers,
+        setPlaylistCover,
+        removePlaylistCover,
+    } from "$lib/stores/playlistCovers";
 
     export let playlistId: number;
 
@@ -25,32 +29,34 @@
     function initialsFromName(name: string) {
         if (!name) return "PL";
         const parts = name.trim().split(/\s+/);
-        const picked = parts.slice(0, 2).map(p => p[0]?.toUpperCase() ?? '');
-        return (picked.join('') || name.slice(0, 2).toUpperCase());
+        const picked = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "");
+        return picked.join("") || name.slice(0, 2).toUpperCase();
     }
 
     function hashToColor(str: string) {
         let h = 0;
-        for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
+        for (let i = 0; i < str.length; i++)
+            h = (h << 5) - h + str.charCodeAt(i);
         const hue = Math.abs(h) % 360;
         return `hsl(${hue} 30% 30%)`;
     }
 
     function generateSvgCover(name: string, size = 512) {
         const initials = initialsFromName(name);
-        const bg = hashToColor(name || 'playlist');
-        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>` +
+        const bg = hashToColor(name || "playlist");
+        const svg =
+            `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>` +
             `<rect width='100%' height='100%' fill='${bg}'/>` +
-            `<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter, system-ui, sans-serif' font-size='${Math.floor(size/3)}' fill='white' font-weight='700'>${initials}</text>` +
+            `<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter, system-ui, sans-serif' font-size='${Math.floor(size / 3)}' fill='white' font-weight='700'>${initials}</text>` +
             `</svg>`;
         return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
     }
 
     function getCoverSrc() {
-        if (!playlist) return generateSvgCover('Playlist');
+        if (!playlist) return generateSvgCover("Playlist");
         const custom = $playlistCovers && $playlistCovers[playlist.id];
         if (custom) return custom;
-        return generateSvgCover(playlist.name || 'Playlist');
+        return generateSvgCover(playlist.name || "Playlist");
     }
 
     function handleCoverFile(e: Event) {
@@ -151,8 +157,14 @@
                 </svg>
             </button>
             <div class="playlist-cover">
-                        <img src={getCoverSrc()} alt="Playlist cover" />
-                        <input type="file" accept="image/*" bind:this={coverInput} on:change={(e) => handleCoverFile(e)} style="display:none" />
+                <img src={getCoverSrc()} alt="Playlist cover" />
+                <input
+                    type="file"
+                    accept="image/*"
+                    bind:this={coverInput}
+                    on:change={(e) => handleCoverFile(e)}
+                    style="display:none"
+                />
             </div>
             <div class="playlist-info">
                 <span class="playlist-type">Playlist</span>
@@ -191,13 +203,28 @@
                         </svg>
                         Play
                     </button>
-                    <button class="btn-secondary" on:click={() => coverInput?.click()} title="Change cover">
+                    <button
+                        class="btn-secondary"
+                        on:click={() => coverInput?.click()}
+                        title="Change cover"
+                    >
                         Change Cover
                     </button>
                     {#if $playlistCovers && playlist && $playlistCovers[playlist.id]}
-                        <button class="icon-btn" on:click={() => removePlaylistCover(playlist.id)} title="Remove cover">
-                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                        <button
+                            class="icon-btn"
+                            on:click={() => removePlaylistCover(playlist.id)}
+                            title="Remove cover"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                width="20"
+                                height="20"
+                            >
+                                <path
+                                    d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                                />
                             </svg>
                         </button>
                     {/if}
@@ -417,7 +444,6 @@
     .playlist-tracks {
         flex: 1;
         overflow-y: auto;
-        padding-bottom: calc(var(--player-height) + var(--spacing-md));
     }
 
     .empty-state {

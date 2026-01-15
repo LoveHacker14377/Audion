@@ -437,7 +437,6 @@
         flex: 1;
         overflow-y: auto;
         padding: var(--spacing-md);
-        padding-bottom: calc(var(--player-height) + var(--spacing-md));
     }
 
     .queue-section {
