@@ -1,0 +1,172 @@
+name: Release Windows
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src-tauri/tauri.conf.json"
+permissions:
+  contents: write
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      # 1. Checkout repository (need full history for tags)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # 2. Read version from tauri.conf.json
+      - name: Read app version
+        id: version
+        shell: pwsh
+        run: |
+          $json = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          if (-not $json.package.version) {
+            Write-Error "Version not found in tauri.conf.json"
+            exit 1
+          }
+          echo "version=$($json.package.version)" >> $env:GITHUB_OUTPUT
+      
+      # 3. Prevent duplicate releases
+      - name: Check if version tag already exists
+        shell: pwsh
+        run: |
+          git fetch --tags
+          if (git tag -l "v${{ steps.version.outputs.version }}") {
+            Write-Error "Release v${{ steps.version.outputs.version }} already exists"
+            exit 1
+          }
+      
+      # 4. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      
+      # 5. Setup Rust
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      # 6. Rust cache
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      
+      # 7. Install frontend dependencies
+      - name: Install dependencies
+        run: npm install
+      
+      # 8. Build Tauri app (unsigned)
+      - name: Build Tauri app
+        run: npm run tauri build
+      
+      # 9. Verify build artifacts
+      - name: Verify build artifacts
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi"
+          $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe"
+          if (-not $msi -or -not $nsis) {
+            Write-Error "Build artifacts not found"
+            exit 1
+          }
+      
+      # 10. Read release notes from file
+      - name: Read release notes
+        id: changelog
+        shell: pwsh
+        run: |
+          # Check if releasenote.md exists
+          if (-not (Test-Path "releasenote.md")) {
+            Write-Error "releasenote.md not found in repository root"
+            exit 1
+          }
+          
+          # Read the content
+          $content = Get-Content "releasenote.md" -Raw -Encoding utf8
+          
+          if ([string]::IsNullOrWhiteSpace($content)) {
+            Write-Error "releasenote.md is empty"
+            exit 1
+          }
+          
+          # Set multiline output for GitHub Actions
+          $delimiter = "EOF_$(New-Guid)"
+          echo "content<<$delimiter" >> $env:GITHUB_OUTPUT
+          echo $content >> $env:GITHUB_OUTPUT
+          echo $delimiter >> $env:GITHUB_OUTPUT
+      
+      # 11. Create GitHub Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: ${{ steps.changelog.outputs.content }}
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # 12. Get file information for Discord
+      - name: Get release file info
+        id: file_info
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi" | Select-Object -First 1
+          $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          
+          $msiSize = [math]::Round($msi.Length / 1MB, 2)
+          $nsisSize = [math]::Round($nsis.Length / 1MB, 2)
+          
+          echo "msi_name=$($msi.Name)" >> $env:GITHUB_OUTPUT
+          echo "msi_size=$msiSize MB" >> $env:GITHUB_OUTPUT
+          echo "nsis_name=$($nsis.Name)" >> $env:GITHUB_OUTPUT
+          echo "nsis_size=$nsisSize MB" >> $env:GITHUB_OUTPUT
+      
+      # 13. Send Discord notification
+      - name: Discord notification
+        if: success()
+        shell: pwsh
+        run: |
+          $payload = @{
+            embeds = @(
+              @{
+                title = "🚀 New Release: v${{ steps.version.outputs.version }}"
+                description = "A new Windows release has been published!"
+                color = 3066993  # Green color
+                fields = @(
+                  @{
+                    name = "📦 MSI Installer"
+                    value = "``${{ steps.file_info.outputs.msi_name }}`` (${{ steps.file_info.outputs.msi_size }})"
+                    inline = $false
+                  },
+                  @{
+                    name = "📦 NSIS Installer"
+                    value = "``${{ steps.file_info.outputs.nsis_name }}`` (${{ steps.file_info.outputs.nsis_size }})"
+                    inline = $false
+                  },
+                  @{
+                    name = "📝 Changelog"
+                    value = ${{ toJson(steps.changelog.outputs.content) }}.Substring(0, [Math]::Min(1024, ${{ toJson(steps.changelog.outputs.content) }}.Length))
+                    inline = $false
+                  }
+                )
+                url = "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+                timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                footer = @{
+                  text = "Released by ${{ github.actor }}"
+                }
+              }
+            )
+          } | ConvertTo-Json -Depth 10
+          
+          Invoke-RestMethod -Uri "${{ secrets.DISCORD_WEBHOOK_URL }}" -Method Post -Body $payload -ContentType "application/json"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
