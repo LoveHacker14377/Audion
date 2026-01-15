@@ -24,14 +24,17 @@ export function toggleFullScreen() {
     isFullScreen.update(v => !v);
 }
 
-export async function toggleMiniPlayer() {
+export async function setMiniPlayer(enable: boolean) {
     const currentState = get(isMiniPlayer);
+
+    // Don't do anything if state is already correct
+    if (currentState === enable) return;
 
     if (isTauri()) {
         try {
             const appWindow = getCurrentWindow();
 
-            if (!currentState) {
+            if (enable) {
                 // Entering PIP mode
                 // Save current window state
                 const size = await appWindow.innerSize();
@@ -96,11 +99,18 @@ export async function toggleMiniPlayer() {
             }
         } catch (error) {
             console.error('Failed to toggle PIP mode:', error);
+            // If window operations fail, don't update store
+            return;
         }
     }
 
     // Update the store state
-    isMiniPlayer.update(v => !v);
+    isMiniPlayer.set(enable);
+}
+
+export async function toggleMiniPlayer() {
+    const currentState = get(isMiniPlayer);
+    await setMiniPlayer(!currentState);
 }
 
 export function toggleQueue() {

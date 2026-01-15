@@ -3,6 +3,7 @@
     import {
         isMiniPlayer,
         toggleMiniPlayer,
+        setMiniPlayer,
         toggleFullScreen,
     } from "$lib/stores/ui";
     import {
@@ -71,7 +72,7 @@
     }
 
     async function handleMaximize() {
-        await toggleMiniPlayer();
+        await setMiniPlayer(false);
         toggleFullScreen();
     }
 
