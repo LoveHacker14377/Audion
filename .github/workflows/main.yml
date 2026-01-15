@@ -132,34 +132,53 @@ jobs:
           echo "nsis_size=$nsisSize MB" >> $env:GITHUB_OUTPUT
       
       # 13. Send Discord notification
+      # 13. Send Discord notification
       - name: Discord notification
         if: success()
         shell: pwsh
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.content }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MSI_NAME: ${{ steps.file_info.outputs.msi_name }}
+          MSI_SIZE: ${{ steps.file_info.outputs.msi_size }}
+          NSIS_NAME: ${{ steps.file_info.outputs.nsis_name }}
+          NSIS_SIZE: ${{ steps.file_info.outputs.nsis_size }}
         run: |
+          if (-not $env:DISCORD_WEBHOOK_URL) {
+            Write-Warning "DISCORD_WEBHOOK_URL secret is not set. Skipping notification."
+            return
+          }
+
+          $changelog = $env:CHANGELOG_CONTENT
+          if ($changelog.Length -gt 1024) {
+            $changelog = $changelog.Substring(0, 1021) + "..."
+          }
+
           $payload = @{
             embeds = @(
               @{
-                title = "🚀 New Release: v${{ steps.version.outputs.version }}"
+                title = "🚀 New Release: v$env:VERSION"
                 description = "A new Windows release has been published!"
                 color = 3066993  # Green color
                 fields = @(
                   @{
                     name = "📦 MSI Installer"
-                    value = "``${{ steps.file_info.outputs.msi_name }}`` (${{ steps.file_info.outputs.msi_size }})"
+                    value = "``$env:MSI_NAME`` ($env:MSI_SIZE)"
                     inline = $false
                   },
                   @{
                     name = "📦 NSIS Installer"
-                    value = "``${{ steps.file_info.outputs.nsis_name }}`` (${{ steps.file_info.outputs.nsis_size }})"
+                    value = "``$env:NSIS_NAME`` ($env:NSIS_SIZE)"
                     inline = $false
                   },
                   @{
                     name = "📝 Changelog"
-                    value = ${{ toJson(steps.changelog.outputs.content) }}.Substring(0, [Math]::Min(1024, ${{ toJson(steps.changelog.outputs.content) }}.Length))
+                    value = $changelog
                     inline = $false
                   }
                 )
-                url = "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+                url = "https://github.com/${{ github.repository }}/releases/tag/v$env:VERSION"
                 timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
                 footer = @{
                   text = "Released by ${{ github.actor }}"
@@ -168,6 +187,4 @@ jobs:
             )
           } | ConvertTo-Json -Depth 10
           
-          Invoke-RestMethod -Uri "${{ secrets.DISCORD_WEBHOOK_URL }}" -Method Post -Body $payload -ContentType "application/json"
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
