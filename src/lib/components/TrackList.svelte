@@ -4,6 +4,7 @@
         formatDuration,
         getAlbumArtSrc,
         addTrackToPlaylist,
+        removeTrackFromPlaylist,
         deleteTrack,
     } from "$lib/api/tauri";
     import {
@@ -109,6 +110,8 @@
         }
     }
 
+    export let playlistId: number | null = null;
+
     async function handleContextMenu(e: MouseEvent, index: number) {
         e.preventDefault();
         const track = sortedTracks[index];
@@ -130,54 +133,75 @@
             },
         }));
 
+        const menuItems: any[] = [
+            {
+                label: "Play",
+                action: () => {
+                    const trackIndex = sortedTracks.findIndex(
+                        (t) => t.id === track.id,
+                    );
+                    if (trackIndex !== -1) playTracks(sortedTracks, trackIndex);
+                },
+            },
+            { type: "separator" },
+            {
+                label: "Add to Queue",
+                action: () => addToQueue([track]),
+            },
+            { type: "separator" },
+            {
+                label: "Add to Playlist",
+                submenu:
+                    playlistItems.length > 0
+                        ? playlistItems
+                        : [
+                              {
+                                  label: "No playlists",
+                                  action: () => {},
+                                  disabled: true,
+                              },
+                          ],
+            },
+        ];
+
+        if (playlistId) {
+            menuItems.push({
+                label: "Remove from Playlist",
+                action: async () => {
+                    try {
+                        await removeTrackFromPlaylist(playlistId, track.id);
+                        tracks = tracks.filter((t) => t.id !== track.id);
+                    } catch (error) {
+                        console.error(
+                            "Failed to remove track from playlist:",
+                            error,
+                        );
+                    }
+                },
+            });
+        }
+
+        menuItems.push(
+            { type: "separator" },
+            {
+                label: "Delete from Library",
+                action: async () => {
+                    try {
+                        await deleteTrack(track.id);
+                        // Remove from local tracks array
+                        tracks = tracks.filter((t) => t.id !== track.id);
+                    } catch (error) {
+                        console.error("Failed to delete track:", error);
+                    }
+                },
+            },
+        );
+
         contextMenu.set({
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: [
-                {
-                    label: "Play",
-                    action: () => {
-                        const trackIndex = sortedTracks.findIndex(
-                            (t) => t.id === track.id,
-                        );
-                        if (trackIndex !== -1)
-                            playTracks(sortedTracks, trackIndex);
-                    },
-                },
-                { type: "separator" },
-                {
-                    label: "Add to Queue",
-                    action: () => addToQueue([track]),
-                },
-                { type: "separator" },
-                {
-                    label: "Add to Playlist",
-                    submenu:
-                        playlistItems.length > 0
-                            ? playlistItems
-                            : [
-                                  {
-                                      label: "No playlists",
-                                      action: () => {},
-                                      disabled: true,
-                                  },
-                              ],
-                },
-                { type: "separator" },
-                {
-                    label: "Delete from Library",
-                    action: async () => {
-                        try {
-                            await deleteTrack(track.id);
-                            // Remove from local tracks array
-                            tracks = tracks.filter((t) => t.id !== track.id);
-                        } catch (error) {
-                            console.error("Failed to delete track:", error);
-                        }
-                    },
-                },
-            ],
+            items: menuItems,
         });
     }
 </script>

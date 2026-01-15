@@ -7,7 +7,8 @@
         renamePlaylist,
         formatDuration,
     } from "$lib/api/tauri";
-    import { playTracks } from "$lib/stores/player";
+    import { contextMenu } from "$lib/stores/ui";
+    import { playTracks, addToQueue } from "$lib/stores/player";
     import { goToPlaylists } from "$lib/stores/view";
     import { loadPlaylists, playlists } from "$lib/stores/library";
     import TrackList from "./TrackList.svelte";
@@ -128,6 +129,45 @@
         }
     }
 
+    function handleHeaderContextMenu(e: MouseEvent) {
+        e.preventDefault();
+        if (!playlist) return;
+
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                {
+                    label: "Play",
+                    action: handlePlayAll,
+                    disabled: tracks.length === 0,
+                },
+                {
+                    label: "Add to Queue",
+                    action: () => {
+                        if (tracks.length > 0) addToQueue(tracks);
+                    },
+                    disabled: tracks.length === 0,
+                },
+                { type: "separator" },
+                {
+                    label: "Rename",
+                    action: startEditing,
+                },
+                {
+                    label: "Change Cover",
+                    action: () => coverInput?.click(),
+                },
+                { type: "separator" },
+                {
+                    label: "Delete Playlist",
+                    action: handleDelete,
+                },
+            ],
+        });
+    }
+
     onMount(() => {
         loadPlaylistData();
     });
@@ -143,7 +183,10 @@
             <span>Loading playlist...</span>
         </div>
     {:else if playlist}
-        <header class="playlist-header">
+        <header
+            class="playlist-header"
+            on:contextmenu={handleHeaderContextMenu}
+        >
             <button class="back-btn" on:click={goToPlaylists}>
                 <svg
                     viewBox="0 0 24 24"
@@ -266,7 +309,7 @@
 
         <div class="playlist-tracks">
             {#if tracks.length > 0}
-                <TrackList {tracks} showAlbum={true} />
+                <TrackList bind:tracks showAlbum={true} {playlistId} />
             {:else}
                 <div class="empty-state">
                     <svg

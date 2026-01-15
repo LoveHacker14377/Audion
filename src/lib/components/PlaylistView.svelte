@@ -1,13 +1,136 @@
 <script lang="ts">
     import { playlists, loadPlaylists } from "$lib/stores/library";
     import { goToPlaylistDetail } from "$lib/stores/view";
-    import { createPlaylist } from "$lib/api/tauri";
+    import {
+        createPlaylist,
+        getPlaylistTracks,
+        deletePlaylist,
+        renamePlaylist,
+    } from "$lib/api/tauri";
     import {
         playlistCovers,
         setPlaylistCover,
         removePlaylistCover,
     } from "$lib/stores/playlistCovers";
+    import { contextMenu } from "$lib/stores/ui";
+    import { playTracks, addToQueue } from "$lib/stores/player";
     import type { Writable } from "svelte/store";
+
+    async function handleDeletePlaylist(id: number, name: string) {
+        if (!confirm(`Delete playlist "${name}"?`)) return;
+
+        try {
+            await deletePlaylist(id);
+            await loadPlaylists();
+        } catch (error) {
+            console.error("Failed to delete playlist:", error);
+        }
+    }
+
+    async function handlePlayPlaylist(id: number) {
+        try {
+            const tracks = await getPlaylistTracks(id);
+            if (tracks.length > 0) {
+                playTracks(tracks, 0);
+            }
+        } catch (error) {
+            console.error("Failed to play playlist:", error);
+        }
+    }
+
+    async function handleAddToQueue(id: number) {
+        try {
+            const tracks = await getPlaylistTracks(id);
+            if (tracks.length > 0) {
+                addToQueue(tracks);
+            }
+        } catch (error) {
+            console.error("Failed to add playlist to queue:", error);
+        }
+    }
+
+    function handleContextMenu(
+        e: MouseEvent,
+        playlist: { id: number; name: string },
+    ) {
+        e.preventDefault();
+
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                {
+                    label: "Play",
+                    action: () => handlePlayPlaylist(playlist.id),
+                },
+                {
+                    label: "Add to Queue",
+                    action: () => handleAddToQueue(playlist.id),
+                },
+                { type: "separator" },
+                {
+                    label: "Rename",
+                    action: async () => {
+                        const newName = prompt(
+                            "Enter new name:",
+                            playlist.name,
+                        );
+                        if (
+                            newName &&
+                            newName.trim() &&
+                            newName !== playlist.name
+                        ) {
+                            try {
+                                await renamePlaylist(
+                                    playlist.id,
+                                    newName.trim(),
+                                );
+                                await loadPlaylists();
+                            } catch (error) {
+                                console.error(
+                                    "Failed to rename playlist:",
+                                    error,
+                                );
+                            }
+                        }
+                    },
+                },
+                {
+                    label: "Change Cover",
+                    action: () => {
+                        // Trigger a file input click - tricky without a hidden input for each card
+                        // Maybe we can use a shared open dialog?
+                        // For now, let's skip or implement a shared input.
+                        // Actually, let's reuse the logic from PlaylistDetail but adapting it is hard without the input element.
+                        // Let's just create a dynamic input or use the one from the detail view concept.
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement)
+                                .files?.[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const result = reader.result as string;
+                                    setPlaylistCover(playlist.id, result);
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        };
+                        input.click();
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Delete Playlist",
+                    action: () =>
+                        handleDeletePlaylist(playlist.id, playlist.name),
+                },
+            ],
+        });
+    }
 
     // Explicitly type playlistCovers as a Writable<Record<string, string>>
     const typedPlaylistCovers: Writable<Record<string, string>> =
@@ -123,6 +246,7 @@
             <button
                 class="playlist-card"
                 on:click={() => goToPlaylistDetail(playlist.id)}
+                on:contextmenu={(e) => handleContextMenu(e, playlist)}
             >
                 <div class="playlist-cover">
                     <img
