@@ -5,9 +5,22 @@
         clearSearch,
     } from "$lib/stores/search";
     import { goToAlbumDetail, goToArtistDetail } from "$lib/stores/view";
-    import { playTracks } from "$lib/stores/player";
-    import { getAlbumArtSrc } from "$lib/api/tauri";
-    import { albums, tracks as allTracks } from "$lib/stores/library";
+    import { playTracks, addToQueue } from "$lib/stores/player";
+    import {
+        getAlbumArtSrc,
+        addTrackToPlaylist,
+        deleteTrack,
+        deleteAlbum,
+    } from "$lib/api/tauri";
+    import {
+        albums,
+        tracks as allTracks,
+        playlists,
+        loadPlaylists,
+        loadLibrary,
+    } from "$lib/stores/library";
+    import { contextMenu } from "$lib/stores/ui";
+    import { pluginStore } from "$lib/stores/plugin-store";
 
     // Create album map for track art lookup
     $: albumMap = new Map($albums.map((a) => [a.id, a]));
@@ -59,6 +72,157 @@
     function getArtistInitial(name: string): string {
         return name.charAt(0).toUpperCase();
     }
+
+    async function handleTrackContextMenu(
+        e: MouseEvent,
+        track: any,
+        index: number,
+    ) {
+        e.preventDefault();
+
+        // Ensure playlists are loaded
+        if ($playlists.length === 0) {
+            await loadPlaylists();
+        }
+
+        // Build playlist submenu items
+        const playlistItems = $playlists.map((playlist) => ({
+            label: playlist.name,
+            action: async () => {
+                try {
+                    await addTrackToPlaylist(playlist.id, track.id);
+                } catch (error) {
+                    console.error("Failed to add track to playlist:", error);
+                }
+            },
+        }));
+
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                {
+                    label: "Play",
+                    action: () => {
+                        playTracks($searchResults.tracks, index);
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Add to Queue",
+                    action: () => addToQueue([track]),
+                },
+                { type: "separator" },
+                {
+                    label: "Add to Playlist",
+                    submenu:
+                        playlistItems.length > 0
+                            ? playlistItems
+                            : [
+                                  {
+                                      label: "No playlists",
+                                      action: () => {},
+                                      disabled: true,
+                                  },
+                              ],
+                },
+                { type: "separator" },
+                {
+                    label: "Go to Album",
+                    action: () => {
+                        if (track.album_id) {
+                            handleAlbumClick(track.album_id);
+                        }
+                    },
+                    disabled: !track.album_id,
+                },
+                {
+                    label: "Go to Artist",
+                    action: () => {
+                        if (track.artist) {
+                            handleArtistClick(track.artist);
+                        }
+                    },
+                    disabled: !track.artist,
+                },
+                { type: "separator" },
+                {
+                    label: "Delete from Library",
+                    action: async () => {
+                        try {
+                            if (track.id) {
+                                await deleteTrack(track.id);
+                                // Refresh library or simple remove from search results not easy without re-search
+                                // but we should at least trigger library reload
+                                loadLibrary();
+                            }
+                        } catch (error) {
+                            console.error("Failed to delete track:", error);
+                        }
+                    },
+                    // Only for local tracks essentially, but backend handles safety?
+                    // Let's assume yes or user will see error.
+                    // Actually checking source might be good.
+                    disabled:
+                        track.source_type && track.source_type !== "local",
+                },
+            ],
+        });
+    }
+
+    function handleAlbumContextMenu(e: MouseEvent, album: any) {
+        e.preventDefault();
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                {
+                    label: "Open Album",
+                    action: () => handleAlbumClick(album.id),
+                },
+                { type: "separator" },
+                {
+                    label: "Go to Artist",
+                    action: () => {
+                        if (album.artist) {
+                            handleArtistClick(album.artist);
+                        }
+                    },
+                    disabled: !album.artist,
+                },
+                { type: "separator" },
+                {
+                    label: "Delete Album",
+                    danger: true,
+                    action: async () => {
+                        try {
+                            await deleteAlbum(album.id);
+                            await loadLibrary();
+                        } catch (error) {
+                            console.error("Failed to delete album:", error);
+                        }
+                    },
+                },
+            ],
+        });
+    }
+
+    function handleArtistContextMenu(e: MouseEvent, artist: any) {
+        e.preventDefault();
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: [
+                {
+                    label: "Open Artist",
+                    action: () => handleArtistClick(artist.name),
+                },
+            ],
+        });
+    }
 </script>
 
 <div class="search-results">
@@ -85,6 +249,8 @@
                         <button
                             class="track-item"
                             on:click={() => handleTrackClick(index)}
+                            on:contextmenu={(e) =>
+                                handleTrackContextMenu(e, track, index)}
                         >
                             <div class="track-art">
                                 {#if albumArt}
@@ -140,6 +306,8 @@
                         <button
                             class="album-card"
                             on:click={() => handleAlbumClick(album.id)}
+                            on:contextmenu={(e) =>
+                                handleAlbumContextMenu(e, album)}
                         >
                             <div class="album-art">
                                 {#if coverSrc}
@@ -189,6 +357,8 @@
                         <button
                             class="artist-card"
                             on:click={() => handleArtistClick(artist.name)}
+                            on:contextmenu={(e) =>
+                                handleArtistContextMenu(e, artist)}
                         >
                             <div class="artist-avatar">
                                 <span class="artist-initial"
