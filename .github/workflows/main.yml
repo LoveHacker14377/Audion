@@ -1,4 +1,4 @@
-name: Release Windows
+name: Release
 on:
   push:
     branches:
@@ -11,6 +11,9 @@ permissions:
 jobs:
   release-windows:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.content }}
     steps:
       # 1. Checkout repository (need full history for tags)
       - name: Checkout repository
@@ -156,6 +159,7 @@ jobs:
           }
 
           $payload = @{
+            content = "@everyone"
             embeds = @(
               @{
                 title = "🚀 New Release: v$env:VERSION"
@@ -188,3 +192,98 @@ jobs:
           } | ConvertTo-Json -Depth 10
           
           Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+
+  release-linux:
+    runs-on: ubuntu-latest
+    needs: release-windows
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install Linux dependencies
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      # 3. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      # 4. Setup Rust
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # 5. Rust cache
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # 6. Install frontend dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 7. Build Tauri app for Linux
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      # 8. Verify build artifacts
+      - name: Verify build artifacts
+        run: |
+          ls -la src-tauri/target/release/bundle/deb/ || echo "No .deb found"
+          ls -la src-tauri/target/release/bundle/appimage/ || echo "No .AppImage found"
+
+      # 9. Upload Linux artifacts to existing release
+      - name: Upload Linux artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release-windows.outputs.version }}
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 10. Send Discord notification for Linux
+      - name: Discord notification (Linux)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          VERSION: ${{ needs.release-windows.outputs.version }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL secret is not set. Skipping notification."
+            exit 0
+          fi
+
+          DEB_FILE=$(ls src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1)
+          APPIMAGE_FILE=$(ls src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1)
+
+          DEB_NAME=$(basename "$DEB_FILE" 2>/dev/null || echo "N/A")
+          APPIMAGE_NAME=$(basename "$APPIMAGE_FILE" 2>/dev/null || echo "N/A")
+
+          DEB_SIZE=$(du -h "$DEB_FILE" 2>/dev/null | cut -f1 || echo "N/A")
+          APPIMAGE_SIZE=$(du -h "$APPIMAGE_FILE" 2>/dev/null | cut -f1 || echo "N/A")
+
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{
+              \"content\": \"@everyone\",
+              \"embeds\": [{
+                \"title\": \"🐧 Linux Release Added: v${VERSION}\",
+                \"description\": \"Linux builds have been added to the release!\",
+                \"color\": 16742144,
+                \"fields\": [
+                  {\"name\": \"📦 DEB Package\", \"value\": \"\`${DEB_NAME}\` (${DEB_SIZE})\", \"inline\": false},
+                  {\"name\": \"📦 AppImage\", \"value\": \"\`${APPIMAGE_NAME}\` (${APPIMAGE_SIZE})\", \"inline\": false}
+                ],
+                \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v${VERSION}\",
+                \"footer\": {\"text\": \"Released by ${{ github.actor }}\"}
+              }]
+            }" \
+            "$DISCORD_WEBHOOK_URL"
