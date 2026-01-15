@@ -163,6 +163,13 @@ function createPluginStore() {
                     loading: false
                 }));
 
+                // Auto-enable the newly installed plugin
+                try {
+                    await this.enablePlugin(info.name);
+                } catch (err) {
+                    console.error(`[PluginStore] Failed to auto-enable ${info.name}:`, err);
+                }
+
                 return true;
             } catch (err) {
                 update(s => ({

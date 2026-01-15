@@ -44,12 +44,14 @@
     }
 
     $: isSearching = $searchQuery.length > 0;
+    $: hideSearchBar = $currentView.type === 'settings' || $currentView.type === 'plugins';
     import GlobalShortcuts from "./GlobalShortcuts.svelte";
 </script>
 
 <main class="main-view">
     <GlobalShortcuts />
     <!-- Search Bar -->
+    {#if !hideSearchBar}
     <div class="search-bar">
         <div class="search-input-wrapper">
             <svg
@@ -91,6 +93,7 @@
             {/if}
         </div>
     </div>
+    {/if}
 
     {#if isSearching}
         <div class="view-container">
