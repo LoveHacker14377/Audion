@@ -10,6 +10,10 @@
         removeFromQueue,
         clearUpcoming,
         reorderQueue,
+        userQueueCount,
+        shuffle,
+        shuffledIndices,
+        shuffledIndex,
     } from "$lib/stores/player";
     import { albums } from "$lib/stores/library";
     import { formatDuration, getAlbumArtSrc } from "$lib/api/tauri";
@@ -27,9 +31,106 @@
         return album ? getAlbumArtSrc(album.art_data) : null;
     }
 
-    // Separate queue into history and upcoming
-    $: historyTracks = $queue.slice(0, $queueIndex);
-    $: upcomingTracks = $queue.slice($queueIndex + 1);
+    // Derived queue state for display
+    let historyTracks: Array<{ track: Track; index: number }> = [];
+    let upcomingTracks: Array<{
+        track: Track;
+        index: number;
+        isPriority: boolean;
+    }> = [];
+
+    // Simple reactive statement to rebuild lists when any dependency changes
+    $: {
+        const q = $queue;
+        const qIdx = $queueIndex;
+        const uCount = $userQueueCount;
+        const isShuffle = $shuffle;
+        const sIndices = $shuffledIndices;
+        const sIdx = $shuffledIndex;
+
+        // History: always what's before current in absolute playback history?
+        // Or based on mode?
+        // Traditionally, history is just "what played before".
+        // In shuffle mode, "Previous" button goes back in shuffle history.
+        // So we should show shuffle history?
+
+        if (isShuffle) {
+            // Shuffle History: tracks from 0 to sIdx-1 in shuffledIndices
+            historyTracks = sIndices
+                .slice(0, sIdx)
+                .map((idx) => ({ track: q[idx], index: idx }));
+
+            // However, if we played priority tracks, they are NOT in sIndices history (or they are at end).
+            // This is tricky.
+            // Let's stick to a simpler history: strictly what is before queueIndex in linear queue?
+            // No, that doesn't make sense for shuffle.
+            // But we don't strictly track "playback history" array.
+
+            // For now, let's just show linear history for simplicity or try to approximate.
+            // Actually, if we just toggled shuffle, history might be empty or weird.
+            // Let's rely on standard queue history for "History" section for now to avoid over-engineering.
+            // historyTracks = q.slice(0, qIdx).map((t, i) => ({ track: t, index: i }));
+
+            // Wait, if I use linear history in shuffle mode, it might show "upcoming" shuffled tracks as history if index < qIdx.
+            // But qIdx jumps around.
+            // So identifying "History" is hard without a separate history log.
+            // Let's hide History in shuffle mode or just show nothing?
+            // Users usually care more about "Up Next".
+            // Let's try to show the shuffle indices history.
+            historyTracks = sIndices
+                .slice(0, sIdx)
+                .map((idx) => ({ track: q[idx], index: idx }));
+        } else {
+            historyTracks = q
+                .slice(0, qIdx)
+                .map((t, i) => ({ track: t, index: i }));
+        }
+
+        // Upcoming
+        if (isShuffle) {
+            upcomingTracks = [];
+
+            // 1. Priority Tracks (User Queue)
+            // These are strictly q[qIdx+1 ... qIdx+uCount]
+            for (let i = 1; i <= uCount; i++) {
+                const idx = qIdx + i;
+                if (idx < q.length) {
+                    upcomingTracks.push({
+                        track: q[idx],
+                        index: idx,
+                        isPriority: true,
+                    });
+                }
+            }
+
+            // 2. Shuffled Tracks
+            // Start from sIdx + 1
+            const remainingShuffled = sIndices.slice(sIdx + 1);
+
+            // We need to filter out tracks that are ALREADY in Priority list.
+            // Priority indices are [qIdx+1 ... qIdx+uCount].
+            const priorityIndices = new Set<number>();
+            for (let i = 1; i <= uCount; i++) priorityIndices.add(qIdx + i);
+
+            for (const idx of remainingShuffled) {
+                if (!priorityIndices.has(idx)) {
+                    upcomingTracks.push({
+                        track: q[idx],
+                        index: idx,
+                        isPriority: false,
+                    });
+                }
+            }
+        } else {
+            // Linear Upcoming
+            upcomingTracks = q.slice(qIdx + 1).map((t, i) => ({
+                track: t,
+                index: qIdx + 1 + i,
+                isPriority: i < uCount,
+            }));
+        }
+    }
+
     $: hasUpcoming = upcomingTracks.length > 0;
 
     function handlePlayTrack(index: number) {
@@ -200,19 +301,19 @@
                         <span class="count">{upcomingTracks.length}</span>
                     </h4>
                     <div class="queue-list">
-                        {#each upcomingTracks as track, i (track.id + "-next-" + i)}
-                            {@const actualIndex = $queueIndex + 1 + i}
+                        {#each upcomingTracks as item, i (item.track.id + "-next-" + i)}
                             <div
                                 class="queue-track"
-                                class:dragging={draggedIndex === actualIndex}
-                                class:drag-over={dragOverIndex === actualIndex}
-                                data-index={actualIndex}
+                                class:dragging={draggedIndex === item.index}
+                                class:drag-over={dragOverIndex === item.index}
+                                class:priority={item.isPriority}
+                                data-index={item.index}
                                 role="listitem"
                             >
                                 <div
                                     class="drag-handle"
                                     on:pointerdown={(e) =>
-                                        handlePointerDown(e, actualIndex)}
+                                        handlePointerDown(e, item.index)}
                                     title="Drag to reorder"
                                 >
                                     <svg
@@ -228,13 +329,12 @@
                                 </div>
                                 <button
                                     class="track-btn"
-                                    on:click={() =>
-                                        handlePlayTrack(actualIndex)}
+                                    on:click={() => handlePlayTrack(item.index)}
                                 >
                                     <div class="track-art">
-                                        {#if getTrackArt(track)}
+                                        {#if getTrackArt(item.track)}
                                             <img
-                                                src={getTrackArt(track)}
+                                                src={getTrackArt(item.track)}
                                                 alt=""
                                                 loading="lazy"
                                                 decoding="async"
@@ -256,21 +356,21 @@
                                     </div>
                                     <div class="track-info">
                                         <span class="track-title truncate"
-                                            >{track.title ||
+                                            >{item.track.title ||
                                                 "Unknown Title"}</span
                                         >
                                         <span class="track-artist truncate"
-                                            >{track.artist ||
+                                            >{item.track.artist ||
                                                 "Unknown Artist"}</span
                                         >
                                     </div>
                                 </button>
                                 <span class="track-duration"
-                                    >{formatDuration(track.duration)}</span
+                                    >{formatDuration(item.track.duration)}</span
                                 >
                                 <button
                                     class="remove-btn"
-                                    on:click={() => handleRemove(actualIndex)}
+                                    on:click={() => handleRemove(item.index)}
                                     title="Remove from queue"
                                 >
                                     <svg
@@ -297,16 +397,16 @@
                         <span class="count">{historyTracks.length}</span>
                     </h4>
                     <div class="queue-list">
-                        {#each historyTracks as track, i (track.id + "-history-" + i)}
+                        {#each historyTracks as item, i (item.track.id + "-history-" + i)}
                             <div class="queue-track past">
                                 <button
                                     class="track-btn"
-                                    on:click={() => handlePlayTrack(i)}
+                                    on:click={() => handlePlayTrack(item.index)}
                                 >
                                     <div class="track-art">
-                                        {#if getTrackArt(track)}
+                                        {#if getTrackArt(item.track)}
                                             <img
-                                                src={getTrackArt(track)}
+                                                src={getTrackArt(item.track)}
                                                 alt=""
                                                 loading="lazy"
                                                 decoding="async"
@@ -328,17 +428,17 @@
                                     </div>
                                     <div class="track-info">
                                         <span class="track-title truncate"
-                                            >{track.title ||
+                                            >{item.track.title ||
                                                 "Unknown Title"}</span
                                         >
                                         <span class="track-artist truncate"
-                                            >{track.artist ||
+                                            >{item.track.artist ||
                                                 "Unknown Artist"}</span
                                         >
                                     </div>
                                 </button>
                                 <span class="track-duration"
-                                    >{formatDuration(track.duration)}</span
+                                    >{formatDuration(item.track.duration)}</span
                                 >
                             </div>
                         {/each}

@@ -192,11 +192,47 @@ export async function playTrack(track: Track): Promise<void> {
     }
 }
 
+
+// Shuffled Queue State
+export const shuffledIndices = writable<number[]>([]);
+export const shuffledIndex = writable<number>(0);
+
+// Helper to shuffle array (Fisher-Yates)
+function shuffleArray<T>(array: T[]): T[] {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 // Play a list of tracks starting at index
 export function playTracks(tracks: Track[], startIndex: number = 0): void {
     queue.set(tracks);
     queueIndex.set(startIndex);
     userQueueCount.set(0); // Reset user queue when starting fresh
+
+    // If shuffle is already on, regenerate shuffle order
+    if (get(shuffle)) {
+        const indices = tracks.map((_, i) => i);
+        const shuffled = shuffleArray(indices);
+        // Ensure the started track is played first? 
+        // Or finding where it ended up?
+        // Usually clicking a track implies "play this now". 
+        // So we swap it to the current position (e.g. 0 if we start playing?)
+        // Let's just shuffle and find the index.
+        console.log('Regenerating shuffle in playTracks');
+        shuffledIndices.set(shuffled);
+
+        // Find where our start track went. 
+        // BUT wait, playTracks usually implies playing THIS track. 
+        // If we simply play shuffle, the user might be confused if we jump to random track.
+        // If startIndex is provided, we play THAT track.
+        // So we should just find where startIndex ended up in shuffled list.
+        const newShuffledIdx = shuffled.indexOf(startIndex);
+        shuffledIndex.set(newShuffledIdx !== -1 ? newShuffledIdx : 0);
+    }
 
     // Emit queueChange event for plugins
     pluginEvents.emit('queueChange', { queue: tracks, index: startIndex });
@@ -223,10 +259,12 @@ export function togglePlay(): void {
 // Next track
 export function nextTrack(): void {
     const q = get(queue);
-    let idx = get(queueIndex);
     const rep = get(repeat);
     const shuf = get(shuffle);
     const userCount = get(userQueueCount);
+
+    // Standard indices
+    let idx = get(queueIndex);
 
     if (q.length === 0) return;
 
@@ -241,17 +279,38 @@ export function nextTrack(): void {
 
     // Check if we have user-queued tracks to play first
     if (userCount > 0) {
-        // Play next user-queued track sequentially
+        // Play next user-queued track sequentially (always sequential for user queue)
+        // User queue tracks are inserted directly after current track in the main queue list.
+        // So we just increment normal index.
         idx = idx + 1;
+
+        // When playing priority tracks, we do NOT update shuffledIndex.
+        // We want to resume the shuffle flow from where we left off after priority tracks are done.
     } else if (shuf) {
-        // Random next track (only if no user tracks waiting)
-        idx = Math.floor(Math.random() * q.length);
+        // Persistent Shuffle Mode
+        const shufIndices = get(shuffledIndices);
+        let shufIdx = get(shuffledIndex);
+
+        // Move to next in shuffled list
+        shufIdx = shufIdx + 1;
+
+        if (shufIdx >= shufIndices.length) {
+            if (rep === 'all') {
+                shufIdx = 0;
+            } else {
+                isPlaying.set(false);
+                return;
+            }
+        }
+
+        shuffledIndex.set(shufIdx);
+        idx = shufIndices[shufIdx];
     } else {
         // Sequential next
         idx = idx + 1;
     }
 
-    if (idx >= q.length) {
+    if (!shuf && idx >= q.length) { // Check bounds for sequential
         if (rep === 'all') {
             idx = 0;
         } else {
@@ -265,8 +324,6 @@ export function nextTrack(): void {
     playTrack(q[idx]);
 
     // Decrement user queue count if we consumed a user-added track
-    // Only decrement if we actually played a user track (which we forced above for userCount > 0)
-    // or if we were in sequential mode and consumed one
     if (userCount > 0) {
         userQueueCount.update(c => Math.max(0, c - 1));
     }
@@ -275,6 +332,7 @@ export function nextTrack(): void {
 // Previous track
 export function previousTrack(): void {
     const q = get(queue);
+    const shuf = get(shuffle);
     let idx = get(queueIndex);
 
     if (q.length === 0) return;
@@ -285,9 +343,23 @@ export function previousTrack(): void {
         return;
     }
 
-    idx = idx - 1;
-    if (idx < 0) {
-        idx = get(repeat) === 'all' ? q.length - 1 : 0;
+    if (shuf) {
+        // Persistent Shuffle Previous
+        const shufIndices = get(shuffledIndices);
+        let shufIdx = get(shuffledIndex);
+
+        shufIdx = shufIdx - 1;
+        if (shufIdx < 0) {
+            shufIdx = get(repeat) === 'all' ? shufIndices.length - 1 : 0;
+        }
+
+        shuffledIndex.set(shufIdx);
+        idx = shufIndices[shufIdx];
+    } else {
+        idx = idx - 1;
+        if (idx < 0) {
+            idx = get(repeat) === 'all' ? q.length - 1 : 0;
+        }
     }
 
     queueIndex.set(idx);
@@ -314,7 +386,32 @@ export function setVolume(sliderValue: number): void {
 
 // Toggle shuffle
 export function toggleShuffle(): void {
-    shuffle.update(s => !s);
+    shuffle.update(s => {
+        const newState = !s;
+
+        if (newState) {
+            // Turn ON: Generate shuffled order
+            const q = get(queue);
+            const currentIdx = get(queueIndex);
+
+            // Create indices array
+            const indices = q.map((_, i) => i);
+            const shuffled = shuffleArray(indices);
+
+            // Set shuffled indices
+            console.log('Regenerating shuffle in toggleShuffle');
+            shuffledIndices.set(shuffled);
+
+            // Find current track in shuffled list to maintain continuity
+            const ptr = shuffled.indexOf(currentIdx);
+            shuffledIndex.set(ptr !== -1 ? ptr : 0);
+        } else {
+            // Turn OFF: Just stop using shuffle
+            // QueueIndex is already correct
+        }
+
+        return newState;
+    });
 }
 
 // Cycle repeat mode
@@ -348,6 +445,7 @@ export function addToQueue(tracks: Track[]): void {
     const userCount = get(userQueueCount);
     // Insert position: after current track + user-added tracks
     const insertPosition = currentIdx + 1 + userCount;
+    const addedCount = tracks.length;
 
     queue.update(q => {
         const newQueue = [...q];
@@ -360,7 +458,27 @@ export function addToQueue(tracks: Track[]): void {
     });
 
     // Update user queue count
-    userQueueCount.update(c => c + tracks.length);
+    userQueueCount.update(c => c + addedCount);
+
+    // Update shuffled indices to reflect the shift in queue
+    if (get(shuffle)) {
+        console.log('Updating shuffle in addToQueue');
+        shuffledIndices.update(indices => {
+            // 1. Shift existing indices that are after insertion point
+            const shifted = indices.map(i => i >= insertPosition ? i + addedCount : i);
+
+            // 2. Add new indices (we append them to the end of shuffled list to not disrupt current flow)
+            // The new tracks are at [insertPosition, insertPosition + addedCount - 1]
+            const newIndices = Array.from({ length: addedCount }, (_, i) => insertPosition + i);
+
+            // We could shuffle 'newIndices' before appending if we want them random
+            // But let's keep them together for now or shuffle them
+            // Let's shuffle the new batch so they are random relative to each other at least
+            const shuffledNew = shuffleArray(newIndices);
+
+            return [...shifted, ...shuffledNew];
+        });
+    }
 }
 
 // Remove track from queue by index
@@ -376,6 +494,56 @@ export function removeFromQueue(index: number): void {
     // Adjust current index if needed
     if (index < currentIdx) {
         queueIndex.update(i => i - 1);
+    }
+
+    // Update shuffle indices
+    if (get(shuffle)) {
+        shuffledIndices.update(indices => {
+            // Remove the deleted index and shift others
+            return indices
+                .filter(i => i !== index)
+                .map(i => i > index ? i - 1 : i);
+        });
+
+        // Handle shuffledIndex pointer if strictly necessary (e.g. if we removed the current shuffled track)
+        // But usually queueIndex update handles the 'current track' logic.
+        // If we removed the track we were PLAYING, we might need to find where we are now.
+        // But the player usually keeps playing the same audio element until explicitly changed.
+
+        // Sync shuffledIndex to where currentIdx is now
+        const newCurrentIdx = index < currentIdx ? currentIdx - 1 : currentIdx;
+        // If we removed the current track (index === currentIdx), then we are now pointing to the next one (which shifted down)
+        // but queueIndex might still be pointing to the same slot number (if it wasn't last).
+
+        // Safest is to just re-find currentIdx in shuffled list?
+        // But wait, if we are playing, we want to stay consistent.
+        // Let's rely on 'nextTrack' logic to use the pointers.
+        // But we should ensure shuffledIndex points to the correct shuffled slot that corresponds to queueIndex.
+        // However, updating the list (filter/map) preserved relative order of remaining items.
+        // So the pointer `shuffledIndex` (which is an index into shuffledIndices array) should mostly be fine,
+        // UNLESS we removed an item *before* the current shuffled position in the SHUFFLED list.
+
+        // Actually, shuffledIndex is "index in the shuffled array".
+        // If we removed an item that was at shuffledIndices[0] and we are at shuffledIndices[5],
+        // then our pointer is now off by 1?
+        // YES. We need to know WHICH item in shuffledIndices was removed.
+        const ptr = get(shuffledIndex);
+        const indices = get(shuffledIndices); // This is the OLD list (before update runs technically, but inside update we return new)
+        // Wait, 'update' callback gets the old value.
+        // We can't easily sync the separate store 'shuffledIndex' inside 'shuffledIndices.update'.
+        // We should do it outside.
+    }
+
+    // Fix shuffledIndex pointer
+    if (get(shuffle)) {
+        // We need to find where the current track is now in the shuffled list
+        // The current track index in queue might have changed (handled above).
+        const actualCurrentQIdx = get(queueIndex);
+        const sIndices = get(shuffledIndices);
+        const ptr = sIndices.indexOf(actualCurrentQIdx);
+        if (ptr !== -1) {
+            shuffledIndex.set(ptr);
+        }
     }
 }
 
@@ -398,6 +566,26 @@ export function reorderQueue(fromIndex: number, toIndex: number): void {
     } else if (fromIndex > currentIdx && toIndex <= currentIdx) {
         queueIndex.update(i => i + 1);
     }
+
+    // Update shuffle indices
+    // This is tricky. An item moved from A to B.
+    // Indices between A and B shifted.
+    // The item at 'fromIndex' is now at 'toIndex'.
+    if (get(shuffle)) {
+        shuffledIndices.update(indices => {
+            return indices.map(i => {
+                if (i === fromIndex) return toIndex;
+                if (fromIndex < toIndex) {
+                    // Moved down: items between from+1 and to shifted up (-1)
+                    if (i > fromIndex && i <= toIndex) return i - 1;
+                } else {
+                    // Moved up: items between to and from-1 shifted down (+1)
+                    if (i >= toIndex && i < fromIndex) return i + 1;
+                }
+                return i;
+            });
+        });
+    }
 }
 
 // Clear upcoming queue (keep history)
@@ -405,6 +593,14 @@ export function clearUpcoming(): void {
     const currentIdx = get(queueIndex);
     queue.update(q => q.slice(0, currentIdx + 1));
     userQueueCount.set(0); // Clear user queue count
+
+    // Update shuffle: remove indices that are now out of bounds
+    if (get(shuffle)) {
+        shuffledIndices.update(indices => indices.filter(i => i <= currentIdx));
+        // And reset/sync pointer
+        const ptr = get(shuffledIndices).indexOf(currentIdx);
+        shuffledIndex.set(ptr !== -1 ? ptr : 0);
+    }
 }
 
 // Play from specific index in queue
@@ -428,5 +624,16 @@ export function playFromQueue(index: number): void {
 
         queueIndex.set(index);
         playTrack(q[index]);
+
+        // Sync shuffle pointer
+        if (get(shuffle)) {
+            const ptr = get(shuffledIndices).indexOf(index);
+            if (ptr !== -1) {
+                shuffledIndex.set(ptr);
+            } else {
+                // If not found in shuffle list (weird state), regenerate or append?
+                // Should be there.
+            }
+        }
     }
 }

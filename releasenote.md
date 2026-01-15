@@ -3,6 +3,7 @@
 ## 1.1.4
 
 ### 🐛 Bug Fixes
-- **Queue Shuffle:** Fixed an issue where the queue would randomize incorrectly when shuffle was enabled.
-- **Theme Loading:** Fixed an issue where the theme would not load correctly on startup.
-- **PiP Fullscreen:** Fixed an issue where the Picture-in-Picture window would not correctly interact with fullscreen mode.
+- Fix song duplicated when folder changed or moved
+- Fix shuffle not working properly. keep shuffling when next track is played
+- Added context menu in search result
+- 
