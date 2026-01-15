@@ -24,11 +24,11 @@ jobs:
         shell: pwsh
         run: |
           $json = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
-          if (-not $json.package.version) {
+          if (-not $json.version) {
             Write-Error "Version not found in tauri.conf.json"
             exit 1
           }
-          echo "version=$($json.package.version)" >> $env:GITHUB_OUTPUT
+          echo "version=$($json.version)" >> $env:GITHUB_OUTPUT
       
       # 3. Prevent duplicate releases
       - name: Check if version tag already exists
