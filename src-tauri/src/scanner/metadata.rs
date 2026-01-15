@@ -1,9 +1,36 @@
 // Audio metadata extraction using lofty
 use base64::{engine::general_purpose::STANDARD, Engine};
 use lofty::{Accessor, AudioFile, Probe, TaggedFileExt};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use crate::db::queries::TrackInsert;
+
+/// Generate a content hash based on metadata for duplicate detection
+fn generate_content_hash(
+    title: Option<&str>,
+    artist: Option<&str>,
+    album: Option<&str>,
+    duration: Option<i32>,
+) -> String {
+    let mut hasher = DefaultHasher::new();
+
+    // Normalize and hash metadata fields
+    let title_normalized = title.unwrap_or("").trim().to_lowercase();
+    let artist_normalized = artist.unwrap_or("").trim().to_lowercase();
+    let album_normalized = album.unwrap_or("").trim().to_lowercase();
+    let duration_str = duration.map(|d| d.to_string()).unwrap_or_default();
+
+    // Create a combined string for hashing
+    let combined = format!(
+        "{}|{}|{}|{}",
+        title_normalized, artist_normalized, album_normalized, duration_str
+    );
+
+    combined.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
 
 pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
     let path = Path::new(path);
@@ -43,6 +70,14 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
                 .first()
                 .map(|pic| STANDARD.encode(pic.data()));
 
+            // Generate content hash for duplicate detection
+            let content_hash = Some(generate_content_hash(
+                title.as_deref(),
+                artist.as_deref(),
+                album.as_deref(),
+                Some(duration),
+            ));
+
             Some(TrackInsert {
                 path: path.to_string_lossy().to_string(),
                 title,
@@ -56,6 +91,7 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
                 source_type: None, // Local file
                 cover_url: None,
                 external_id: None,
+                content_hash,
             })
         }
         None => {
@@ -64,6 +100,13 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
             track.duration = Some(duration);
             track.format = format;
             track.bitrate = bitrate;
+            // Generate content hash for fallback
+            track.content_hash = Some(generate_content_hash(
+                track.title.as_deref(),
+                track.artist.as_deref(),
+                track.album.as_deref(),
+                Some(duration),
+            ));
             Some(track)
         }
     }
@@ -83,6 +126,7 @@ fn create_fallback_metadata(path: &Path) -> TrackInsert {
         source_type: None, // Local file
         cover_url: None,
         external_id: None,
+        content_hash: None, // Will be set later with duration
     }
 }
 

@@ -143,6 +143,10 @@ export async function deleteAlbum(albumId: number): Promise<boolean> {
     return await invoke('delete_album', { albumId });
 }
 
+export async function resetDatabase(): Promise<void> {
+    return await invoke('reset_database');
+}
+
 // Playlist commands
 export async function createPlaylist(name: string): Promise<number> {
     return await invoke('create_playlist', { name });

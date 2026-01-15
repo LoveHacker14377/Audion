@@ -27,6 +27,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             source_type TEXT DEFAULT 'local',
             cover_url TEXT,
             external_id TEXT,
+            content_hash TEXT,
             FOREIGN KEY (album_id) REFERENCES albums(id)
         );
 
@@ -54,7 +55,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             last_scanned TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Create indexes for faster queries
+        -- Create indexes for faster queries (except content_hash which needs migration first)
         CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
         CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album);
         CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON tracks(album_id);
@@ -70,6 +71,13 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     );
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN cover_url TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN external_id TEXT", []);
+    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN content_hash TEXT", []);
+
+    // Create index for content_hash after migration ensures column exists
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_content_hash ON tracks(content_hash)",
+        [],
+    );
 
     Ok(())
 }

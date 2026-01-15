@@ -274,6 +274,9 @@ pub async fn add_external_track(
     track: ExternalTrackInput,
     db: State<'_, Database>,
 ) -> Result<i64, String> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     // Use stream_url as path if provided, otherwise construct from source_type://external_id
@@ -281,6 +284,18 @@ pub async fn add_external_track(
         .stream_url
         .clone()
         .unwrap_or_else(|| format!("{}://{}", track.source_type, track.external_id));
+
+    // Generate content hash for external tracks
+    let mut hasher = DefaultHasher::new();
+    let combined = format!(
+        "{}|{}|{}|{}",
+        track.title.trim().to_lowercase(),
+        track.artist.trim().to_lowercase(),
+        track.album.as_deref().unwrap_or("").trim().to_lowercase(),
+        track.duration.map(|d| d.to_string()).unwrap_or_default()
+    );
+    combined.hash(&mut hasher);
+    let content_hash = Some(format!("{:016x}", hasher.finish()));
 
     let track_insert = queries::TrackInsert {
         path,
@@ -295,8 +310,28 @@ pub async fn add_external_track(
         source_type: Some(track.source_type),
         cover_url: track.cover_url,
         external_id: Some(track.external_id),
+        content_hash,
     };
 
     queries::insert_or_update_track(&conn, &track_insert)
         .map_err(|e| format!("Failed to add external track: {}", e))
+}
+
+/// Reset the database by clearing all data
+#[tauri::command]
+pub async fn reset_database(db: State<'_, Database>) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    conn.execute_batch(
+        "
+        DELETE FROM playlist_tracks;
+        DELETE FROM playlists;
+        DELETE FROM tracks;
+        DELETE FROM albums;
+        DELETE FROM music_folders;
+        ",
+    )
+    .map_err(|e| format!("Failed to reset database: {}", e))?;
+
+    Ok(())
 }

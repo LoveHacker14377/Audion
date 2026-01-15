@@ -2,10 +2,18 @@
     import { theme, presetAccents, type ThemeMode } from "$lib/stores/theme";
     import { appSettings } from "$lib/stores/settings";
     import { updates } from "$lib/stores/updates";
+    import { resetDatabase } from "$lib/api/tauri";
+    import { loadLibrary } from "$lib/stores/library";
     import UpdatePopup from "./UpdatePopup.svelte";
 
     let customColorInput = "#1DB954";
     let showUpdatePopup = false;
+
+    // Database reset state
+    let showResetModal = false;
+    let resetConfirmText = "";
+    let isResetting = false;
+    let resetError = "";
 
     function handleModeChange(mode: ThemeMode) {
         theme.setMode(mode);
@@ -19,6 +27,41 @@
         if (customColorInput && /^#[0-9A-Fa-f]{6}$/.test(customColorInput)) {
             theme.addCustomColor(customColorInput);
             theme.setAccentColor(customColorInput);
+        }
+    }
+
+    function openResetModal() {
+        showResetModal = true;
+        resetConfirmText = "";
+        resetError = "";
+    }
+
+    function closeResetModal() {
+        showResetModal = false;
+        resetConfirmText = "";
+        resetError = "";
+        isResetting = false;
+    }
+
+    async function handleResetDatabase() {
+        if (resetConfirmText !== "DELETE CONFIRM") {
+            resetError = "Please type 'DELETE CONFIRM' exactly to proceed";
+            return;
+        }
+
+        isResetting = true;
+        resetError = "";
+
+        try {
+            await resetDatabase();
+
+            // Reload the library to reflect changes
+            await loadLibrary();
+
+            closeResetModal();
+        } catch (error) {
+            resetError = `Failed to reset database: ${error}`;
+            isResetting = false;
         }
     }
 </script>
@@ -293,6 +336,26 @@
                 </div>
             </section>
 
+            <!-- Danger Zone -->
+            <section class="settings-section danger-zone">
+                <h3 class="section-title danger">Danger Zone</h3>
+
+                <div class="setting-item">
+                    <div class="danger-item">
+                        <div class="danger-info">
+                            <span class="setting-label">Reset Database</span>
+                            <p class="setting-hint">
+                                Delete all tracks, albums, playlists, and music
+                                folder references. This action cannot be undone.
+                            </p>
+                        </div>
+                        <button class="danger-btn" on:click={openResetModal}>
+                            Reset Database
+                        </button>
+                    </div>
+                </div>
+            </section>
+
             <!-- About -->
             <section class="settings-section">
                 <h3 class="section-title">About</h3>
@@ -325,6 +388,102 @@
         release={$updates.latestRelease}
         on:close={() => (showUpdatePopup = false)}
     />
+{/if}
+
+{#if showResetModal}
+    <div
+        class="modal-overlay"
+        on:click={closeResetModal}
+        on:keydown={(e) => e.key === "Escape" && closeResetModal()}
+        role="button"
+        tabindex="0"
+    >
+        <div
+            class="modal-content"
+            on:click|stopPropagation
+            on:keydown|stopPropagation
+            role="dialog"
+            aria-modal="true"
+        >
+            <div class="modal-header">
+                <h2>Reset Database</h2>
+                <button class="modal-close" on:click={closeResetModal}>
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="24"
+                        height="24"
+                        fill="currentColor"
+                    >
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                        />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="warning-box">
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="48"
+                        height="48"
+                        fill="currentColor"
+                    >
+                        <path
+                            d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
+                        />
+                    </svg>
+                    <p>This will permanently delete:</p>
+                    <ul>
+                        <li>All tracks in your library</li>
+                        <li>All albums</li>
+                        <li>All playlists</li>
+                        <li>All music folder references</li>
+                    </ul>
+                    <p class="warning-note">This action cannot be undone!</p>
+                </div>
+
+                <div class="confirm-input">
+                    <label for="confirm-text">
+                        Type <strong>DELETE CONFIRM</strong> to proceed:
+                    </label>
+                    <input
+                        id="confirm-text"
+                        type="text"
+                        bind:value={resetConfirmText}
+                        placeholder="DELETE CONFIRM"
+                        disabled={isResetting}
+                    />
+                </div>
+
+                {#if resetError}
+                    <p class="error-message">{resetError}</p>
+                {/if}
+            </div>
+
+            <div class="modal-footer">
+                <button
+                    class="cancel-btn"
+                    on:click={closeResetModal}
+                    disabled={isResetting}
+                >
+                    Cancel
+                </button>
+                <button
+                    class="confirm-danger-btn"
+                    on:click={handleResetDatabase}
+                    disabled={isResetting ||
+                        resetConfirmText !== "DELETE CONFIRM"}
+                >
+                    {#if isResetting}
+                        Resetting...
+                    {:else}
+                        Reset Database
+                    {/if}
+                </button>
+            </div>
+        </div>
+    </div>
 {/if}
 
 <style>
@@ -629,5 +788,229 @@
         font-size: 0.75rem;
         color: var(--text-subdued);
         margin-bottom: var(--spacing-sm);
+    }
+
+    /* Danger Zone */
+    .danger-zone {
+        border: 1px solid #dc3545;
+    }
+
+    .section-title.danger {
+        color: #dc3545;
+        border-bottom-color: rgba(220, 53, 69, 0.3);
+    }
+
+    .danger-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--spacing-md);
+    }
+
+    .danger-info {
+        flex: 1;
+    }
+
+    .danger-btn {
+        padding: var(--spacing-sm) var(--spacing-lg);
+        background-color: transparent;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+    }
+
+    .danger-btn:hover {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .modal-content {
+        background-color: var(--bg-elevated);
+        border-radius: var(--radius-lg);
+        max-width: 480px;
+        width: 90%;
+        max-height: 90vh;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-lg);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-header h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #dc3545;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: var(--spacing-xs);
+        border-radius: var(--radius-sm);
+        transition: all var(--transition-fast);
+    }
+
+    .modal-close:hover {
+        background-color: var(--bg-highlight);
+        color: var(--text-primary);
+    }
+
+    .modal-body {
+        padding: var(--spacing-lg);
+    }
+
+    .warning-box {
+        background-color: rgba(220, 53, 69, 0.1);
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        border-radius: var(--radius-md);
+        padding: var(--spacing-lg);
+        text-align: center;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .warning-box svg {
+        color: #dc3545;
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .warning-box p {
+        color: var(--text-primary);
+        margin: var(--spacing-sm) 0;
+    }
+
+    .warning-box ul {
+        text-align: left;
+        margin: var(--spacing-md) 0;
+        padding-left: var(--spacing-xl);
+        color: var(--text-secondary);
+    }
+
+    .warning-box li {
+        margin: var(--spacing-xs) 0;
+    }
+
+    .warning-note {
+        color: #dc3545 !important;
+        font-weight: 600;
+    }
+
+    .confirm-input {
+        margin-top: var(--spacing-md);
+    }
+
+    .confirm-input label {
+        display: block;
+        margin-bottom: var(--spacing-sm);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .confirm-input label strong {
+        color: #dc3545;
+        font-family: monospace;
+    }
+
+    .confirm-input input {
+        width: 100%;
+        padding: var(--spacing-md);
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 1rem;
+        font-family: monospace;
+    }
+
+    .confirm-input input:focus {
+        outline: none;
+        border-color: #dc3545;
+    }
+
+    .confirm-input input:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .error-message {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: var(--spacing-sm);
+        text-align: center;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--spacing-md);
+        padding: var(--spacing-lg);
+        border-top: 1px solid var(--border-color);
+    }
+
+    .cancel-btn {
+        padding: var(--spacing-sm) var(--spacing-lg);
+        background-color: var(--bg-surface);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .cancel-btn:hover:not(:disabled) {
+        background-color: var(--bg-highlight);
+    }
+
+    .cancel-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .confirm-danger-btn {
+        padding: var(--spacing-sm) var(--spacing-lg);
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .confirm-danger-btn:hover:not(:disabled) {
+        background-color: #c82333;
+    }
+
+    .confirm-danger-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 </style>

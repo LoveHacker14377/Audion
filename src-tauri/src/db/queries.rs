@@ -55,10 +55,27 @@ pub struct TrackInsert {
     pub source_type: Option<String>,
     pub cover_url: Option<String>,
     pub external_id: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 // Track operations
 pub fn insert_or_update_track(conn: &Connection, track: &TrackInsert) -> Result<i64> {
+    // Check if a track with the same content_hash already exists (skip duplicates)
+    if let Some(ref hash) = track.content_hash {
+        let existing: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM tracks WHERE content_hash = ?1 AND path != ?2",
+                params![hash, track.path],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if existing.is_some() {
+            // Duplicate detected - skip this track
+            return Ok(0);
+        }
+    }
+
     // First, handle album if present
     let album_id = if let Some(album_name) = &track.album {
         let artist = track.artist.as_deref();
@@ -73,8 +90,8 @@ pub fn insert_or_update_track(conn: &Connection, track: &TrackInsert) -> Result<
     };
 
     conn.execute(
-        "INSERT INTO tracks (path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        "INSERT INTO tracks (path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, content_hash)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
          ON CONFLICT(path) DO UPDATE SET
             title = excluded.title,
             artist = excluded.artist,
@@ -86,7 +103,8 @@ pub fn insert_or_update_track(conn: &Connection, track: &TrackInsert) -> Result<
             bitrate = excluded.bitrate,
             source_type = excluded.source_type,
             cover_url = excluded.cover_url,
-            external_id = excluded.external_id",
+            external_id = excluded.external_id,
+            content_hash = excluded.content_hash",
         params![
             track.path,
             track.title,
@@ -100,6 +118,7 @@ pub fn insert_or_update_track(conn: &Connection, track: &TrackInsert) -> Result<
             track.source_type,
             track.cover_url,
             track.external_id,
+            track.content_hash,
         ],
     )?;
 
