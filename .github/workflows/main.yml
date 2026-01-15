@@ -6,11 +6,22 @@ on:
     paths:
       - "src-tauri/tauri.conf.json"
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - windows
+          - linux
+          - both
 permissions:
   contents: write
 jobs:
   release-windows:
     runs-on: windows-latest
+    if: ${{ github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'both' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       changelog: ${{ steps.changelog.outputs.content }}
@@ -196,65 +207,75 @@ jobs:
   release-linux:
     runs-on: ubuntu-latest
     needs: release-windows
+    # Allow running even if Windows was skipped (for linux-only builds)
+    if: ${{ always() && (github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'both') && (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped') }}
     steps:
       # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Linux dependencies
+      # 2. Read version from tauri.conf.json (for standalone runs)
+      - name: Read app version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 3. Install Linux dependencies
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
-      # 3. Setup Node.js
+      # 4. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
 
-      # 4. Setup Rust
+      # 5. Setup Rust
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # 5. Rust cache
+      # 6. Rust cache
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      # 6. Install frontend dependencies
+      # 7. Install frontend dependencies
       - name: Install dependencies
         run: npm install
 
-      # 7. Build Tauri app for Linux
+      # 8. Build Tauri app for Linux
       - name: Build Tauri app
         run: npm run tauri build
 
-      # 8. Verify build artifacts
+      # 9. Verify build artifacts
       - name: Verify build artifacts
         run: |
           ls -la src-tauri/target/release/bundle/deb/ || echo "No .deb found"
           ls -la src-tauri/target/release/bundle/appimage/ || echo "No .AppImage found"
 
-      # 9. Upload Linux artifacts to existing release
+      # 10. Upload Linux artifacts (creates or updates release)
       - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.release-windows.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           files: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 10. Send Discord notification for Linux
+      # 11. Send Discord notification for Linux
       - name: Discord notification (Linux)
         if: success()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          VERSION: ${{ needs.release-windows.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL secret is not set. Skipping notification."
