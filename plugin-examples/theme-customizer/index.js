@@ -754,12 +754,26 @@
         },
 
         async loadSavedTheme() {
-            if (!this.api?.storage?.get) return;
+            if (!this.api?.storage?.get) {
+                console.error('[ThemeCustomizer] Storage API not available');
+                return;
+            }
 
             try {
+                console.log('[ThemeCustomizer] Loading saved theme...');
                 const savedTheme = await this.api.storage.get('selectedTheme');
-                if (savedTheme && THEMES[savedTheme]) {
-                    this.applyTheme(savedTheme, false);
+                console.log(`[ThemeCustomizer] Retrieved saved theme: "${savedTheme}"`);
+
+                if (savedTheme) {
+                    if (THEMES[savedTheme]) {
+                        console.log(`[ThemeCustomizer] Theme "${savedTheme}" found in definitions. Applying...`);
+                        this.applyTheme(savedTheme, false);
+                    } else {
+                        console.error(`[ThemeCustomizer] Theme "${savedTheme}" NOT found in definitions.`);
+                        console.log('Available themes:', Object.keys(THEMES));
+                    }
+                } else {
+                    console.log('[ThemeCustomizer] No saved theme found.');
                 }
             } catch (err) {
                 console.error('[ThemeCustomizer] Failed to load saved theme:', err);

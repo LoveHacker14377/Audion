@@ -27,6 +27,7 @@ export class PluginStorage {
         try {
             const storageKey = this.getKey(key);
             const value = localStorage.getItem(storageKey);
+            console.log(`[PluginStorage:${this.pluginName}] Getting ${key}:`, value);
             return value ? JSON.parse(value) : null;
         } catch (err) {
             console.error(`[PluginStorage:${this.pluginName}] Failed to get ${key}:`, err);
@@ -41,6 +42,7 @@ export class PluginStorage {
         try {
             const storageKey = this.getKey(key);
             const serialized = JSON.stringify(value);
+            console.log(`[PluginStorage:${this.pluginName}] Setting ${key} to ${serialized}`);
 
             // Check quota before writing
             if (!this.checkQuota(storageKey, serialized)) {
@@ -52,6 +54,7 @@ export class PluginStorage {
             }
 
             localStorage.setItem(storageKey, serialized);
+            console.log(`[PluginStorage:${this.pluginName}] Successfully saved ${key}`);
             return true;
         } catch (err) {
             console.error(`[PluginStorage:${this.pluginName}] Failed to set ${key}:`, err);

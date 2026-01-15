@@ -368,6 +368,8 @@ export class PluginRuntime {
           console.warn(`[PluginRuntime:${pluginName}] Storage write rate limited`);
           return false;
         }
+        return plugin.storage.set(args[0], args[1]);
+
       // Library Write APIs
       case 'library.downloadTrack':
         // args: [options: { url, filename, metadata, downloadPath? }]
