@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { selectMusicFolder, scanMusic, rescanMusic } from "$lib/api/tauri";
+    import { selectMusicFolder, addFolder, rescanMusic } from "$lib/api/tauri";
     import {
         loadLibrary,
         loadPlaylists,
@@ -24,7 +24,9 @@
             const path = await selectMusicFolder();
             if (path) {
                 isScanning = true;
-                await scanMusic([path]);
+                // Add folder then full rescan
+                await addFolder(path);
+                await rescanMusic();
                 await loadLibrary();
                 await loadPlaylists();
             }

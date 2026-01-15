@@ -72,6 +72,13 @@ pub async fn scan_music(paths: Vec<String>, db: State<'_, Database>) -> Result<S
 }
 
 #[tauri::command]
+pub async fn add_folder(path: String, db: State<'_, Database>) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    queries::add_music_folder(&conn, &path).map_err(|e| format!("Failed to add folder: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn rescan_music(db: State<'_, Database>) -> Result<ScanResult, String> {
     let mut tracks_added = 0;
     let mut tracks_deleted = 0;

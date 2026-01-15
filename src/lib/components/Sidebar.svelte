@@ -25,7 +25,8 @@
     import { appSettings } from "$lib/stores/settings";
     import {
         selectMusicFolder,
-        scanMusic,
+        addFolder,
+        rescanMusic,
         deletePlaylist,
         type Playlist,
     } from "$lib/api/tauri";
@@ -36,6 +37,7 @@
     import UpdatePopup from "./UpdatePopup.svelte";
 
     let isScanning = false;
+    let scanStatus = "Scanning...";
     let scanError: string | null = null;
     let showUpdatePopup = false;
 
@@ -48,8 +50,12 @@
             const path = await selectMusicFolder();
             if (path) {
                 isScanning = true;
+                scanStatus = "Rescanning Library...";
                 scanError = null;
-                const result = await scanMusic([path]);
+
+                // Add folder then full rescan to ensure consistency
+                await addFolder(path);
+                const result = await rescanMusic();
 
                 if (result.errors.length > 0) {
                     console.warn("Scan errors:", result.errors);
@@ -370,7 +376,7 @@
                         stroke-linecap="round"
                     />
                 </svg>
-                <span>Scanning...</span>
+                <span>{scanStatus}</span>
             {:else}
                 <svg
                     viewBox="0 0 24 24"

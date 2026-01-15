@@ -91,6 +91,10 @@ export async function scanMusic(paths: string[]): Promise<ScanResult> {
     return await invoke('scan_music', { paths });
 }
 
+export async function addFolder(path: string): Promise<void> {
+    return await invoke('add_folder', { path });
+}
+
 export async function rescanMusic(): Promise<ScanResult> {
     return await invoke('rescan_music');
 }

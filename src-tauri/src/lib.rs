@@ -36,6 +36,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Library commands
             commands::scan_music,
+            commands::add_folder,
             commands::rescan_music,
             commands::get_library,
             commands::get_tracks_by_album,
