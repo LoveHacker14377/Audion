@@ -610,6 +610,34 @@ export class PluginRuntime {
       };
     }
 
+    // Network API - CORS-free fetch (always available for plugins with network:fetch permission)
+    if (this.hasPermission(pluginName, 'network:fetch')) {
+      api.fetch = async (url: string, options?: { method?: string; headers?: Record<string, string>; body?: string }) => {
+        try {
+          const result = await invoke<{ status: number; headers: Record<string, string>; body: string }>('proxy_fetch', {
+            request: {
+              url,
+              method: options?.method || 'GET',
+              headers: options?.headers || null,
+              body: options?.body || null
+            }
+          });
+
+          // Return a Response-like object
+          return {
+            ok: result.status >= 200 && result.status < 300,
+            status: result.status,
+            headers: result.headers,
+            text: async () => result.body,
+            json: async () => JSON.parse(result.body)
+          };
+        } catch (error) {
+          console.error(`[PluginRuntime] Fetch failed for ${pluginName}:`, error);
+          throw error;
+        }
+      };
+    }
+
     return api;
   }
 

@@ -882,7 +882,12 @@
 
             try {
                 const param = this.searchMode === 'track' ? 's' : 'a';
-                const response = await fetch(`${API_BASE}/search/?${param}=${encodeURIComponent(query)}`);
+                const url = `${API_BASE}/search/?${param}=${encodeURIComponent(query)}`;
+
+                // Use CORS-free fetch via Tauri backend
+                const response = this.api.fetch
+                    ? await this.api.fetch(url)
+                    : await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
@@ -1204,7 +1209,13 @@
         },
 
         async fetchStream(trackId, quality) {
-            const response = await fetch(`${API_BASE}/track/?id=${trackId}&quality=${quality}`);
+            const url = `${API_BASE}/track/?id=${trackId}&quality=${quality}`;
+
+            // Use CORS-free fetch via Tauri backend
+            const response = this.api.fetch
+                ? await this.api.fetch(url)
+                : await fetch(url);
+
             if (!response.ok) {
                 throw new Error(`Failed to get stream: HTTP ${response.status}`);
             }

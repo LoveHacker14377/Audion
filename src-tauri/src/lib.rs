@@ -69,6 +69,10 @@ pub fn run() {
             commands::grant_permissions,
             commands::revoke_permissions,
             commands::get_plugin_dir,
+            commands::check_plugin_updates,
+            commands::update_plugin,
+            // Network commands
+            commands::proxy_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -239,10 +239,13 @@ pub async fn install_plugin(repo_url: String, plugin_dir: String) -> Result<Plug
         ));
     }
 
-    let manifest: PluginManifest = manifest_response
+    let mut manifest: PluginManifest = manifest_response
         .json()
         .await
         .map_err(|e| format!("Failed to parse plugin.json: {}", e))?;
+
+    // Inject repo URL into manifest for future update checks
+    manifest.repo = Some(repo_url.clone());
 
     // Create plugin directory
     let plugin_name = manifest.name.clone();
@@ -250,7 +253,7 @@ pub async fn install_plugin(repo_url: String, plugin_dir: String) -> Result<Plug
     let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
     fs::create_dir_all(&plugin_path).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
 
-    // Save plugin.json
+    // Save plugin.json (with repo URL included)
     let manifest_json = serde_json::to_string_pretty(&manifest)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
     fs::write(plugin_path.join("plugin.json"), &manifest_json)
@@ -390,4 +393,261 @@ pub fn get_plugin_dir(app_handle: tauri::AppHandle) -> Result<String, String> {
     let plugin_dir = app_dir.join("plugins");
     fs::create_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
     Ok(plugin_dir.to_string_lossy().to_string())
+}
+
+// Helper to compare semver versions (returns true if remote is newer)
+fn is_newer_version(local: &str, remote: &str) -> bool {
+    let parse_version = |v: &str| -> Vec<u32> {
+        v.trim_start_matches('v')
+            .split('.')
+            .filter_map(|s| s.parse().ok())
+            .collect()
+    };
+
+    let local_parts = parse_version(local);
+    let remote_parts = parse_version(remote);
+
+    for i in 0..std::cmp::max(local_parts.len(), remote_parts.len()) {
+        let local_num = local_parts.get(i).copied().unwrap_or(0);
+        let remote_num = remote_parts.get(i).copied().unwrap_or(0);
+
+        if remote_num > local_num {
+            return true;
+        } else if remote_num < local_num {
+            return false;
+        }
+    }
+    false
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct PluginUpdateInfo {
+    pub name: String,
+    pub current_version: String,
+    pub new_version: String,
+    pub repo_url: String,
+}
+
+#[tauri::command]
+pub async fn check_plugin_updates(plugin_dir: String) -> Result<Vec<PluginUpdateInfo>, String> {
+    let mut updates = Vec::new();
+    let dir = PathBuf::from(&plugin_dir);
+    let client = reqwest::Client::new();
+
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(manifest) = read_plugin_manifest(&path) {
+                    // Need repo URL to check for updates
+                    if let Some(repo_url) = &manifest.repo {
+                        // Parse GitHub URL
+                        let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
+                        if parts.len() < 2 {
+                            continue;
+                        }
+
+                        let owner = parts[parts.len() - 2];
+                        let repo = parts[parts.len() - 1];
+
+                        // Get default branch
+                        let repo_api_url =
+                            format!("https://api.github.com/repos/{}/{}", owner, repo);
+                        let default_branch = match client
+                            .get(&repo_api_url)
+                            .header("User-Agent", "Audion-Plugin-Manager")
+                            .send()
+                            .await
+                        {
+                            Ok(resp) if resp.status().is_success() => {
+                                match resp.json::<serde_json::Value>().await {
+                                    Ok(info) => info["default_branch"]
+                                        .as_str()
+                                        .unwrap_or("main")
+                                        .to_string(),
+                                    Err(_) => "main".to_string(),
+                                }
+                            }
+                            _ => "main".to_string(),
+                        };
+
+                        // Fetch remote plugin.json
+                        let manifest_url = format!(
+                            "https://raw.githubusercontent.com/{}/{}/{}/plugin.json",
+                            owner, repo, default_branch
+                        );
+
+                        if let Ok(resp) = client
+                            .get(&manifest_url)
+                            .header("User-Agent", "Audion-Plugin-Manager")
+                            .send()
+                            .await
+                        {
+                            if resp.status().is_success() {
+                                if let Ok(remote_manifest) = resp.json::<PluginManifest>().await {
+                                    if is_newer_version(&manifest.version, &remote_manifest.version)
+                                    {
+                                        updates.push(PluginUpdateInfo {
+                                            name: manifest.name.clone(),
+                                            current_version: manifest.version.clone(),
+                                            new_version: remote_manifest.version,
+                                            repo_url: repo_url.clone(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(updates)
+}
+
+#[tauri::command]
+pub async fn update_plugin(name: String, plugin_dir: String) -> Result<PluginInfo, String> {
+    // Get the current plugin's manifest to retrieve repo URL and preserve state
+    let safe_name = name.replace(" ", "-").to_lowercase();
+    let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
+
+    let manifest =
+        read_plugin_manifest(&plugin_path).ok_or_else(|| format!("Plugin not found: {}", name))?;
+
+    let repo_url = manifest
+        .repo
+        .ok_or_else(|| format!("Plugin {} has no repository URL", name))?;
+
+    // Load current state to preserve enabled status and permissions
+    let states = load_plugin_states(&plugin_dir);
+    let current_state = states.plugins.get(&name).cloned();
+
+    // Remove the old plugin files (but keep state)
+    fs::remove_dir_all(&plugin_path)
+        .map_err(|e| format!("Failed to remove old plugin files: {}", e))?;
+
+    // Reinstall from repo (reuse install_plugin logic)
+    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
+    if parts.len() < 2 {
+        return Err("Invalid repository URL".to_string());
+    }
+
+    let owner = parts[parts.len() - 2];
+    let repo = parts[parts.len() - 1];
+    let client = reqwest::Client::new();
+
+    // Get default branch
+    let repo_api_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
+    let default_branch = match client
+        .get(&repo_api_url)
+        .header("User-Agent", "Audion-Plugin-Manager")
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+            Ok(info) => info["default_branch"]
+                .as_str()
+                .unwrap_or("main")
+                .to_string(),
+            Err(_) => "main".to_string(),
+        },
+        _ => "main".to_string(),
+    };
+
+    // Fetch new plugin.json
+    let manifest_url = format!(
+        "https://raw.githubusercontent.com/{}/{}/{}/plugin.json",
+        owner, repo, default_branch
+    );
+
+    let manifest_response = client
+        .get(&manifest_url)
+        .header("User-Agent", "Audion-Plugin-Manager")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch plugin.json: {}", e))?;
+
+    if !manifest_response.status().is_success() {
+        return Err(format!(
+            "Failed to fetch plugin.json: HTTP {}",
+            manifest_response.status()
+        ));
+    }
+
+    let new_manifest: PluginManifest = manifest_response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse plugin.json: {}", e))?;
+
+    // Create plugin directory
+    fs::create_dir_all(&plugin_path).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
+
+    // Save new plugin.json
+    let manifest_json = serde_json::to_string_pretty(&new_manifest)
+        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+    fs::write(plugin_path.join("plugin.json"), &manifest_json)
+        .map_err(|e| format!("Failed to save plugin.json: {}", e))?;
+
+    // Fetch the entry file
+    let entry_url = format!(
+        "https://raw.githubusercontent.com/{}/{}/{}/{}",
+        owner, repo, default_branch, new_manifest.entry
+    );
+
+    let entry_response = client
+        .get(&entry_url)
+        .header("User-Agent", "Audion-Plugin-Manager")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch entry file: {}", e))?;
+
+    if !entry_response.status().is_success() {
+        return Err(format!(
+            "Failed to fetch {}: HTTP {}",
+            new_manifest.entry,
+            entry_response.status()
+        ));
+    }
+
+    let entry_bytes = entry_response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read entry file: {}", e))?;
+
+    fs::write(plugin_path.join(&new_manifest.entry), &entry_bytes)
+        .map_err(|e| format!("Failed to save entry file: {}", e))?;
+
+    // Update state, preserving enabled status and permissions from before
+    let mut states = load_plugin_states(&plugin_dir);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let (enabled, granted_permissions) = if let Some(old_state) = current_state {
+        (old_state.enabled, old_state.granted_permissions)
+    } else {
+        (false, vec![])
+    };
+
+    states.plugins.insert(
+        new_manifest.name.clone(),
+        PluginState {
+            name: new_manifest.name.clone(),
+            enabled,
+            granted_permissions: granted_permissions.clone(),
+            version: new_manifest.version.clone(),
+            plugin_type: new_manifest.plugin_type.clone(),
+            installed_at: now,
+        },
+    );
+    save_plugin_states(&plugin_dir, &states)?;
+
+    Ok(PluginInfo {
+        name: new_manifest.name.clone(),
+        enabled,
+        manifest: new_manifest,
+        granted_permissions,
+    })
 }

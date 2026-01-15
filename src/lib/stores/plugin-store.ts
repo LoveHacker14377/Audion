@@ -15,6 +15,13 @@ export interface PluginInfo {
     granted_permissions: string[];
 }
 
+export interface PluginUpdateInfo {
+    name: string;
+    current_version: string;
+    new_version: string;
+    repo_url: string;
+}
+
 export interface PluginStoreState {
     installed: PluginInfo[];
     marketplace: MarketplacePlugin[];
@@ -95,12 +102,87 @@ function createPluginStore() {
                         }
                     }
                 }
+
+                // Check for plugin updates in background
+                this.checkAndApplyUpdates();
             } catch (err) {
                 update(s => ({
                     ...s,
                     loading: false,
                     error: `Failed to initialize: ${err}`
                 }));
+            }
+        },
+
+        // Check for updates and automatically apply them
+        async checkAndApplyUpdates() {
+            try {
+                const updates = await invoke<PluginUpdateInfo[]>('check_plugin_updates', { pluginDir });
+
+                if (updates.length > 0) {
+                    console.log(`[PluginStore] Found ${updates.length} plugin update(s):`, updates);
+
+                    for (const updateInfo of updates) {
+                        try {
+                            console.log(`[PluginStore] Auto-updating ${updateInfo.name} from ${updateInfo.current_version} to ${updateInfo.new_version}`);
+                            await this.updatePlugin(updateInfo.name);
+                            console.log(`[PluginStore] Successfully updated ${updateInfo.name}`);
+                        } catch (err) {
+                            console.error(`[PluginStore] Failed to update ${updateInfo.name}:`, err);
+                        }
+                    }
+                } else {
+                    console.log('[PluginStore] All plugins are up to date');
+                }
+            } catch (err) {
+                console.error('[PluginStore] Failed to check for updates:', err);
+            }
+        },
+
+        // Check for available plugin updates
+        async checkForUpdates(): Promise<PluginUpdateInfo[]> {
+            try {
+                return await invoke<PluginUpdateInfo[]>('check_plugin_updates', { pluginDir });
+            } catch (err) {
+                console.error('[PluginStore] Failed to check for updates:', err);
+                return [];
+            }
+        },
+
+        // Update a specific plugin
+        async updatePlugin(name: string): Promise<boolean> {
+            try {
+                const updatedInfo = await invoke<PluginInfo>('update_plugin', { name, pluginDir });
+
+                // Update store state
+                update(s => ({
+                    ...s,
+                    installed: s.installed.map(p =>
+                        p.name === name ? updatedInfo : p
+                    )
+                }));
+
+                // Reload plugin in runtime if it was enabled
+                if (updatedInfo.enabled && runtime) {
+                    // Unload old version first
+                    runtime.disablePlugin(name);
+
+                    // Grant permissions and reload
+                    const allPermissions = [
+                        ...updatedInfo.granted_permissions,
+                        ...(updatedInfo.manifest.permissions || [])
+                    ];
+                    const uniquePermissions = [...new Set(allPermissions)];
+                    runtime.grantPermissions(name, uniquePermissions);
+                    await runtime.loadPlugin(updatedInfo.manifest);
+                    runtime.enablePlugin(name);
+                }
+
+                return true;
+            } catch (err) {
+                console.error(`[PluginStore] Failed to update ${name}:`, err);
+                update(s => ({ ...s, error: `Failed to update plugin: ${err}` }));
+                return false;
             }
         },
 
