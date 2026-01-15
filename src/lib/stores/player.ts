@@ -226,6 +226,7 @@ export function nextTrack(): void {
     let idx = get(queueIndex);
     const rep = get(repeat);
     const shuf = get(shuffle);
+    const userCount = get(userQueueCount);
 
     if (q.length === 0) return;
 
@@ -238,8 +239,12 @@ export function nextTrack(): void {
         return;
     }
 
-    if (shuf) {
-        // Random next track
+    // Check if we have user-queued tracks to play first
+    if (userCount > 0) {
+        // Play next user-queued track sequentially
+        idx = idx + 1;
+    } else if (shuf) {
+        // Random next track (only if no user tracks waiting)
         idx = Math.floor(Math.random() * q.length);
     } else {
         // Sequential next
@@ -260,7 +265,11 @@ export function nextTrack(): void {
     playTrack(q[idx]);
 
     // Decrement user queue count if we consumed a user-added track
-    userQueueCount.update(c => Math.max(0, c - 1));
+    // Only decrement if we actually played a user track (which we forced above for userCount > 0)
+    // or if we were in sequential mode and consumed one
+    if (userCount > 0) {
+        userQueueCount.update(c => Math.max(0, c - 1));
+    }
 }
 
 // Previous track

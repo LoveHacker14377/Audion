@@ -1,6 +1,5 @@
 <script lang="ts">
     import { fade, fly } from "svelte/transition";
-    import { flip } from "svelte/animate";
     import { isQueueVisible, toggleQueue } from "$lib/stores/ui";
     import {
         queue,
@@ -201,14 +200,13 @@
                         <span class="count">{upcomingTracks.length}</span>
                     </h4>
                     <div class="queue-list">
-                        {#each upcomingTracks as track, i (track.id)}
+                        {#each upcomingTracks as track, i (track.id + "-next-" + i)}
                             {@const actualIndex = $queueIndex + 1 + i}
                             <div
                                 class="queue-track"
                                 class:dragging={draggedIndex === actualIndex}
                                 class:drag-over={dragOverIndex === actualIndex}
                                 data-index={actualIndex}
-                                animate:flip={{ duration: 200 }}
                                 role="listitem"
                             >
                                 <div
