@@ -20,16 +20,6 @@
         "decorations": true,
         "resizable": true,
         "maximized": false
-      },
-      {
-        "title": "Audion",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 900,
-        "minHeight": 600,
-        "resizable": true,
-        "disableGpu": true,
-        "platforms": ["linux"]
       }
     ],
     "security": {
