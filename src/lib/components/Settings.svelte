@@ -306,6 +306,27 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="setting-item">
+                    <div class="toggle-container">
+                        <div class="toggle-info">
+                            <span class="setting-label">Autoplay</span>
+                            <p class="setting-hint">
+                                Keep playing random tracks from your library
+                                when the queue ends
+                            </p>
+                        </div>
+                        <button
+                            class="toggle-btn"
+                            class:active={$appSettings.autoplay}
+                            on:click={() =>
+                                appSettings.setAutoplay(!$appSettings.autoplay)}
+                            aria-label="Toggle Autoplay"
+                        >
+                            <div class="toggle-handle"></div>
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <!-- Developer -->

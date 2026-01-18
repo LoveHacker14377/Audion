@@ -137,12 +137,15 @@ fn get_or_create_album(
     artist: Option<&str>,
     art_data: Option<&str>,
 ) -> Result<i64> {
-    // Try to find existing album
-    let existing: Option<i64> = conn.query_row(
-        "SELECT id FROM albums WHERE name = ?1 AND (artist = ?2 OR (artist IS NULL AND ?2 IS NULL))",
-        params![name, artist],
-        |row| row.get(0),
-    ).ok();
+    // Match by album name only to avoid splitting albums when tracks have different artists
+    // This groups all tracks with the same album name under one album
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM albums WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )
+        .ok();
 
     if let Some(id) = existing {
         // Update art if we have new art data and existing doesn't have it
@@ -150,6 +153,13 @@ fn get_or_create_album(
             conn.execute(
                 "UPDATE albums SET art_data = ?1 WHERE id = ?2 AND art_data IS NULL",
                 params![art, id],
+            )?;
+        }
+        // Optionally update artist if not set yet
+        if let Some(album_artist) = artist {
+            conn.execute(
+                "UPDATE albums SET artist = ?1 WHERE id = ?2 AND artist IS NULL",
+                params![album_artist, id],
             )?;
         }
         return Ok(id);
@@ -486,4 +496,13 @@ pub fn cleanup_deleted_tracks(conn: &Connection, folder_paths: &[String]) -> Res
     }
 
     Ok(deleted_count)
+}
+
+/// Cleanup albums that have no tracks associated with them
+pub fn cleanup_empty_albums(conn: &Connection) -> Result<usize> {
+    let deleted = conn.execute(
+        "DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks WHERE album_id IS NOT NULL)",
+        [],
+    )?;
+    Ok(deleted)
 }

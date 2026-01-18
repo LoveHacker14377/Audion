@@ -14,13 +14,21 @@
         addToQueue,
     } from "$lib/stores/player";
     import { contextMenu } from "$lib/stores/ui";
-    import { albums, playlists, loadPlaylists } from "$lib/stores/library";
+    import {
+        albums,
+        playlists,
+        loadPlaylists,
+        loadLibrary,
+    } from "$lib/stores/library";
     import { pluginStore } from "$lib/stores/plugin-store";
     import { goToAlbumDetail } from "$lib/stores/view";
 
     export let tracks: Track[] = [];
     export let title: string = "Tracks";
     export let showAlbum: boolean = true;
+
+    // Track images that failed to load
+    let failedImages = new Set<string>();
 
     // Filter out external tracks if their source plugin isn't enabled
     $: filteredTracks = tracks.filter((track) => {
@@ -188,7 +196,9 @@
                 action: async () => {
                     try {
                         await deleteTrack(track.id);
-                        // Remove from local tracks array
+                        // Refresh library to update album list (removes empty albums)
+                        await loadLibrary();
+                        // Also remove from local tracks array for immediate UI feedback
                         tracks = tracks.filter((t) => t.id !== track.id);
                     } catch (error) {
                         console.error("Failed to delete track:", error);
@@ -290,13 +300,17 @@
                 </span>
                 <span class="col-cover">
                     <div class="cover-wrapper">
-                        {#if albumArt}
+                        {#if albumArt && !failedImages.has(albumArt)}
                             <img
                                 src={albumArt}
                                 alt="Album cover"
                                 class="cover-image"
                                 loading="lazy"
                                 decoding="async"
+                                on:error={() => {
+                                    failedImages.add(albumArt);
+                                    failedImages = failedImages;
+                                }}
                             />
                         {:else}
                             <div class="cover-placeholder">

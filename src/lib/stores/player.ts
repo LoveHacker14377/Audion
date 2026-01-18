@@ -4,6 +4,8 @@ import type { Track } from '$lib/api/tauri';
 import { getAudioSrc } from '$lib/api/tauri';
 import { addToast } from '$lib/stores/toast';
 import { EventEmitter, type PluginEvents } from '$lib/plugins/event-emitter';
+import { tracks as libraryTracks } from '$lib/stores/library';
+import { appSettings } from '$lib/stores/settings';
 
 // Plugin event emitter (global singleton for plugin system)
 export const pluginEvents = new EventEmitter<PluginEvents>();
@@ -262,11 +264,18 @@ export function nextTrack(): void {
     const rep = get(repeat);
     const shuf = get(shuffle);
     const userCount = get(userQueueCount);
+    const settings = get(appSettings);
 
     // Standard indices
     let idx = get(queueIndex);
 
-    if (q.length === 0) return;
+    if (q.length === 0) {
+        // Queue is empty, try autoplay from library
+        if (settings.autoplay) {
+            playRandomFromLibrary();
+        }
+        return;
+    }
 
     if (rep === 'one') {
         // Repeat current track
@@ -297,6 +306,10 @@ export function nextTrack(): void {
         if (shufIdx >= shufIndices.length) {
             if (rep === 'all') {
                 shufIdx = 0;
+            } else if (settings.autoplay) {
+                // Autoplay: pick random track from library
+                playRandomFromLibrary();
+                return;
             } else {
                 isPlaying.set(false);
                 return;
@@ -313,6 +326,10 @@ export function nextTrack(): void {
     if (!shuf && idx >= q.length) { // Check bounds for sequential
         if (rep === 'all') {
             idx = 0;
+        } else if (settings.autoplay) {
+            // Autoplay: pick random track from library
+            playRandomFromLibrary();
+            return;
         } else {
             // Stop at end
             isPlaying.set(false);
@@ -327,6 +344,33 @@ export function nextTrack(): void {
     if (userCount > 0) {
         userQueueCount.update(c => Math.max(0, c - 1));
     }
+}
+
+// Play a random track from the library (for autoplay feature)
+function playRandomFromLibrary(): void {
+    const allTracks = get(libraryTracks);
+    if (allTracks.length === 0) {
+        isPlaying.set(false);
+        return;
+    }
+
+    // Pick a random track, avoiding the current one if possible
+    const current = get(currentTrack);
+    let availableTracks = allTracks;
+
+    if (current && allTracks.length > 1) {
+        availableTracks = allTracks.filter(t => t.id !== current.id);
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableTracks.length);
+    const randomTrack = availableTracks[randomIndex];
+
+    // Add to queue and play
+    queue.update(q => [...q, randomTrack]);
+    const newQueue = get(queue);
+    queueIndex.set(newQueue.length - 1);
+
+    playTrack(randomTrack);
 }
 
 // Previous track

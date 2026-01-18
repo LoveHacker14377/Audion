@@ -9,6 +9,9 @@
 
     export let albums: Album[] = [];
 
+    // Track images that failed to load
+    let failedImages = new Set<string>();
+
     // Get album cover - use track's cover_url for external tracks (same as TrackList)
     function getAlbumCover(album: Album): string | null {
         // First check if album has embedded art
@@ -74,12 +77,16 @@
             on:contextmenu={(e) => handleContextMenu(e, album)}
         >
             <div class="album-art">
-                {#if coverSrc}
+                {#if coverSrc && !failedImages.has(coverSrc)}
                     <img
                         src={coverSrc}
                         alt={album.name}
                         loading="lazy"
                         decoding="async"
+                        on:error={() => {
+                            failedImages.add(coverSrc);
+                            failedImages = failedImages;
+                        }}
                     />
                 {:else}
                     <div class="album-art-placeholder">
