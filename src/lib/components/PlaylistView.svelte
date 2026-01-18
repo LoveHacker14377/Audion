@@ -334,9 +334,10 @@
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: var(--spacing-lg);
         padding: var(--spacing-md);
-        flex: 1;
+        flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        align-content: start;
     }
 
     .playlist-card {
