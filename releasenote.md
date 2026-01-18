@@ -1,24 +1,33 @@
 # Release Notes
 
-## 1.1.7
+## Version 1.1.7
+
+### ✨ New Features
+
+- **Download Functionality**: Added support for downloading tracks (requires `tidal-search` re-installation).
+- **Autoplay**: The player now automatically queues random tracks from the library when the current queue ends, ensuring uninterrupted listening.
+- **Interactive Lyrics**: Users can now click on a specific line in the lyrics to skip directly to that part of the song.
+
+### 🚀 Enhancements
+
+- **Lyrics Handling**: Prioritized local `.lrc` files in the music folder for lyrics display.
+- **Visual Indicators**:
+    - Added indicators for unavailable tracks.
+    - Added indicators for downloaded tracks.
+- **Duration Formatting**: Updated album and playlist duration display to use the `HH:MM` format for better readability.
+- **Spotify Converter**: Improved the Spotify converter to handle more than 30 songs at a time.
 
 ### 🐛 Bug Fixes
-- empty album persisting without track
-- playlist do not appear in search results
-- Album Tracks been split: Album Tracks are being sorted by artist, meaning albums with tracks with another artist are split into another duplicate album.
-- Feature: Continuous music playback after selected song
- As a user
- I want the music player to continue playing songs after the selected one
- So that I can enjoy uninterrupted listening experience
-- The app should look at my folder for lyrics first eg same file name with  .lrc
-- Clicking on a specific line should let me skip to that part of the song.
-- mini Player hover text getting cutted
-- handle picture erorr when disconnected
-- autoplay feature keep playing random tracks from library when the queue ends
-- fix playlist view. playlist card taking full height when we only have 1 row of playlist
-- fix spotify converter only convert 30 song at the time
-- added download feature (need to reinstall tidal-serach)
-- add visual indicator for unavailable tracks
-- added downloaded visual indicator
-- change format for album and playlist total hour to HH:MM
-- fix playlist deleted before confirmation
+
+- **Library Organization**: Fixed an issue where albums were split into duplicates if tracks had different artists.
+- **Search**: Resolved an issue where playlists were not appearing in search results.
+- **Playlists**:
+    - Fixed a bug where a single playlist row would consume the full container height.
+    - Addressed an issue where playlists were deleted before the confirmation dialog appeared.
+- **UI/UX**:
+    - Handled image loading errors gracefully when offline or disconnected.
+- **Data Integrity**: Fixed a bug where empty albums persisted after tracks were removed.
+
+### ⚠️ Known Issues / Notes
+
+- **macOS/Linux**: Builds for these platforms are currently experimental.
