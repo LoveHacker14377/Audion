@@ -256,7 +256,7 @@
 
                     {#if hasDownloadable}
                         <button
-                            class="action-btn primary"
+                            class="btn-secondary download-btn"
                             on:click={handleDownloadAll}
                             disabled={isDownloading ||
                                 (!hasDownloadable && !allDownloaded) ||
@@ -476,6 +476,16 @@
     .btn-secondary:hover:not(:disabled) {
         border-color: var(--text-primary);
         transform: scale(1.05);
+    }
+
+    .btn-secondary.downloaded {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+        cursor: default;
+    }
+
+    .btn-secondary.downloaded:hover {
+        transform: none;
     }
 
     .btn-secondary:disabled {
