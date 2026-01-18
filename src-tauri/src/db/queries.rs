@@ -38,6 +38,7 @@ pub struct Artist {
 pub struct Playlist {
     pub id: i64,
     pub name: String,
+    pub cover_url: Option<String>,
     pub created_at: Option<String>,
 }
 
@@ -338,14 +339,16 @@ pub fn create_playlist(conn: &Connection, name: &str) -> Result<i64> {
 }
 
 pub fn get_all_playlists(conn: &Connection) -> Result<Vec<Playlist>> {
-    let mut stmt = conn.prepare("SELECT id, name, created_at FROM playlists ORDER BY name")?;
+    let mut stmt =
+        conn.prepare("SELECT id, name, cover_url, created_at FROM playlists ORDER BY name")?;
 
     let playlists = stmt
         .query_map([], |row| {
             Ok(Playlist {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                created_at: row.get(2)?,
+                cover_url: row.get(2)?,
+                created_at: row.get(3)?,
             })
         })?
         .collect::<Result<Vec<_>>>()?;
@@ -422,6 +425,18 @@ pub fn rename_playlist(conn: &Connection, playlist_id: i64, new_name: &str) -> R
     conn.execute(
         "UPDATE playlists SET name = ?1 WHERE id = ?2",
         params![new_name, playlist_id],
+    )?;
+    Ok(())
+}
+
+pub fn update_playlist_cover(
+    conn: &Connection,
+    playlist_id: i64,
+    cover_url: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE playlists SET cover_url = ?1 WHERE id = ?2",
+        params![cover_url, playlist_id],
     )?;
     Ok(())
 }

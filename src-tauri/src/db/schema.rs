@@ -35,6 +35,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS playlists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            cover_url TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -78,6 +79,9 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_tracks_content_hash ON tracks(content_hash)",
         [],
     );
+
+    // Add cover_url to playlists table for existing databases
+    let _ = conn.execute("ALTER TABLE playlists ADD COLUMN cover_url TEXT", []);
 
     Ok(())
 }
