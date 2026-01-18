@@ -22,6 +22,12 @@
     } from "$lib/stores/library";
     import { pluginStore } from "$lib/stores/plugin-store";
     import { goToAlbumDetail } from "$lib/stores/view";
+    import {
+        canDownload,
+        downloadTrack,
+        needsDownloadLocation,
+    } from "$lib/services/downloadService";
+    import { addToast } from "$lib/stores/toast";
 
     export let tracks: Track[] = [];
     export let title: string = "Tracks";
@@ -155,6 +161,32 @@
             {
                 label: "Add to Queue",
                 action: () => addToQueue([track]),
+            },
+            { type: "separator" },
+            {
+                label: "Download",
+                action: async () => {
+                    if (needsDownloadLocation()) {
+                        addToast(
+                            "Please configure a download location in Settings first",
+                            "error",
+                        );
+                        return;
+                    }
+
+                    addToast(`Downloading "${track.title}"...`, "info");
+                    try {
+                        await downloadTrack(track);
+                        addToast(`Downloaded "${track.title}"`, "success");
+                    } catch (error) {
+                        console.error("Failed to download track:", error);
+                        addToast(
+                            `Failed to download "${track.title}"`,
+                            "error",
+                        );
+                    }
+                },
+                disabled: !canDownload(track),
             },
             { type: "separator" },
             {
@@ -343,9 +375,7 @@
                         <span class="track-name truncate"
                             >{track.title || "Unknown Title"}</span
                         >
-                        {#if track.source_type && track.source_type !== "local"}
-                            <span class="quality-tag stream-tag">S</span>
-                        {/if}
+
                         {#if track.format}
                             {@const formatUpper = track.format.toUpperCase()}
                             {@const displayFormat =
@@ -628,16 +658,6 @@
         color: var(--accent-primary);
         border-color: var(--accent-primary);
         background-color: rgba(29, 185, 84, 0.15);
-    }
-
-    .quality-tag.stream-tag {
-        color: var(--accent-primary);
-        border-color: var(--accent-primary);
-        background-color: color-mix(
-            in srgb,
-            var(--accent-primary),
-            transparent 85%
-        );
     }
 
     .track-artist {

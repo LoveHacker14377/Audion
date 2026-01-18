@@ -130,44 +130,56 @@ export async function playTrack(track: Track): Promise<void> {
         try {
             let src: string;
 
-            // Check if this is an external streaming track
-            if (track.source_type && track.source_type !== 'local') {
-                // External track - need to resolve stream URL via plugin
-                const { pluginStore } = await import('./plugin-store');
-                const runtime = pluginStore.getRuntime();
+            // Check for local cached version first
+            if (track.local_src) {
+                try {
+                    src = await getAudioSrc(track.local_src);
+                } catch (err) {
+                    console.warn('Failed to play local cached file, falling back to stream', err);
+                }
+            }
 
-                if (runtime && track.external_id) {
-                    try {
-                        // Resolve fresh stream URL
-                        const streamUrl = await runtime.resolveStreamUrl(track.source_type, track.external_id);
-                        if (streamUrl) {
-                            src = streamUrl;
-                        } else {
-                            console.error('Failed to resolve stream URL for:', track.source_type, track.external_id);
-                            addToast(`Unable to play "${track.title}": Stream URL not found`, 'error');
+            // If no local source or it failed, try standard resolution
+            if (!src!) {
+                // Check if this is an external streaming track
+                if (track.source_type && track.source_type !== 'local') {
+                    // External track - need to resolve stream URL via plugin
+                    const { pluginStore } = await import('./plugin-store');
+                    const runtime = pluginStore.getRuntime();
+
+                    if (runtime && track.external_id) {
+                        try {
+                            // Resolve fresh stream URL
+                            const streamUrl = await runtime.resolveStreamUrl(track.source_type, track.external_id);
+                            if (streamUrl) {
+                                src = streamUrl;
+                            } else {
+                                console.error('Failed to resolve stream URL for:', track.source_type, track.external_id);
+                                addToast(`Unable to play "${track.title}": Stream URL not found`, 'error');
+                                return;
+                            }
+                        } catch (err) {
+                            console.error('Plugin resolution error:', err);
+                            addToast(`Error playing "${track.title}": ${err instanceof Error ? err.message : 'Unknown plugin error'}`, 'error');
                             return;
                         }
-                    } catch (err) {
-                        console.error('Plugin resolution error:', err);
-                        addToast(`Error playing "${track.title}": ${err instanceof Error ? err.message : 'Unknown plugin error'}`, 'error');
+                    } else if (track.path.startsWith('http://') || track.path.startsWith('https://')) {
+                        // Fallback: path is already a URL
+                        src = track.path;
+                    } else {
+                        console.error('Cannot play external track: no resolver available or path is not a URL');
+                        addToast(`Cannot play "${track.title}": Missing stream information`, 'error');
                         return;
                     }
-                } else if (track.path.startsWith('http://') || track.path.startsWith('https://')) {
-                    // Fallback: path is already a URL
-                    src = track.path;
                 } else {
-                    console.error('Cannot play external track: no resolver available or path is not a URL');
-                    addToast(`Cannot play "${track.title}": Missing stream information`, 'error');
-                    return;
-                }
-            } else {
-                // Local file - convert file path to asset URL
-                try {
-                    src = await getAudioSrc(track.path);
-                } catch (err) {
-                    console.error('File access error:', err);
-                    addToast(`Cannot play "${track.title}": File not found or inaccessible`, 'error');
-                    return;
+                    // Local file - convert file path to asset URL
+                    try {
+                        src = await getAudioSrc(track.path);
+                    } catch (err) {
+                        console.error('File access error:', err);
+                        addToast(`Cannot play "${track.title}": File not found or inaccessible`, 'error');
+                        return;
+                    }
                 }
             }
 

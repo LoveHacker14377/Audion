@@ -52,6 +52,7 @@ export interface Track {
     cover_url?: string | null;  // For streaming services (Tidal, etc.)
     source_type?: string | null;  // 'local', 'tidal', 'url'
     external_id?: string | null;  // Source-specific ID
+    local_src?: string | null; // Local file path for offline playback
 }
 
 export interface Album {

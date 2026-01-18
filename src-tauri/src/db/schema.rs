@@ -73,6 +73,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN cover_url TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN external_id TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN content_hash TEXT", []);
+    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN local_src TEXT", []);
 
     // Create index for content_hash after migration ensures column exists
     let _ = conn.execute(

@@ -79,6 +79,7 @@ pub fn run() {
             commands::musixmatch_request,
             // Metadata commands
             commands::download_and_save_audio,
+            commands::update_local_src,
             // Plugin commands
             commands::list_plugins,
             commands::install_plugin,

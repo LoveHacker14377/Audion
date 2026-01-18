@@ -320,6 +320,7 @@ pub async fn add_external_track(
         cover_url: track.cover_url,
         external_id: Some(track.external_id),
         content_hash,
+        local_src: None,
     };
 
     queries::insert_or_update_track(&conn, &track_insert)
