@@ -297,9 +297,9 @@
             </div>
         </header>
 
-        <div class="album-tracks">
-            <TrackList {tracks} showAlbum={false} />
-        </div>
+        <section class="track-list-section">
+            <TrackList {tracks} {isTidalAvailable} showAlbum={false} />
+        </section>
     {:else}
         <div class="not-found">
             <h2>Album not found</h2>

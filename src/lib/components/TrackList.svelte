@@ -32,21 +32,32 @@
     export let tracks: Track[] = [];
     export let title: string = "Tracks";
     export let showAlbum: boolean = true;
+    export let isTidalAvailable: boolean = true;
 
     // Track images that failed to load
     let failedImages = new Set<string>();
 
-    // Filter out external tracks if their source plugin isn't enabled
-    $: filteredTracks = tracks.filter((track) => {
-        // Local tracks are always shown
-        if (!track.source_type || track.source_type === "local") {
-            return true;
-        }
-        // External tracks: check if a resolver is registered
+    function isTrackUnavailable(track: Track): boolean {
+        // Local tracks are always available
+        if (!track.source_type || track.source_type === "local") return false;
+        // Downloaded tracks are always available
+        if (track.local_src) return false;
+        // Otherwise depends on plugin availability
+        // Also check if we have a resolver for this source type
+        if (!isTidalAvailable) return true;
+
         const runtime = pluginStore.getRuntime();
-        if (!runtime) return false;
-        return runtime.streamResolvers.has(track.source_type);
-    });
+        if (!runtime) return true;
+        return !runtime.streamResolvers.has(track.source_type);
+    }
+
+    // Filter out external tracks ONLY if we filter completely (old logic).
+    // New logic: show all but mark unavailable.
+    // However, the original filteredTracks logic was checking for resolver existence.
+    // We should probably keep showing them but maybe mark them?
+    // Let's modify filteredTracks to NOT filter based on resolvers,
+    // but relies on the CSS class for visual indication.
+    $: filteredTracks = tracks;
 
     // Create a map of album_id to album for quick lookup
     $: albumMap = new Map($albums.map((a) => [a.id, a]));
@@ -110,6 +121,8 @@
     }
 
     function handleTrackClick(index: number, track: Track) {
+        if (isTrackUnavailable(track)) return;
+
         // Find the actual index in the filtered/sorted list
         const trackIndex = sortedTracks.findIndex((t) => t.id === track.id);
         if (trackIndex !== -1) {
@@ -118,6 +131,8 @@
     }
 
     function handleTrackDoubleClick(index: number, track: Track) {
+        if (isTrackUnavailable(track)) return;
+
         const trackIndex = sortedTracks.findIndex((t) => t.id === track.id);
         if (trackIndex !== -1) {
             playTracks(sortedTracks, trackIndex);
@@ -127,6 +142,7 @@
     export let playlistId: number | null = null;
 
     async function handleContextMenu(e: MouseEvent, index: number) {
+        // Context menu still allowed for unavailable tracks? Probably yes (e.g. to delete)
         e.preventDefault();
         const track = sortedTracks[index];
 
@@ -147,6 +163,8 @@
             },
         }));
 
+        const isUnavailable = isTrackUnavailable(track);
+
         const menuItems: any[] = [
             {
                 label: "Play",
@@ -156,11 +174,13 @@
                     );
                     if (trackIndex !== -1) playTracks(sortedTracks, trackIndex);
                 },
+                disabled: isUnavailable,
             },
             { type: "separator" },
             {
                 label: "Add to Queue",
                 action: () => addToQueue([track]),
+                disabled: isUnavailable,
             },
             { type: "separator" },
             {
@@ -186,7 +206,9 @@
                         );
                     }
                 },
-                disabled: !canDownload(track),
+                disabled:
+                    !canDownload(track) ||
+                    (isUnavailable && !isTidalAvailable && !track.local_src), // Enable download if it's the only way to get it? No, if plugin off, can't download.
             },
             { type: "separator" },
             {
@@ -250,6 +272,7 @@
 
 <div class="track-list">
     <header class="list-header" class:no-album={!showAlbum}>
+        <!-- ... existing header ... -->
         <button class="col-header col-num" on:click={() => toggleSort(null)}>
             {#if sortField === null}
                 <span class="sort-icon">#</span>
@@ -302,9 +325,11 @@
     <div class="list-body">
         {#each sortedTracks as track, index}
             {@const albumArt = getTrackAlbumArt(track)}
+            {@const unavailable = isTrackUnavailable(track)}
             <div
                 class="track-row"
                 class:playing={$currentTrack?.id === track.id}
+                class:unavailable
                 on:click={() => handleTrackClick(index, track)}
                 on:dblclick={() => handleTrackDoubleClick(index, track)}
                 on:contextmenu={(e) => handleContextMenu(e, index)}
@@ -711,5 +736,14 @@
 
     .empty-state p {
         font-size: 0.875rem;
+    }
+
+    .track-row.unavailable {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .track-row.unavailable:hover {
+        background-color: transparent;
     }
 </style>
