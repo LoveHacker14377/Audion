@@ -153,7 +153,7 @@
 
 <footer class="player-bar" class:hidden>
     <!-- Hidden audio element -->
-    <audio bind:this={audioElement}></audio>
+    <audio bind:this={audioElement} crossorigin="anonymous"></audio>
 
     <!-- Track info -->
     <div class="track-info">

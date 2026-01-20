@@ -1,6 +1,7 @@
 <script lang="ts">
     import { theme, presetAccents, type ThemeMode } from "$lib/stores/theme";
     import { appSettings } from "$lib/stores/settings";
+    import { equalizer, EQ_PRESETS } from "$lib/stores/equalizer";
     import { updates } from "$lib/stores/updates";
     import { resetDatabase, selectMusicFolder } from "$lib/api/tauri";
     import { loadLibrary } from "$lib/stores/library";
@@ -358,6 +359,97 @@
                         >
                             <div class="toggle-handle"></div>
                         </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Equalizer -->
+            <section class="settings-section">
+                <h3 class="section-title">Equalizer</h3>
+
+                <div class="setting-item">
+                    <div class="toggle-container">
+                        <div class="toggle-info">
+                            <span class="setting-label">Enable Equalizer</span>
+                            <p class="setting-hint">
+                                Apply audio frequency adjustments to your music
+                            </p>
+                        </div>
+                        <button
+                            class="toggle-btn"
+                            class:active={$equalizer.enabled}
+                            on:click={() =>
+                                equalizer.setEnabled(!$equalizer.enabled)}
+                            aria-label="Toggle Equalizer"
+                        >
+                            <div class="toggle-handle"></div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <span class="setting-label">Preset</span>
+                    <div class="preset-selector">
+                        <select
+                            class="preset-select"
+                            value={$equalizer.currentPreset || ""}
+                            on:change={(e) =>
+                                equalizer.applyPreset(e.currentTarget.value)}
+                            disabled={!$equalizer.enabled}
+                        >
+                            <option value="" disabled>Custom</option>
+                            {#each EQ_PRESETS as preset}
+                                <option value={preset.name}
+                                    >{preset.name}</option
+                                >
+                            {/each}
+                        </select>
+                        <button
+                            class="reset-btn"
+                            on:click={() => equalizer.reset()}
+                            disabled={!$equalizer.enabled}
+                            title="Reset to Flat"
+                        >
+                            Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    class="setting-item eq-bands-container"
+                    class:disabled={!$equalizer.enabled}
+                >
+                    <div class="eq-bands">
+                        {#each $equalizer.bands as band, i}
+                            <div class="eq-band">
+                                <span class="eq-gain"
+                                    >{band.gain > 0 ? "+" : ""}{band.gain}</span
+                                >
+                                <div class="eq-slider-container">
+                                    <input
+                                        type="range"
+                                        class="eq-slider"
+                                        min="-12"
+                                        max="12"
+                                        step="1"
+                                        value={band.gain}
+                                        disabled={!$equalizer.enabled}
+                                        on:input={(e) =>
+                                            equalizer.setBandGain(
+                                                i,
+                                                parseInt(e.currentTarget.value),
+                                            )}
+                                        aria-label="{band.label} Hz"
+                                    />
+                                </div>
+                                <span class="eq-label">{band.label}</span>
+                            </div>
+                        {/each}
+                    </div>
+                    <div class="eq-scale">
+                        <span>+12</span>
+                        <span>0</span>
+                        <span>-12</span>
                     </div>
                 </div>
             </section>
@@ -1103,5 +1195,195 @@
     .confirm-danger-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+    }
+
+    /* Equalizer Styles */
+    .preset-selector {
+        display: flex;
+        gap: var(--spacing-sm);
+        align-items: center;
+    }
+
+    .preset-select {
+        flex: 1;
+        padding: var(--spacing-sm) var(--spacing-md);
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        cursor: pointer;
+        max-width: 200px;
+    }
+
+    .preset-select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .preset-select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .reset-btn {
+        padding: var(--spacing-sm) var(--spacing-md);
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .reset-btn:hover:not(:disabled) {
+        background-color: var(--bg-highlight);
+        border-color: var(--text-primary);
+    }
+
+    .reset-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .eq-bands-container {
+        display: flex;
+        gap: var(--spacing-md);
+        padding: var(--spacing-lg);
+        background-color: var(--bg-surface);
+        border-radius: var(--radius-md);
+        transition: opacity var(--transition-fast);
+        overflow: hidden;
+    }
+
+    .eq-bands-container.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .eq-bands {
+        display: flex;
+        justify-content: space-around;
+        gap: var(--spacing-xs);
+        flex: 1;
+        min-width: 0;
+    }
+
+    .eq-band {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-xs);
+        flex: 1;
+        min-width: 0;
+        max-width: 60px;
+    }
+
+    .eq-gain {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        min-width: 28px;
+        text-align: center;
+        font-family: monospace;
+    }
+
+    .eq-label {
+        font-size: 0.6rem;
+        color: var(--text-subdued);
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .eq-slider-container {
+        height: 100px;
+        width: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .eq-slider {
+        width: 100px;
+        height: 6px;
+        transform: rotate(-90deg);
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--bg-highlight);
+        border-radius: 3px;
+        cursor: pointer;
+        outline: none;
+    }
+
+    .eq-slider::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px;
+        background: var(--bg-highlight);
+        border-radius: 3px;
+    }
+
+    .eq-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: var(--accent-primary);
+        border-radius: 50%;
+        margin-top: -5px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .eq-slider::-webkit-slider-thumb:hover {
+        background: var(--accent-hover);
+        transform: scale(1.1);
+    }
+
+    .eq-slider::-moz-range-track {
+        width: 100%;
+        height: 6px;
+        background: var(--bg-highlight);
+        border-radius: 3px;
+    }
+
+    .eq-slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        background: var(--accent-primary);
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .eq-slider::-moz-range-thumb:hover {
+        background: var(--accent-hover);
+    }
+
+    .eq-slider:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .eq-slider:disabled::-webkit-slider-thumb {
+        background: var(--text-subdued);
+    }
+
+    .eq-slider:disabled::-moz-range-thumb {
+        background: var(--text-subdued);
+    }
+
+    .eq-scale {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        font-size: 0.6rem;
+        color: var(--text-subdued);
+        padding: 20px 0;
+        font-family: monospace;
+        min-width: 24px;
     }
 </style>

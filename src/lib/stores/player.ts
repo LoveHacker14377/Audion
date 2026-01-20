@@ -6,6 +6,7 @@ import { addToast } from '$lib/stores/toast';
 import { EventEmitter, type PluginEvents } from '$lib/plugins/event-emitter';
 import { tracks as libraryTracks } from '$lib/stores/library';
 import { appSettings } from '$lib/stores/settings';
+import { equalizer, EQ_FREQUENCIES } from '$lib/stores/equalizer';
 
 // Plugin event emitter (global singleton for plugin system)
 export const pluginEvents = new EventEmitter<PluginEvents>();
@@ -53,6 +54,97 @@ export const repeat = writable<'none' | 'one' | 'all'>('none');
 let audioElement: HTMLAudioElement | null = null;
 let animationFrameId: number | null = null;
 
+// Web Audio API for equalizer
+let audioContext: AudioContext | null = null;
+let sourceNode: MediaElementAudioSourceNode | null = null;
+let eqFilters: BiquadFilterNode[] = [];
+let eqConnected = false;
+
+// Get the AudioContext (for potential visualizer use)
+export function getAudioContext(): AudioContext | null {
+    return audioContext;
+}
+
+// Initialize the equalizer filters
+function initializeEqualizer(audio: HTMLAudioElement): void {
+    if (eqConnected) return; // Already initialized
+
+    try {
+        // Create AudioContext on user interaction (browser requirement)
+        if (!audioContext) {
+            audioContext = new AudioContext();
+        }
+
+        // Create source node from audio element (can only be done once per element)
+        if (!sourceNode) {
+            sourceNode = audioContext.createMediaElementSource(audio);
+        }
+
+        // CRITICAL: First connect directly to destination to ensure audio plays
+        // We'll disconnect and reconnect through filters after
+        sourceNode.connect(audioContext.destination);
+
+        // Create EQ filters (peaking filters for each band)
+        eqFilters = EQ_FREQUENCIES.map((freq, index) => {
+            const filter = audioContext!.createBiquadFilter();
+            filter.type = 'peaking';
+            filter.frequency.value = freq;
+            filter.Q.value = 1.4; // Standard Q for 10-band EQ
+            filter.gain.value = 0;
+            return filter;
+        });
+
+        // Now disconnect direct connection and route through filters
+        sourceNode.disconnect();
+
+        // Connect the chain: source → filters → destination
+        let currentNode: AudioNode = sourceNode;
+        for (const filter of eqFilters) {
+            currentNode.connect(filter);
+            currentNode = filter;
+        }
+        currentNode.connect(audioContext.destination);
+
+        // Set initial gains from equalizer state
+        const state = equalizer.getState();
+        if (state.enabled) {
+            state.bands.forEach((band, i) => {
+                if (eqFilters[i]) {
+                    eqFilters[i].gain.value = band.gain;
+                }
+            });
+        }
+
+        // Register callbacks for equalizer changes
+        equalizer.onGainChange((bandIndex, gain) => {
+            if (eqFilters[bandIndex] && equalizer.getState().enabled) {
+                eqFilters[bandIndex].gain.value = gain;
+            }
+        });
+
+        equalizer.onEnabledChange((enabled) => {
+            const state = equalizer.getState();
+            eqFilters.forEach((filter, i) => {
+                filter.gain.value = enabled ? state.bands[i].gain : 0;
+            });
+        });
+
+        eqConnected = true;
+        console.log('[Player] Equalizer initialized successfully');
+    } catch (error) {
+        console.error('[Player] Failed to initialize equalizer:', error);
+        // Fallback: ensure audio still plays by connecting source directly to destination
+        if (sourceNode && audioContext) {
+            try {
+                sourceNode.connect(audioContext.destination);
+                console.log('[Player] Fallback: audio connected directly to output');
+            } catch (e) {
+                console.error('[Player] Fallback connection failed:', e);
+            }
+        }
+    }
+}
+
 // High-frequency time update using requestAnimationFrame for smooth lyrics
 function startTimeSync(): void {
     if (animationFrameId !== null) return;
@@ -94,6 +186,29 @@ export function setAudioElement(element: HTMLAudioElement): void {
     // Sync volume (convert linear slider to logarithmic audio volume)
     const sliderVol = get(volume);
     audioElement.volume = sliderToAudioVolume(sliderVol);
+
+    // Listen for equalizer enable - only init when user enables it
+    equalizer.onEnabledChange((enabled) => {
+        if (enabled && !eqConnected && audioElement) {
+            initializeEqualizer(audioElement);
+            // Resume audio context if suspended (browser autoplay policy)
+            if (audioContext?.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+    });
+
+    // If EQ is already enabled on load, init it on first play
+    if (equalizer.getState().enabled) {
+        const initEQ = () => {
+            initializeEqualizer(element);
+            if (audioContext?.state === 'suspended') {
+                audioContext.resume();
+            }
+            element.removeEventListener('play', initEQ);
+        };
+        element.addEventListener('play', initEQ);
+    }
 
     // Set up event listeners
     audioElement.addEventListener('ended', handleTrackEnd);
