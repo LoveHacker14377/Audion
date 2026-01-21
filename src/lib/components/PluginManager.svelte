@@ -361,6 +361,22 @@
               >
                 Uninstall
               </button>
+              {#if plugin.manifest.repo}
+                <button
+                  class="btn-secondary"
+                  on:click={async () => {
+                    if (
+                      confirm(
+                        `Are you sure you want to reinstall "${plugin.name}"?`,
+                      )
+                    ) {
+                      await pluginStore.reinstallPlugin(plugin.name);
+                    }
+                  }}
+                >
+                  Reinstall
+                </button>
+              {/if}
             </div>
           </div>
         {:else}

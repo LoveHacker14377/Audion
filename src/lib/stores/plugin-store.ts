@@ -31,6 +31,7 @@ export interface PluginStoreState {
     searchQuery: string;
     categoryFilter: string;
     activeTab: 'curated' | 'community' | 'installed';
+    pendingUpdates: PluginUpdateInfo[];
 }
 
 // Initial state
@@ -42,7 +43,8 @@ const initialState: PluginStoreState = {
     error: null,
     searchQuery: '',
     categoryFilter: 'all',
-    activeTab: 'curated'
+    activeTab: 'curated',
+    pendingUpdates: []
 };
 
 // Create the store
@@ -114,23 +116,14 @@ function createPluginStore() {
             }
         },
 
-        // Check for updates and automatically apply them
+        // Check for updates and update store state (does not auto-apply)
         async checkAndApplyUpdates() {
             try {
                 const updates = await invoke<PluginUpdateInfo[]>('check_plugin_updates', { pluginDir });
 
                 if (updates.length > 0) {
                     console.log(`[PluginStore] Found ${updates.length} plugin update(s):`, updates);
-
-                    for (const updateInfo of updates) {
-                        try {
-                            console.log(`[PluginStore] Auto-updating ${updateInfo.name} from ${updateInfo.current_version} to ${updateInfo.new_version}`);
-                            await this.updatePlugin(updateInfo.name);
-                            console.log(`[PluginStore] Successfully updated ${updateInfo.name}`);
-                        } catch (err) {
-                            console.error(`[PluginStore] Failed to update ${updateInfo.name}:`, err);
-                        }
-                    }
+                    update(s => ({ ...s, pendingUpdates: updates }));
                 } else {
                     console.log('[PluginStore] All plugins are up to date');
                 }
@@ -138,6 +131,33 @@ function createPluginStore() {
                 console.error('[PluginStore] Failed to check for updates:', err);
             }
         },
+
+        // Apply all pending updates
+        async applyPendingUpdates() {
+            const state = get({ subscribe });
+            const updates = state.pendingUpdates;
+
+            if (updates.length === 0) return;
+
+            update(s => ({ ...s, loading: true }));
+
+            for (const updateInfo of updates) {
+                try {
+                    console.log(`[PluginStore] Updating ${updateInfo.name}...`);
+                    await this.updatePlugin(updateInfo.name);
+                } catch (err) {
+                    console.error(`[PluginStore] Failed to update ${updateInfo.name}:`, err);
+                }
+            }
+
+            update(s => ({ ...s, loading: false, pendingUpdates: [] }));
+        },
+
+        // Clear pending updates (skip for now)
+        clearPendingUpdates() {
+            update(s => ({ ...s, pendingUpdates: [] }));
+        },
+
 
         // Check for available plugin updates
         async checkForUpdates(): Promise<PluginUpdateInfo[]> {
@@ -165,7 +185,7 @@ function createPluginStore() {
                 // Reload plugin in runtime if it was enabled
                 if (updatedInfo.enabled && runtime) {
                     // Unload old version first
-                    runtime.disablePlugin(name);
+                    await runtime.unloadPlugin(name);
 
                     // Grant permissions and reload
                     const allPermissions = [
@@ -283,6 +303,72 @@ function createPluginStore() {
                     loading: false,
                     error: `Failed to uninstall: ${err}`
                 }));
+                return false;
+            }
+        },
+
+        // Reinstall a plugin
+        async reinstallPlugin(name: string): Promise<boolean> {
+            const state = get({ subscribe });
+            const plugin = state.installed.find(p => p.name === name);
+
+            if (!plugin) {
+                update(s => ({ ...s, error: `Plugin ${name} not found` }));
+                return false;
+            }
+
+            const repoUrl = plugin.manifest.repo;
+            if (!repoUrl) {
+                update(s => ({ ...s, error: `Plugin ${name} does not have a repository URL` }));
+                return false;
+            }
+
+            update(s => ({ ...s, loading: true, error: null }));
+
+            try {
+                // First uninstall
+                console.log(`[PluginStore] Reinstalling ${name}: Uninstalling first...`);
+                await invoke('uninstall_plugin', { name, pluginDir });
+
+                // Then install
+                console.log(`[PluginStore] Reinstalling ${name}: Installing from ${repoUrl}...`);
+                const info = await invoke<PluginInfo>('install_plugin', {
+                    repoUrl,
+                    pluginDir
+                });
+
+                update(s => ({
+                    ...s,
+                    // Replace the old plugin entry with the new one (though uninstall removed it from backend, we filtered it in memory?)
+                    // Actually uninstallPlugin updates the store, so we just need to add it back.
+                    // But we are doing manual invoke calls to avoid double store updates if we called this.uninstallPlugin
+                    // Let's just use the result 'info' to update the list.
+                    installed: [...state.installed.filter(p => p.name !== name), info],
+                    loading: false
+                }));
+
+                // Auto-enable
+                try {
+                    await this.enablePlugin(info.name);
+                } catch (err) {
+                    console.error(`[PluginStore] Failed to auto-enable ${info.name}:`, err);
+                }
+
+                return true;
+            } catch (err) {
+                console.error(`[PluginStore] Failed to reinstall ${name}:`, err);
+                update(s => ({
+                    ...s,
+                    loading: false,
+                    error: `Failed to reinstall: ${err}`
+                }));
+
+                // Refresh list just in case we are in a weird state
+                try {
+                    const installed = await invoke<PluginInfo[]>('list_plugins', { pluginDir });
+                    update(s => ({ ...s, installed }));
+                } catch (e) { /* ignore */ }
+
                 return false;
             }
         },

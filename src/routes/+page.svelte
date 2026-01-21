@@ -23,6 +23,7 @@
   import { isMiniPlayer } from "$lib/stores/ui";
   import { pluginStore } from "$lib/stores/plugin-store";
   import { appSettings } from "$lib/stores/settings";
+  import PluginUpdateDialog from "$lib/components/PluginUpdateDialog.svelte";
 
   let isLoading = true;
   let notInTauri = false;
@@ -105,6 +106,12 @@
     <ToastContainer />
     <KeyboardShortcuts />
     <KeyboardShortcutsHelp />
+    <KeyboardShortcuts />
+    <KeyboardShortcutsHelp />
+
+    {#if $pluginStore.pendingUpdates.length > 0}
+      <PluginUpdateDialog on:close={() => pluginStore.clearPendingUpdates()} />
+    {/if}
   {/if}
 </div>
 

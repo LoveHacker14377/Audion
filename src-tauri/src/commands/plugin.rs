@@ -575,10 +575,13 @@ pub async fn update_plugin(name: String, plugin_dir: String) -> Result<PluginInf
         ));
     }
 
-    let new_manifest: PluginManifest = manifest_response
+    let mut new_manifest: PluginManifest = manifest_response
         .json()
         .await
         .map_err(|e| format!("Failed to parse plugin.json: {}", e))?;
+
+    // Inject repo URL into manifest for future update checks
+    new_manifest.repo = Some(repo_url.clone());
 
     // Create plugin directory
     fs::create_dir_all(&plugin_path).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
