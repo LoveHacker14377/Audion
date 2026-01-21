@@ -7,3 +7,4 @@
 - Fix ContextMenu Overflow
 - Fix Updater
 - Added Tittle Bar
+- New Look! added more option in title bar
