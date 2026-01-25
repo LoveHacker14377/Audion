@@ -8,6 +8,7 @@ export interface PluginEvents {
     playStateChange: { isPlaying: boolean };
     timeUpdate: { currentTime: number; duration: number };
     queueChange: { queue: any[]; index: number };
+    seeked: { currentTime: number; duration: number };
 }
 
 export class EventEmitter<EventMap extends Record<string, any>> {

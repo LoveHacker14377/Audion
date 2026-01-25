@@ -48,7 +48,7 @@ pub fn discord_update_presence(
     let mut client_guard = state.0.lock().unwrap();
 
     if let Some(client) = client_guard.as_mut() {
-        // Format: 
+        // Format:
         // Line 1 (details): Song Title
         // Line 2 (state): Artist - Album (or just Artist)
         let state_text = if let Some(album) = &data.album {
@@ -59,48 +59,36 @@ pub fn discord_update_presence(
 
         let mut activity = activity::Activity::new()
             .details(&data.song_title)
-            .state(&state_text);
+            .state(&state_text)
+            .activity_type(activity::ActivityType::Listening); // Set activity type to Listening
 
-        // Add timestamps for progress bar - ALWAYS set them if we have duration
-        // progress bar not working
-        if let Some(duration) = data.duration {
+        // Add timestamps for progress bar
+        let current = data.current_time.unwrap_or(0) as i64;
+        let duration = data.duration.unwrap_or(0) as i64;
+
+        if duration > 0 && data.is_playing {
+            // Only show timestamps when actively playing
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs() as i64;
 
-            let current = data.current_time.unwrap_or(0);
-            let elapsed = current as i64;
-            let total = duration as i64;
+            let start_time = now - current;
+            let end_time = start_time + duration;
 
-            if data.is_playing && total > 0 {
-                // For playing: show start time and end time
-                let remaining = total - elapsed;
-                activity = activity.timestamps(
-                    activity::Timestamps::new()
-                        .start(now - elapsed)
-                        .end(now + remaining),
-                );
-            } else if total > 0 {
-                // For paused: just show elapsed time
-                activity = activity.timestamps(
-                    activity::Timestamps::new()
-                        .start(now - elapsed),
-                );
-            }
+            activity =
+                activity.timestamps(activity::Timestamps::new().start(start_time).end(end_time));
         }
+        // When paused/stopped, don't set any timestamps at all
 
         // Add album art as large image
         let mut assets = activity::Assets::new();
 
         if let Some(cover) = &data.cover_url {
-            
             // Use album cover as large image
-            assets = assets
-                .large_image(cover)
-                .large_text(&data.song_title); // Hover text shows song title
+            assets = assets.large_image(cover).large_text(&data.song_title); // Hover text shows song title
         } else {
-            // Fallback to default app icon 
+            // Fallback to default app icon
             // must be uploaded to Discord Developer Portal as "audion_logo"
             assets = assets
                 .large_image("audion_logo")
@@ -109,12 +97,11 @@ pub fn discord_update_presence(
 
         activity = activity.assets(assets);
 
-        
-        // open website button
-        let button_label = "Open -->".to_string();
-        let button_url = "https://audionplayer.com/".to_string();
-        activity = activity.buttons(vec![activity::Button::new(&button_label, &button_url)]);
-
+        // Add download button with icon
+        activity = activity.buttons(vec![activity::Button::new(
+            "Download Audion ↓",
+            "https://audionplayer.com/download",
+        )]);
 
         client
             .set_activity(activity)

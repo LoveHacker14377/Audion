@@ -221,6 +221,13 @@ export function setAudioElement(element: HTMLAudioElement): void {
     audioElement.addEventListener('durationchange', () => {
         duration.set(audioElement?.duration ?? 0);
     });
+    audioElement.addEventListener('seeked', (e) => {
+        const target = e.target as HTMLAudioElement;
+        pluginEvents.emit('seeked', { 
+            currentTime: target.currentTime,
+            duration: target.duration 
+        });
+    });
     audioElement.addEventListener('play', () => {
         isPlaying.set(true);
         pluginEvents.emit('playStateChange', { isPlaying: true });

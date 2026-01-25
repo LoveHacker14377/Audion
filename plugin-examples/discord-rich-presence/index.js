@@ -24,22 +24,22 @@
 
       // Subscribe to player events
       api.on("trackChange", (data) => this.handleTrackChange(data));
-      api.on("playbackState", (data) => this.handlePlaybackState(data));
+      api.on("playStateChange", (data) => this.handlePlaybackState(data));
       api.on("timeUpdate", (data) => this.handleTimeUpdate(data));
-
-      console.log("[Discord RPC] Event listeners registered");
+      api.on("seeked", (data) => this.handleSeeked(data));
     },
 
     async connect() {
+      console.log("[Discord RPC] Attempting to connect...");
       try {
         const result = await this.api.discord.connect();
-        console.log("[Discord RPC]", result);
+        console.log("[Discord RPC] ✅ Connected:", result);
         this.isConnected = true;
 
         // Update with current track if available
         this.updatePresence();
       } catch (error) {
-        console.error("[Discord RPC] Connection failed:", error);
+        console.error("[Discord RPC] ❌ Connection failed:", error);
         this.isConnected = false;
 
         // Retry in 5 seconds
@@ -101,8 +101,19 @@
       this.currentTime = currentTime || 0;
       this.duration = duration || this.duration;
 
-      // Update every 10 seconds for smoother progress bar
+      // Schedule regular update every 10 seconds
       this.scheduleUpdate();
+    },
+
+    handleSeeked(data) {
+      const { currentTime, duration } = data;
+      console.log(`[Discord RPC] ⏭️ Seeked to ${Math.floor(currentTime)}s`);
+
+      this.currentTime = currentTime || 0;
+      this.duration = duration || this.duration;
+
+      // Update immediately on seek
+      this.updatePresence();
     },
 
     scheduleUpdate() {
@@ -113,7 +124,7 @@
       this.updateTimeout = setTimeout(() => {
         this.updatePresence();
         this.updateTimeout = null;
-      }, 10000); // Update every 10 seconds for better accuracy
+      }, 10000); // Update every 10 seconds for progress bar
     },
 
     async updatePresence() {
@@ -138,6 +149,25 @@
         return;
       }
 
+      // WORKAROUND: Always fetch live playback state directly from player
+      // because the playbackState event listener is broken
+      try {
+        this.isPlaying = this.api.player.isPlaying();
+        this.currentTime = this.api.player.getCurrentTime();
+        this.duration = this.api.player.getDuration();
+      } catch (error) {
+        console.log("[Discord RPC] Failed to fetch live state:", error);
+      }
+
+      // If paused, clear the presence entirely to avoid Discord timestamp bugs
+      if (!this.isPlaying) {
+        console.log(
+          "[Discord RPC] ⏸️ Paused - clearing presence to prevent timestamp bugs",
+        );
+        await this.clearPresence();
+        return;
+      }
+
       // Prepare presence data
       const presenceData = {
         song_title: this.currentTrack.title || "Unknown Track",
@@ -149,21 +179,15 @@
         is_playing: this.isPlaying,
       };
 
-      // debug
-      console.log("[Discord RPC] Full presence data being sent:", presenceData);
-      console.log("[Discord RPC] Cover URL:", presenceData.cover_url);
-      console.log("[Discord RPC] Current track object:", this.currentTrack);
+      console.log(
+        `[Discord RPC] Updating: "${presenceData.song_title}" by ${presenceData.artist} (${presenceData.current_time}s/${presenceData.duration}s)`,
+      );
 
       try {
-        await this.api.discord.updatePresence(presenceData);
-        console.log("[Discord RPC] Presence updated:", {
-          title: presenceData.song_title,
-          artist: presenceData.artist,
-          time: `${presenceData.current_time}/${presenceData.duration}`,
-          playing: presenceData.is_playing,
-        });
+        const result = await this.api.discord.updatePresence(presenceData);
+        console.log("[Discord RPC] ✅ Presence updated");
       } catch (error) {
-        console.error("[Discord RPC] Update failed:", error);
+        console.error("[Discord RPC] ❌ Update failed:", error);
 
         // Try to reconnect
         this.isConnected = false;
@@ -175,15 +199,15 @@
     // discord needs a http link. it can't access local files
     // currently using a fixed logo from the uploaded assets
     // todo -create a server to server covers as http urls
+    // tracks from tidal show covers successfuly
     getCoverUrl() {
       const coverUrl = this.currentTrack?.cover_url;
       if (typeof coverUrl !== "string") return null;
-    
+
       try {
         const url = new URL(coverUrl);
-        return url.protocol === "http:" || url.protocol === "https:"
-          ? coverUrl
-          : null;
+        const isValid = url.protocol === "http:" || url.protocol === "https:";
+        return isValid ? coverUrl : null;
       } catch {
         return null;
       }
