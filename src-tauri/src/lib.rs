@@ -31,7 +31,7 @@ pub fn run() {
             let database = Database::new(&app_dir).expect("Failed to initialize database");
 
             app.manage(database);
-            
+
             // Initialize Discord RPC state
             app.manage(discord::DiscordState(std::sync::Mutex::new(None)));
 
@@ -84,6 +84,7 @@ pub fn run() {
             // Metadata commands
             commands::download_and_save_audio,
             commands::update_local_src,
+            commands::update_track_cover_url,
             // Plugin commands
             commands::list_plugins,
             commands::install_plugin,

@@ -14,6 +14,7 @@
     duration: 0,
     isPlaying: false,
     updateTimeout: null,
+    coverCache: new Map(), // Cache found covers to avoid repeated searches
 
     init(api) {
       console.log("[Discord RPC] Plugin initialized");
@@ -173,7 +174,7 @@
         song_title: this.currentTrack.title || "Unknown Track",
         artist: this.currentTrack.artist || "Unknown Artist",
         album: this.currentTrack.album || null,
-        cover_url: this.getCoverUrl(),
+        cover_url: await this.getCoverUrl(),
         current_time: Math.floor(this.currentTime),
         duration: Math.floor(this.duration),
         is_playing: this.isPlaying,
@@ -195,24 +196,63 @@
       }
     },
 
-    // cover
-    // discord needs a http link. it can't access local files
-    // currently using a fixed logo from the uploaded assets
-    // todo -create a server to server covers as http urls
-    // tracks from tidal show covers successfuly
-    getCoverUrl() {
+    async getCoverUrl() {
       const coverUrl = this.currentTrack?.cover_url;
-      if (typeof coverUrl !== "string") return null;
 
-      try {
-        const url = new URL(coverUrl);
-        const isValid = url.protocol === "http:" || url.protocol === "https:";
-        return isValid ? coverUrl : null;
-      } catch {
-        return null;
+      // If we already have a valid HTTP/HTTPS URL (from streaming), use it
+      if (typeof coverUrl === "string") {
+        try {
+          const url = new URL(coverUrl);
+          const isValid = url.protocol === "http:" || url.protocol === "https:";
+          if (isValid) {
+            return coverUrl;
+          }
+        } catch {}
       }
+
+      // For local files without a valid cover URL, search Tidal
+      if (this.currentTrack?.title && this.currentTrack?.artist) {
+        const cacheKey = `${this.currentTrack.artist}-${this.currentTrack.title}`;
+
+        // Check cache first
+        if (this.coverCache.has(cacheKey)) {
+          return this.coverCache.get(cacheKey);
+        }
+
+        // Search Tidal for cover
+        const foundCover = await this.searchCoverFromTidal();
+        if (foundCover) {
+          this.coverCache.set(cacheKey, foundCover);
+          console.log("[Discord RPC] Found cover from Tidal:", foundCover);
+          return foundCover;
+        }
+      }
+
+      // No cover available - Discord will use app icon
+      return null;
     },
-    
+
+    async searchCoverFromTidal() {
+      // Use Tidal plugin's cover search if available
+      if (window.TidalSearchAPI?.searchCover) {
+        try {
+          const trackId = this.currentTrack?.id || null;
+          return await window.TidalSearchAPI.searchCover(
+            this.currentTrack.title,
+            this.currentTrack.artist,
+            trackId, // Pass track ID so Tidal can update the database
+          );
+        } catch (error) {
+          console.log("[Discord RPC] Tidal cover search error:", error);
+        }
+      } else {
+        console.log(
+          "[Discord RPC] Tidal Search plugin not available for cover lookup",
+        );
+      }
+
+      return null;
+    },
 
     async clearPresence() {
       if (!this.isConnected) {
