@@ -46,7 +46,8 @@ export interface LoadedPlugin {
     api: RateLimiter;
     storage: RateLimiter;
   };
-  eventListeners: Map<string, EventListener[]>;
+  // removed : eventListeners: Map<string, EventListener[]>;
+  // Instead, track event subscriptions by plugin name in EventEmitter
 }
 
 export interface PluginRuntimeConfig {
@@ -59,6 +60,8 @@ export class PluginRuntime {
   plugins: Map<string, LoadedPlugin> = new Map();
   private grantedPermissions: Map<string, string[]> = new Map();
   private config: PluginRuntimeConfig;
+  // Track which plugin registered which stream resolver
+  private streamResolverOwners: Map<string, string> = new Map(); // sourceType -> pluginName
 
   // Stream resolvers: map of source_type -> resolver function
   // Resolver takes (external_id, options?) and returns Promise<string | null> (stream URL)
@@ -95,6 +98,7 @@ export class PluginRuntime {
   }
 
   // Load a JS plugin via script tag
+  // Load a JS plugin via script tag
   private async loadJsPlugin(manifest: AudionPluginManifest): Promise<LoadedPlugin> {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -117,7 +121,6 @@ export class PluginRuntime {
           loadedAt: Date.now(),
           storage: new PluginStorage(manifest.name),
           rateLimiters: this.createRateLimiters(),
-          eventListeners: new Map()
         };
 
         // Register plugin BEFORE calling init() so storage APIs work during initialization
@@ -169,7 +172,6 @@ export class PluginRuntime {
         loadedAt: Date.now(),
         storage: new PluginStorage(manifest.name),
         rateLimiters: this.createRateLimiters(),
-        eventListeners: new Map()
       };
 
       // Call lifecycle hooks
@@ -503,38 +505,22 @@ export class PluginRuntime {
       event: K,
       listener: EventListener
     ) => {
-      if (!plugin) return;
-
-      pluginEvents.on(event, listener);
-
-      // Track listener for cleanup
-      if (!plugin.eventListeners.has(event as string)) {
-        plugin.eventListeners.set(event as string, []);
-      }
-      plugin.eventListeners.get(event as string)!.push(listener);
+      // Pass plugin name for automatic tracking
+      pluginEvents.on(event, listener, pluginName);
     };
 
     api.off = <K extends keyof import('./event-emitter').PluginEvents>(
       event: K,
       listener: EventListener
     ) => {
-      if (!plugin) return;
-
       pluginEvents.off(event, listener);
-
-      // Remove from tracked listeners
-      const listeners = plugin.eventListeners.get(event as string);
-      if (listeners) {
-        const index = listeners.indexOf(listener);
-        if (index > -1) listeners.splice(index, 1);
-      }
     };
 
     api.once = <K extends keyof import('./event-emitter').PluginEvents>(
       event: K,
       listener: EventListener
     ) => {
-      pluginEvents.once(event, listener);
+      pluginEvents.once(event, listener, pluginName);
     };
 
     if (this.hasPermission(pluginName, 'player:control')) {
@@ -617,10 +603,15 @@ export class PluginRuntime {
         // Resolver: (externalId: string, options?: {quality?: string}) => Promise<string | null>
         registerResolver: (sourceType: string, resolver: (externalId: string, options?: any) => Promise<string | null>) => {
           this.streamResolvers.set(sourceType, resolver);
+          this.streamResolverOwners.set(sourceType, pluginName);
           console.log(`[PluginRuntime] Registered stream resolver for '${sourceType}' from plugin '${pluginName}'`);
         },
         unregisterResolver: (sourceType: string) => {
-          this.streamResolvers.delete(sourceType);
+          const owner = this.streamResolverOwners.get(sourceType);
+          if (owner === pluginName) {
+            this.streamResolvers.delete(sourceType);
+            this.streamResolverOwners.delete(sourceType);
+          }
         }
       };
     }
@@ -737,36 +728,94 @@ export class PluginRuntime {
     return plugin;
   }
 
-  // Unload a plugin
+  // Unload a plugin with complete cleanup
   async unloadPlugin(name: string): Promise<void> {
     const plugin = this.plugins.get(name);
     if (!plugin) return;
 
-    // Remove all event listeners
-    plugin.eventListeners.forEach((listeners, event) => {
-      listeners.forEach(listener => {
-        pluginEvents.off(event as any, listener);
+    console.log(`[PluginRuntime] Unloading plugin: ${name}`);
+
+    try {
+      // 1. Call destroy lifecycle hook FIRST
+      if (plugin.manifest.type === 'wasm' && plugin.instance?.destroy) {
+        try {
+          plugin.instance.destroy();
+        } catch (err) {
+          console.error(`[PluginRuntime] Error in plugin destroy hook:`, err);
+        }
+      } else if (plugin.manifest.type === 'js' && plugin.instance?.destroy) {
+        try {
+          plugin.instance.destroy();
+        } catch (err) {
+          console.error(`[PluginRuntime] Error in plugin destroy hook:`, err);
+        }
+      }
+
+      // 2. Remove all event listeners
+      pluginEvents.removePluginListeners(name);
+
+      // 3. Remove all UI slot content
+      try {
+        uiSlotManager.removePluginContent(name);
+      } catch (err) {
+        console.error(`[PluginRuntime] Error removing UI content:`, err);
+      }
+
+      // 4. Clear all storage for this plugin (NOW ASYNC)
+      try {
+        const removedCount = await plugin.storage.clear();
+        console.log(`[PluginRuntime] Cleared ${removedCount} storage items for ${name}`);
+      } catch (err) {
+        console.error(`[PluginRuntime] Error clearing storage:`, err);
+      }
+
+      // 5. Unregister stream resolvers owned by this plugin
+      this.streamResolverOwners.forEach((owner, sourceType) => {
+        if (owner === name) {
+          this.streamResolvers.delete(sourceType);
+          this.streamResolverOwners.delete(sourceType);
+        }
       });
-    });
-    plugin.eventListeners.clear();
 
-    // Remove all UI slot content
-    uiSlotManager.removePluginContent(name);
+      // 6. Reset and clear rate limiters
+      plugin.rateLimiters.api.reset();
+      plugin.rateLimiters.storage.reset();
 
-    // Call destroy lifecycle hook
-    if (plugin.manifest.type === 'wasm' && plugin.instance.destroy) {
-      plugin.instance.destroy();
-    } else if (plugin.manifest.type === 'js' && plugin.instance?.destroy) {
-      plugin.instance.destroy();
+      // 7. Remove script tag for JS plugins
+      if (plugin.manifest.type === 'js') {
+        const script = document.getElementById(`plugin-${name}`);
+        if (script) {
+          script.remove();
+        }
+
+        // Remove from global scope
+        const globalName = name.replace(/\s+/g, '');
+        if ((window as any)[globalName]) {
+          delete (window as any)[globalName];
+        }
+        if ((window as any)[name]) {
+          delete (window as any)[name];
+        }
+      }
+
+      // 8. Clear WASM memory references
+      if (plugin.manifest.type === 'wasm' && plugin.instance?.memory) {
+        plugin.instance.memory = undefined;
+      }
+
+      // 9. Revoke all granted permissions
+      this.revokePermissions(name);
+
+      // 10. Remove from plugins map
+      this.plugins.delete(name);
+
+      console.log(`[PluginRuntime] Successfully unloaded plugin: ${name}`);
+    } catch (err) {
+      console.error(`[PluginRuntime] Error during plugin unload:`, err);
+      // Still remove from map even if cleanup partially failed
+      this.plugins.delete(name);
+      throw err;
     }
-
-    // Remove script tag for JS plugins
-    if (plugin.manifest.type === 'js') {
-      const script = document.getElementById(`plugin-${name}`);
-      script?.remove();
-    }
-
-    this.plugins.delete(name);
   }
 
   // Enable plugin
@@ -795,6 +844,39 @@ export class PluginRuntime {
     }
 
     return true;
+  }
+
+  // Periodic cleanup to prevent memory bloat
+  // Call this from a timer or on plugin list refresh
+  cleanupDetachedResources(): void {
+    console.log('[PluginRuntime] Running periodic cleanup...');
+
+    let cleaned = 0;
+
+    // Clean up orphaned script tags
+    document.querySelectorAll('script[id^="plugin-"]').forEach(script => {
+      const pluginName = script.id.replace('plugin-', '');
+      if (!this.plugins.has(pluginName)) {
+        script.remove();
+        cleaned++;
+      }
+    });
+
+    // Clean up orphaned UI slots
+    const loadedPluginNames = new Set(this.plugins.keys());
+    uiSlotManager.getAllSlots().forEach(slotName => {
+      const contents = uiSlotManager.getSlotContent(slotName);
+      contents.forEach(content => {
+        if (!loadedPluginNames.has(content.pluginName)) {
+          uiSlotManager.removeContent(slotName, content.pluginName);
+          cleaned++;
+        }
+      });
+    });
+
+    if (cleaned > 0) {
+      console.log(`[PluginRuntime] Cleaned up ${cleaned} orphaned resources`);
+    }
   }
 
   // Load all plugins from manifests

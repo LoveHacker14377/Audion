@@ -4,8 +4,13 @@ use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
+const DISCORD_APP_ID: &str = "1464631480251715676";
 
 pub struct DiscordState(pub Mutex<Option<DiscordIpcClient>>);
+
+fn is_valid_url(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://")
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PresenceData {
@@ -20,7 +25,8 @@ pub struct PresenceData {
 
 #[tauri::command]
 pub fn discord_connect(state: State<DiscordState>) -> Result<String, String> {
-    let mut client_guard = state.0.lock().unwrap();
+    let mut client_guard = state.0.lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
 
     // Don't reconnect if already connected
     if client_guard.is_some() {
@@ -28,7 +34,7 @@ pub fn discord_connect(state: State<DiscordState>) -> Result<String, String> {
     }
 
     // Create client
-    let mut client = DiscordIpcClient::new("1464631480251715676");
+    let mut client = DiscordIpcClient::new(DISCORD_APP_ID);
 
     // Connect
     client
@@ -45,7 +51,8 @@ pub fn discord_update_presence(
     state: State<DiscordState>,
     data: PresenceData,
 ) -> Result<String, String> {
-    let mut client_guard = state.0.lock().unwrap();
+    let mut client_guard = state.0.lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
 
     if let Some(client) = client_guard.as_mut() {
         // Format:
@@ -83,19 +90,39 @@ pub fn discord_update_presence(
 
         // Add album art as large image
         let mut assets = activity::Assets::new();
+        let mut large_is_audion_logo = false;
 
         if let Some(cover) = &data.cover_url {
-            // Use album cover as large image
-            assets = assets.large_image(cover).large_text(&data.song_title); // Hover text shows song title
-        } else {
-            // Fallback to default app icon
-            // must be uploaded to Discord Developer Portal as "audion_logo"
+            if is_valid_url(cover) {
+                // Real album art
+                assets = assets
+                    .large_image(cover)
+                    .large_text(&data.song_title);
+            } else {
+                // Invalid URL → fallback to logo
+                assets = assets
+                    .large_image("audion_logo")
+                    .large_text(&data.song_title);
+                large_is_audion_logo = true;
+            }
+        }else {
+            // Cover failed → fallback
             assets = assets
                 .large_image("audion_logo")
                 .large_text(&data.song_title);
+
+            large_is_audion_logo = true;
+        }
+
+        // Unless large image IS audion_logo → show Audion as small image
+        if !large_is_audion_logo {
+            assets = assets
+                .small_image("audion_logo")
+                .small_text("Audion");
         }
 
         activity = activity.assets(assets);
+
 
         // Add download button with icon
         activity = activity.buttons(vec![activity::Button::new(

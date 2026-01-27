@@ -15,6 +15,7 @@
     isPlaying: false,
     updateTimeout: null,
     coverCache: new Map(), // Cache found covers to avoid repeated searches
+    MAX_COVER_CACHE_SIZE: 100, // Limit cache size
 
     init(api) {
       console.log("[Discord RPC] Plugin initialized");
@@ -223,6 +224,7 @@
         const foundCover = await this.searchCoverFromTidal();
         if (foundCover) {
           this.coverCache.set(cacheKey, foundCover);
+          this.pruneCache(); // clear old cache
           console.log("[Discord RPC] Found cover from Tidal:", foundCover);
           return foundCover;
         }
@@ -252,6 +254,17 @@
       }
 
       return null;
+    },
+
+    // covercache cleanup
+    pruneCache() {
+      if (this.coverCache.size > this.MAX_COVER_CACHE_SIZE) {
+        // Remove oldest half (FIFO)
+        const entries = Array.from(this.coverCache.entries());
+        const toKeep = entries.slice(-this.MAX_COVER_CACHE_SIZE / 2);
+        this.coverCache.clear();
+        toKeep.forEach(([key, value]) => this.coverCache.set(key, value));
+      }
     },
 
     async clearPresence() {
