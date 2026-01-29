@@ -1,4 +1,5 @@
 // Tauri backend commands for plugin management
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -8,6 +9,8 @@ use tauri::Manager;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PluginManifest {
     pub name: String,
+    #[serde(default)]
+    pub safe_name: Option<String>, // Explicit safe folder name (e.g., "discord-rich-presence")
     pub version: String,
     pub author: String,
     #[serde(default)]
@@ -21,6 +24,8 @@ pub struct PluginManifest {
     pub entry: String,
     #[serde(default)]
     pub permissions: Vec<String>,
+    #[serde(default)]
+    pub cross_plugin_access: Vec<CrossPluginAccess>,
     #[serde(default)]
     pub ui_slots: Option<Vec<String>>,
     #[serde(default)]
@@ -54,6 +59,40 @@ pub struct PluginInfo {
 #[derive(Serialize, Deserialize, Default)]
 struct PluginStateStore {
     plugins: HashMap<String, PluginState>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CrossPluginAccess {
+    pub plugin: String,
+    pub methods: Vec<String>,
+}
+
+// Helper to convert display name to safe folder name (fallback when safe_name not in manifest)
+fn to_safe_name(name: &str) -> String {
+    name.replace(" ", "-").to_lowercase()
+}
+
+// Get safe name from manifest (prefers explicit safe_name, falls back to conversion)
+fn get_safe_name_from_manifest(manifest: &PluginManifest) -> String {
+    manifest
+        .safe_name
+        .clone()
+        .unwrap_or_else(|| to_safe_name(&manifest.name))
+}
+
+// Validate that safe_name matches actual folder structure
+fn validate_safe_name(manifest: &PluginManifest, actual_folder: &str) -> Result<(), String> {
+    let expected_safe_name = get_safe_name_from_manifest(manifest);
+
+    if expected_safe_name != actual_folder {
+        return Err(format!(
+            "Plugin manifest safe_name mismatch: expected folder '{}' but found '{}'. \
+            Update plugin.json to set \"safe_name\": \"{}\"",
+            expected_safe_name, actual_folder, actual_folder
+        ));
+    }
+
+    Ok(())
 }
 
 fn get_state_file_path(plugin_dir: &str) -> PathBuf {
@@ -96,6 +135,14 @@ pub fn list_plugins(plugin_dir: String) -> Vec<PluginInfo> {
             let path = entry.path();
             if path.is_dir() {
                 if let Some(manifest) = read_plugin_manifest(&path) {
+                    // Validate that manifest matches folder structure
+                    if let Some(folder_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if let Err(e) = validate_safe_name(&manifest, folder_name) {
+                            eprintln!("Warning: {}", e);
+                            // Continue anyway to allow users to see misconfigured plugins
+                        }
+                    }
+
                     let name = manifest.name.clone();
                     let state = states.plugins.get(&name);
 
@@ -118,12 +165,31 @@ pub fn list_plugins(plugin_dir: String) -> Vec<PluginInfo> {
 pub fn enable_plugin(name: String, plugin_dir: String) -> Result<bool, String> {
     let mut states = load_plugin_states(&plugin_dir);
 
-    // Use safe folder name (matching install logic)
-    let safe_name = name.replace(" ", "-").to_lowercase();
+    // First try to read manifest to get proper safe_name
+    // Fall back to conversion if manifest not found
+    let safe_name = {
+        let fallback_safe_name = to_safe_name(&name);
+        let plugin_path = PathBuf::from(&plugin_dir).join(&fallback_safe_name);
+
+        if let Some(manifest) = read_plugin_manifest(&plugin_path) {
+            get_safe_name_from_manifest(&manifest)
+        } else {
+            fallback_safe_name
+        }
+    };
+
     let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
 
     // Read manifest to get requested permissions
     let manifest = read_plugin_manifest(&plugin_path);
+
+    // Validate but allow enabling anyway (just warn)
+    if let Some(ref m) = manifest {
+        if let Err(e) = validate_safe_name(m, &safe_name) {
+            eprintln!("Warning: {}", e);
+            // Continue anyway - user explicitly wants to enable
+        }
+    }
 
     if let Some(state) = states.plugins.get_mut(&name) {
         state.enabled = true;
@@ -247,10 +313,13 @@ pub async fn install_plugin(repo_url: String, plugin_dir: String) -> Result<Plug
     // Inject repo URL into manifest for future update checks
     manifest.repo = Some(repo_url.clone());
 
-    // Create plugin directory
-    let plugin_name = manifest.name.clone();
-    let safe_name = plugin_name.replace(" ", "-").to_lowercase();
+    // Get safe name from manifest (prefers explicit safe_name field)
+    let safe_name = get_safe_name_from_manifest(&manifest);
     let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
+
+    // Validate that the manifest is consistent (defensive check for new installs)
+    validate_safe_name(&manifest, &safe_name)?;
+
     fs::create_dir_all(&plugin_path).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
 
     // Save plugin.json (with repo URL included)
@@ -318,8 +387,18 @@ pub async fn install_plugin(repo_url: String, plugin_dir: String) -> Result<Plug
 
 #[tauri::command]
 pub fn uninstall_plugin(name: String, plugin_dir: String) -> Result<bool, String> {
-    // Convert to safe folder name (matching install logic)
-    let safe_name = name.replace(" ", "-").to_lowercase();
+    // Try to get safe name, but don't validate
+    let safe_name = {
+        let fallback_safe_name = to_safe_name(&name);
+        let plugin_path = PathBuf::from(&plugin_dir).join(&fallback_safe_name);
+
+        if let Some(manifest) = read_plugin_manifest(&plugin_path) {
+            get_safe_name_from_manifest(&manifest)
+        } else {
+            fallback_safe_name
+        }
+    };
+
     let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
 
     if !plugin_path.exists() {
@@ -363,6 +442,49 @@ pub fn grant_permissions(
     } else {
         Err(format!("Plugin not tracked: {}", name))
     }
+}
+
+// cross plugin permission check
+#[tauri::command]
+pub fn check_cross_plugin_permission(
+    caller_plugin: String,
+    target_plugin: String,
+    method: String,
+    plugin_dir: String,
+) -> Result<bool, String> {
+    // Get caller plugin's manifest using safe name
+    let safe_caller_name = to_safe_name(&caller_plugin);
+    let caller_path = PathBuf::from(&plugin_dir).join(&safe_caller_name);
+
+    let manifest = read_plugin_manifest(&caller_path)
+        .ok_or_else(|| format!("Caller plugin not found: {}", caller_plugin))?;
+
+    // Check if caller has permission for this target plugin + method
+    // The manifest contains display names in cross_plugin_access, so compare directly
+    for access in &manifest.cross_plugin_access {
+        if access.plugin == target_plugin && access.methods.contains(&method) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+// Get all cross-plugin permissions for a plugin - returns them as-is from manifest
+#[tauri::command]
+pub fn get_cross_plugin_permissions(
+    plugin_name: String,
+    plugin_dir: String,
+) -> Result<Vec<CrossPluginAccess>, String> {
+    // First try with fallback safe name to locate the plugin
+    let fallback_safe_name = to_safe_name(&plugin_name);
+    let plugin_path = PathBuf::from(&plugin_dir).join(&fallback_safe_name);
+
+    let manifest = read_plugin_manifest(&plugin_path)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_name))?;
+
+    // Return cross_plugin_access as-is (contains display names like "Tidal Search")
+    Ok(manifest.cross_plugin_access)
 }
 
 #[tauri::command]
@@ -509,11 +631,18 @@ pub async fn check_plugin_updates(plugin_dir: String) -> Result<Vec<PluginUpdate
 #[tauri::command]
 pub async fn update_plugin(name: String, plugin_dir: String) -> Result<PluginInfo, String> {
     // Get the current plugin's manifest to retrieve repo URL and preserve state
-    let safe_name = name.replace(" ", "-").to_lowercase();
-    let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
+    let fallback_safe_name = to_safe_name(&name);
+    let plugin_path = PathBuf::from(&plugin_dir).join(&fallback_safe_name);
 
     let manifest =
         read_plugin_manifest(&plugin_path).ok_or_else(|| format!("Plugin not found: {}", name))?;
+
+    let safe_name = get_safe_name_from_manifest(&manifest);
+
+    // Validate before updating
+    validate_safe_name(&manifest, &safe_name)?;
+
+    let plugin_path = PathBuf::from(&plugin_dir).join(&safe_name);
 
     let repo_url = manifest
         .repo
@@ -583,13 +712,19 @@ pub async fn update_plugin(name: String, plugin_dir: String) -> Result<PluginInf
     // Inject repo URL into manifest for future update checks
     new_manifest.repo = Some(repo_url.clone());
 
+    // Validate the new manifest
+    let new_safe_name = get_safe_name_from_manifest(&new_manifest);
+    validate_safe_name(&new_manifest, &new_safe_name)?;
+
     // Create plugin directory
-    fs::create_dir_all(&plugin_path).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
+    let new_plugin_path = PathBuf::from(&plugin_dir).join(&new_safe_name);
+    fs::create_dir_all(&new_plugin_path)
+        .map_err(|e| format!("Failed to create plugin dir: {}", e))?;
 
     // Save new plugin.json
     let manifest_json = serde_json::to_string_pretty(&new_manifest)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
-    fs::write(plugin_path.join("plugin.json"), &manifest_json)
+    fs::write(new_plugin_path.join("plugin.json"), &manifest_json)
         .map_err(|e| format!("Failed to save plugin.json: {}", e))?;
 
     // Fetch the entry file
@@ -618,7 +753,7 @@ pub async fn update_plugin(name: String, plugin_dir: String) -> Result<PluginInf
         .await
         .map_err(|e| format!("Failed to read entry file: {}", e))?;
 
-    fs::write(plugin_path.join(&new_manifest.entry), &entry_bytes)
+    fs::write(new_plugin_path.join(&new_manifest.entry), &entry_bytes)
         .map_err(|e| format!("Failed to save entry file: {}", e))?;
 
     // Update state, preserving enabled status and permissions from before

@@ -246,8 +246,25 @@ export async function fetchCuratedRegistry(): Promise<MarketplacePlugin[]> {
   return [];
 }
 
-// Fetch a community plugin from manifest URL
-export async function fetchCommunityPlugin(manifestUrl: string): Promise<MarketplacePlugin | null> {
+// Fetch a community plugin from manifest URL or repository URL
+export async function fetchCommunityPlugin(url: string): Promise<MarketplacePlugin | null> {
+  // Convert GitHub repository URL to raw manifest URL if needed
+  let manifestUrl = url;
+
+  // Check if it's a GitHub repo URL (not already a raw URL)
+  if (url.includes('github.com') && !url.includes('raw.githubusercontent.com')) {
+    // Extract owner/repo from URL
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (match) {
+      const [, owner, repo] = match;
+      // Remove trailing slash and .git if present
+      const cleanRepo = repo.replace(/\.git$/, '').replace(/\/$/, '');
+      // Default to main branch (you could also detect the default branch)
+      manifestUrl = `https://raw.githubusercontent.com/${owner}/${cleanRepo}/main/plugin.json`;
+      console.log(`[Marketplace] Converted repo URL to manifest URL: ${manifestUrl}`);
+    }
+  }
+
   // Validate URL
   if (!isValidUrl(manifestUrl)) {
     console.warn(`[Marketplace] Invalid URL: ${manifestUrl}`);
@@ -278,7 +295,7 @@ export async function fetchCommunityPlugin(manifestUrl: string): Promise<Marketp
     const plugin: MarketplacePlugin = {
       manifest,
       curated: false,
-      repo: manifest.repo || '',
+      repo: url, // Store original repo URL
       manifest_url: manifestUrl,
       verified: false
     };

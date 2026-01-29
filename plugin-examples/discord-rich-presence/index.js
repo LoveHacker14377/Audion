@@ -243,6 +243,7 @@
             this.currentTrack.title,
             this.currentTrack.artist,
             trackId, // Pass track ID so Tidal can update the database
+            "Discord Rich Presence", // IMPORTANT, must match plugin name exactly
           );
         } catch (error) {
           console.log("[Discord RPC] Tidal cover search error:", error);

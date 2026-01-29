@@ -206,6 +206,9 @@ export class PluginStorage {
 
         return { used, total: this.quotaBytes, available, percentUsed };
     }
+<<<<<<< Updated upstream
+}
+=======
 
     /**
      * Batch set multiple keys (more efficient than multiple set() calls)
@@ -253,13 +256,19 @@ export class PluginStorage {
     }
 
     /**
-     * Import data (replaces existing data)
+     * Import data into storage
+     * WARNING: This REPLACES all existing data by default
+     * @param data - Data to import
+     * @param replace - If true (default), clears all existing data first. If false, merges with existing data.
      */
-    async importData(data: Record<string, any>): Promise<{ success: number; failed: number }> {
-        // Clear existing data first
-        await this.clear();
+    async importData(data: Record<string, any>, replace = true): Promise<{ success: number; failed: number }> {
+        if (replace) {
+            // Clear existing data first
+            await this.clear();
+        }
 
         // Import new data
         return this.setBatch(data);
     }
 }
+>>>>>>> Stashed changes

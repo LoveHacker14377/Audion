@@ -93,6 +93,8 @@ pub fn run() {
             commands::disable_plugin,
             commands::get_plugin_permissions,
             commands::grant_permissions,
+            commands::check_cross_plugin_permission,
+            commands::get_cross_plugin_permissions,
             commands::revoke_permissions,
             commands::get_plugin_dir,
             commands::check_plugin_updates,
