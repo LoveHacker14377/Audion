@@ -453,9 +453,10 @@
         padding: var(--spacing-sm) var(--spacing-xl);
     }
 
-    .album-tracks {
+    .track-list-section {
         flex: 1;
         overflow-y: auto;
+        min-height: 0;
     }
 
     .btn-secondary {
