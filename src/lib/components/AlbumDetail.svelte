@@ -461,10 +461,10 @@
         padding: var(--spacing-sm) var(--spacing-xl);
     }
 
-    /* i'm not sure why this is being unused. but it might be imp and i might have broke something
-    .album-tracks {
+    .track-list-section {
         flex: 1;
         overflow-y: auto;
+        min-height: 0;
     }
     */
     .btn-secondary {
