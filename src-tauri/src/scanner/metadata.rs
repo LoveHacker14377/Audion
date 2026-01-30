@@ -1,5 +1,4 @@
 // Audio metadata extraction using lofty
-use base64::{engine::general_purpose::STANDARD, Engine};
 use lofty::{Accessor, AudioFile, Probe, TaggedFileExt};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -64,17 +63,17 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
             let album = tag.album().map(|s| s.to_string());
             let track_number = tag.track().map(|n| n as i32);
         
-            // Extract album art (for the album)
+            // Extract album art as raw bytes (NOT base64)
             let album_art = tag
                 .pictures()
                 .first()
-                .map(|pic| STANDARD.encode(pic.data()));
+                .map(|pic| pic.data().to_vec());
         
-            // Extract track cover (same as album art, but stored per-track)
+            // Extract track cover as raw bytes (same as album art, but stored per-track)
             let track_cover = tag
                 .pictures()
                 .first()
-                .map(|pic| STANDARD.encode(pic.data()));
+                .map(|pic| pic.data().to_vec());
         
             // Generate content hash for duplicate detection
             let content_hash = Some(generate_content_hash(

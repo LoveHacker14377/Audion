@@ -10,6 +10,7 @@ use db::Database;
 use std::path::PathBuf;
 use tauri::Manager;
 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -68,6 +69,16 @@ pub fn run() {
             commands::delete_track,
             commands::delete_album,
             commands::reset_database,
+            commands::sync_cover_paths_from_files,
+            // Cover Management commands
+            commands::covers::migrate_covers_to_files,
+            commands::covers::get_track_cover_path,
+            commands::covers::get_batch_cover_paths,
+            commands::covers::get_album_art_path,
+            commands::covers::get_cover_as_asset_url,
+            commands::covers::preload_covers,
+            commands::covers::cleanup_orphaned_cover_files,
+            commands::covers::clear_base64_covers,
             // Playlist commands
             commands::create_playlist,
             commands::get_playlists,
@@ -77,6 +88,7 @@ pub fn run() {
             commands::delete_playlist,
             commands::rename_playlist,
             commands::update_playlist_cover,
+            commands::reorder_playlist_tracks,
             // Lyrics commands
             commands::save_lrc_file,
             commands::load_lrc_file,

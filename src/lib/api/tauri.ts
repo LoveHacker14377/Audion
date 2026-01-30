@@ -50,7 +50,8 @@ export interface Track {
     format: string | null;
     bitrate: number | null;
     cover_url?: string | null;  // For streaming services (Tidal, etc.)
-    track_cover?: string | null; // Track's embedded cover (base64)
+    track_cover?: string | null; // old - Track's embedded cover (base64)
+    track_cover_path?: string | null; // File path to cover image
     source_type?: string | null;  // 'local', 'tidal', 'url'
     external_id?: string | null;  // Source-specific ID
     local_src?: string | null; // Local file path for offline playback
@@ -60,7 +61,8 @@ export interface Album {
     id: number;
     name: string;
     artist: string | null;
-    art_data: string | null;
+    art_data: string | null; // old - base64 album art
+    art_path?: string | null; // File path to album art
 }
 
 export interface Artist {
@@ -85,6 +87,14 @@ export interface ScanResult {
     tracks_added: number;
     tracks_updated: number;
     tracks_deleted: number;
+    errors: string[];
+}
+
+export interface MigrationProgress {
+    total: number;
+    processed: number;
+    tracks_migrated: number;
+    albums_migrated: number;
     errors: string[];
 }
 
@@ -149,7 +159,124 @@ export async function resetDatabase(): Promise<void> {
     return await invoke('reset_database');
 }
 
+// Cover Loading Commands
+
+// Migrate all existing base64 covers to file-based storage
+// This is a one-time thing that should be run after upgrading
+export async function migrateCoversToFiles(): Promise<MigrationProgress> {
+    return await invoke('migrate_covers_to_files');
+}
+
+
+// Get the file path for a single track's cover
+// Returns null if no cover exists
+export async function getTrackCoverPath(trackId: number): Promise<string | null> {
+    return await invoke('get_track_cover_path', { trackId });
+}
+
+// Get cover paths for multiple tracks in a single batch operation
+// Returns a map of trackId -> coverPath
+export async function getBatchCoverPaths(trackIds: number[]): Promise<Record<number, string>> {
+    return await invoke('get_batch_cover_paths', { trackIds });
+}
+
+// Get the file path for an album's art
+// Returns null if no art exists
+export async function getAlbumArtPath(albumId: number): Promise<string | null> {
+    return await invoke('get_album_art_path', { albumId });
+}
+
+// Convert a file path to an asset URL for browser use
+// (This is mostly handled on the frontend via convertFileSrc)
+export async function getCoverAsAssetUrl(filePath: string): Promise<string> {
+    return await invoke('get_cover_as_asset_url', { filePath });
+}
+
+// Preload covers for better performance
+// Currently not used, but could implement backend caching in the future
+export async function preloadCovers(trackIds: number[]): Promise<void> {
+    return await invoke('preload_covers', { trackIds });
+}
+
+// Clean up orphaned cover files (covers without corresponding tracks/albums)
+// Returns the number of files deleted
+export async function cleanupOrphanedCoverFiles(): Promise<number> {
+    return await invoke('cleanup_orphaned_cover_files');
+}
+
+// Clear all base64 cover data from the database after successful migration
+// imp -Only run this after verifying all covers have been migrated
+export async function clearBase64Covers(): Promise<number> {
+    return await invoke('clear_base64_covers');
+}
+
+// Helper Functions for Cover Display
+// Get the cover source URL for a track
+// Handles both file paths and base64 data
+// Priority: file path > base64 > null
+export function getTrackCoverSrc(track: Track): string | null {
+    // Priority 1: File path (new system)
+    if (track.track_cover_path) {
+        return convertFileSrc(track.track_cover_path);
+    }
+
+    // Priority 2: Base64 data - old
+    if (track.track_cover) {
+        return getAlbumArtSrc(track.track_cover, false);
+    }
+
+    // Priority 3: Cover URL (for streaming services)
+    if (track.cover_url) {
+        return track.cover_url;
+    }
+
+    return null;
+}
+
+// Get the album art source URL
+// Handles both file paths and base64 data
+// Priority: file path > base64 > null
+export function getAlbumCoverSrc(album: Album): string | null {
+    // Priority 1: File path (new system)
+    if (album.art_path) {
+        return convertFileSrc(album.art_path);
+    }
+
+    // Priority 2: Base64 data - old
+    if (album.art_data) {
+        return getAlbumArtSrc(album.art_data, false);
+    }
+
+    return null;
+}
+
+/**
+ * Convert album art data or path to a displayable URL
+ * @param artDataOrPath - Either base64 string or file path
+ * @param isPath - Whether the input is a file path (true) or base64 (false)
+ */
+export function getAlbumArtSrc(artDataOrPath: string | null, isPath: boolean = false): string | null {
+    if (!artDataOrPath) return null;
+
+    // If it's a file path, convert to asset URL
+    if (isPath) {
+        return convertFileSrc(artDataOrPath);
+    }
+
+    // Otherwise treat as base64
+    // Detect image type from base64 header
+    if (artDataOrPath.startsWith('/9j/')) {
+        return `data:image/jpeg;base64,${artDataOrPath}`;
+    } else if (artDataOrPath.startsWith('iVBOR')) {
+        return `data:image/png;base64,${artDataOrPath}`;
+    }
+    // Default to JPEG
+    return `data:image/jpeg;base64,${artDataOrPath}`;
+}
+
+
 // Playlist commands
+
 export async function createPlaylist(name: string): Promise<number> {
     return await invoke('create_playlist', { name });
 }
@@ -178,7 +305,13 @@ export async function renamePlaylist(playlistId: number, newName: string): Promi
     return await invoke('rename_playlist', { playlistId, newName });
 }
 
+export async function reorderPlaylistTracks(playlistId: number, fromIndex: number, toIndex: number): Promise<void> {
+    return await invoke('reorder_playlist_tracks', { playlistId, fromIndex, toIndex });
+}
+
+
 // File dialog
+
 export async function selectMusicFolder(): Promise<string | null> {
     await ensureTauriLoaded();
     const selected = await openFunc!({
@@ -213,15 +346,6 @@ export function formatDuration(seconds: number | null): string {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Get album art as data URL
-export function getAlbumArtSrc(artData: string | null): string | null {
-    if (!artData) return null;
-    // Detect image type from base64 header
-    if (artData.startsWith('/9j/')) {
-        return `data:image/jpeg;base64,${artData}`;
-    } else if (artData.startsWith('iVBOR')) {
-        return `data:image/png;base64,${artData}`;
-    }
-    // Default to JPEG
-    return `data:image/jpeg;base64,${artData}`;
+export async function syncCoverPathsFromFiles(): Promise<MigrationProgress> {
+    return await invoke('sync_cover_paths_from_files');
 }

@@ -23,7 +23,7 @@
     }
   }
   import { lyricsData, activeLine } from "$lib/stores/lyrics";
-  import { getAlbumArtSrc, getAlbum, formatDuration } from "$lib/api/tauri";
+  import { getAlbumArtSrc, getAlbum, getAlbumCoverSrc, getTrackCoverSrc, formatDuration } from "$lib/api/tauri";
   import { onMount, tick } from "svelte";
 
   let albumArt: string | null = null;
@@ -95,30 +95,17 @@
 
   // Load album art
 $: if ($currentTrack) {
-  if ($currentTrack.track_cover) {
-    // Priority 1: Track's own embedded cover
-    albumArt = getAlbumArtSrc($currentTrack.track_cover);
-  } else if ($currentTrack.cover_url) {
-    // Priority 2: Tidal/streaming cover
-    albumArt = $currentTrack.cover_url;
-  } else if ($currentTrack.album_id) {
-    // Priority 3: Album art
-    loadAlbumArt($currentTrack.album_id);
+  // Use the helper function that handles all cover sources
+  const trackCover = getTrackCoverSrc($currentTrack);
+  
+  if (trackCover) {
+    albumArt = trackCover;
   } else {
     albumArt = null;
   }
 } else {
   albumArt = null;
 }
-
-  async function loadAlbumArt(albumId: number) {
-    try {
-      const album = await getAlbum(albumId);
-      albumArt = album ? getAlbumArtSrc(album.art_data) : null;
-    } catch {
-      albumArt = null;
-    }
-  }
 
   // Auto-scroll lyrics
   $: if ($activeLine !== -1 && lyricsContainer) {

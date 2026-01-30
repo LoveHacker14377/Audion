@@ -26,7 +26,7 @@
         toggleQueue,
         toggleMiniPlayer,
     } from "$lib/stores/ui";
-    import { formatDuration, getAlbumArtSrc, getAlbum } from "$lib/api/tauri";
+    import { formatDuration, getAlbumArtSrc, getAlbum, getTrackCoverSrc, getAlbumCoverSrc } from "$lib/api/tauri";
     import { uiSlotManager } from "$lib/plugins/ui-slots";
     import PluginMenu from "$lib/components/PluginMenu.svelte";
     import { goToArtistDetail } from "$lib/stores/view";
@@ -42,6 +42,7 @@
     let isVolumeChanging = false;
     let albumArt: string | null = null;
     let imageLoadFailed = false;
+    let loadedAlbum: any = null;
 
     // Slot containers
     let slotStart: HTMLDivElement;
@@ -50,30 +51,59 @@
     // Expose audio element for visualizer
     $: audioElementRef = audioElement;
 
-    // Reactive album art loading
-    $: if ($currentTrack?.track_cover) {
-        // Priority 1: Track's embedded cover
-        albumArt = getAlbumArtSrc($currentTrack.track_cover);
-        imageLoadFailed = false;
-    } else if ($currentTrack?.cover_url) {
-        // Priority 2: Streaming/Tidal cover
-        albumArt = $currentTrack.cover_url;
-        imageLoadFailed = false;
-    } else if ($currentTrack?.album_id) {
-        // Priority 3: Album art
-        loadAlbumArt($currentTrack.album_id);
-        imageLoadFailed = false;
+    // Load track cover - with priority order
+    $: if ($currentTrack) {
+        loadTrackCover($currentTrack);
     } else {
         albumArt = null;
         imageLoadFailed = false;
+        loadedAlbum = null;
+    }
+
+    async function loadTrackCover(track: any) {
+        imageLoadFailed = false;
+        
+        if (track.track_cover_path) {
+            // Priority 1: Track's file-based cover
+            albumArt = getTrackCoverSrc(track);
+        } else if (track.track_cover) {
+            // Priority 2: Track's base64 cover - old
+            albumArt = getAlbumArtSrc(track.track_cover);
+        } else if (track.cover_url) {
+            // Priority 3: Streaming track cover URL
+            albumArt = track.cover_url;
+        } else if (track.album_id) {
+            // Priority 4 & 5: Album art (file-based or base64)
+            await loadAlbumArt(track.album_id);
+        } else {
+            albumArt = null;
+        }
     }
 
     async function loadAlbumArt(albumId: number) {
         try {
             const album = await getAlbum(albumId);
-            albumArt = album ? getAlbumArtSrc(album.art_data) : null;
+            
+            if (!album) {
+                albumArt = null;
+                loadedAlbum = null;
+                return;
+            }
+            
+            loadedAlbum = album;
+            
+            if (album.art_path) {
+                // Priority 4: Album's file-based art
+                albumArt = getAlbumCoverSrc(album);
+            } else if (album.art_data) {
+                // Priority 5: Album's base64 art - old
+                albumArt = getAlbumArtSrc(album.art_data);
+            } else {
+                albumArt = null;
+            }
         } catch {
             albumArt = null;
+            loadedAlbum = null;
         }
     }
 

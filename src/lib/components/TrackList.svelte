@@ -3,9 +3,12 @@
   import {
     formatDuration,
     getAlbumArtSrc,
+    getTrackCoverSrc,
+    getAlbumCoverSrc,
     addTrackToPlaylist,
     removeTrackFromPlaylist,
     deleteTrack,
+    reorderPlaylistTracks,
   } from "$lib/api/tauri";
   import {
     playTracks,
@@ -128,16 +131,16 @@
   }
 
   function isTrackUnavailable(track: Track): boolean {
-        // Local tracks are always available
+    // Local tracks are always available
     if (!track.source_type || track.source_type === "local") return false;
-        // Downloaded tracks are always available
+    // Downloaded tracks are always available
     if (track.local_src) return false;
 
-        // If offline and not downloaded/local, it's unavailable
+    // If offline and not downloaded/local, it's unavailable
     if (!$isOnline) return true;
 
-        // Otherwise depends on plugin availability
-        // Also check if we have a resolver for this source type
+    // Otherwise depends on plugin availability
+    // Also check if we have a resolver for this source type
     if (!isTidalAvailable) return true;
 
     const runtime = pluginStore.getRuntime();
@@ -152,9 +155,6 @@
     // Let's modify filteredTracks to NOT filter based on resolvers,
     // but relies on the CSS class for visual indication.
   $: filteredTracks = tracks;
-
-    // Create a map of album_id to album for quick lookup
-    $: albumMap = new Map($albums.map((a) => [a.id, a]));
 
   // Sorting state
   type SortField = "title" | "album" | "duration" | null;
@@ -230,7 +230,25 @@
     if (trackAlbumArtCache.has(track.id)) {
       return trackAlbumArtCache.get(track.id) ?? null;
     }
-    const result = getTrackAlbumCover(track.id);
+
+    let result: string | null = null;
+
+    // Priority 1: Track's own cover (handles both track_cover_path and track_cover)
+    result = getTrackCoverSrc(track);
+
+    // Priority 2: If no track cover, try album art
+    if (!result && track.album_id) {
+      const album = albumMap.get(track.album_id);
+      if (album) {
+        result = getAlbumCoverSrc(album);
+      }
+    }
+
+    // Priority 3: fallback to library helper
+    if (!result) {
+      result = getTrackAlbumCover(track.id);
+    }
+
     // Cache the result
     trackAlbumArtCache.set(track.id, result);
     return result;
@@ -257,12 +275,12 @@
   async function handleContextMenu(e: MouseEvent, track: Track) {
     e.preventDefault();
 
-        // Ensure playlists are loaded
+    // Ensure playlists are loaded
     if ($playlists.length === 0) {
       await loadPlaylists();
     }
 
-        // Build playlist submenu items
+    // Build playlist submenu items
     const playlistItems = $playlists.map((playlist) => ({
       label: playlist.name,
       action: async () => {
@@ -280,9 +298,7 @@
       {
         label: "Play",
         action: () => {
-                    const trackIndex = sortedTracks.findIndex(
-                        (t) => t.id === track.id,
-                    );
+          const trackIndex = sortedTracks.findIndex((t) => t.id === track.id);
           if (trackIndex !== -1) playTracks(sortedTracks, trackIndex);
         },
         disabled: isUnavailable,
@@ -311,10 +327,7 @@
             addToast(`Downloaded "${track.title}"`, "success");
           } catch (error) {
             console.error("Failed to download track:", error);
-                        addToast(
-                            `Failed to download "${track.title}"`,
-                            "error",
-                        );
+            addToast(`Failed to download "${track.title}"`, "error");
           }
         },
         disabled:
@@ -345,10 +358,7 @@
             await removeTrackFromPlaylist(playlistId, track.id);
             tracks = tracks.filter((t) => t.id !== track.id);
           } catch (error) {
-                        console.error(
-                            "Failed to remove track from playlist:",
-                            error,
-                        );
+            console.error("Failed to remove track from playlist:", error);
           }
         },
       });
@@ -364,7 +374,7 @@
             // Clear from cache
             trackAlbumArtCache.delete(track.id);
             await loadLibrary();
-                        // Also remove from local tracks array for immediate UI feedback
+            // Also remove from local tracks array for immediate UI feedback
             tracks = tracks.filter((t) => t.id !== track.id);
           } catch (error) {
             console.error("Failed to delete track:", error);
@@ -391,11 +401,101 @@
     failedImages.add(albumArt);
     failedImages = failedImages;
   }
+
+  // Drag and drop for playlist reordering (only enabled when playlistId is set)
+  let draggedIndex: number | null = null;
+  let dragOverIndex: number | null = null;
+  let isDragging = false;
+
+  function handlePointerDown(e: PointerEvent, actualIndex: number) {
+    if (!playlistId) return; // Only allow dragging in playlists
+    
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation(); // Prevent parent handlers
+    isDragging = true;
+    draggedIndex = actualIndex;
+
+    // Capture pointer events
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+
+    // Add global listeners
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (!isDragging || draggedIndex === null || !playlistId) return;
+
+    // Find element under pointer
+    const elementsUnderPointer = document.elementsFromPoint(
+      e.clientX,
+      e.clientY,
+    );
+    const trackRow = elementsUnderPointer.find((el) =>
+      el.classList.contains("track-row"),
+    );
+
+    if (trackRow) {
+      const indexAttr = trackRow.getAttribute("data-track-index");
+      if (indexAttr !== null) {
+        const overIndex = parseInt(indexAttr, 10);
+        if (overIndex !== draggedIndex) {
+          dragOverIndex = overIndex;
+        } else {
+          dragOverIndex = null;
+        }
+      }
+    } else {
+      dragOverIndex = null;
+    }
+  }
+
+  async function handlePointerUp() {
+    if (
+      isDragging &&
+      draggedIndex !== null &&
+      dragOverIndex !== null &&
+      draggedIndex !== dragOverIndex &&
+      playlistId
+    ) {
+      console.log("Reorder playlist:", playlistId, "from:", draggedIndex, "to:", dragOverIndex);
+      
+      try {
+        // Update backend
+        await reorderPlaylistTracks(playlistId, draggedIndex, dragOverIndex);
+        
+        console.log("Reorder successful, updating local state");
+        
+        // Update local state for instant feedback
+        const newTracks = [...tracks];
+        const [removed] = newTracks.splice(draggedIndex, 1);
+        newTracks.splice(dragOverIndex, 0, removed);
+        tracks = newTracks;
+        
+        addToast("Tracks reordered", "success");
+      } catch (error) {
+        console.error("Failed to reorder tracks:", error);
+        addToast(`Failed to reorder tracks: ${error}`, "error");
+      }
+    }
+
+    // Cleanup
+    isDragging = false;
+    draggedIndex = null;
+    dragOverIndex = null;
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", handlePointerUp);
+  }
 </script>
 
 <div class="track-list">
   <!-- Header stays fixed -->
-  <header class="list-header" class:no-album={!showAlbum}>
+  <header class="list-header" class:no-album={!showAlbum} class:with-drag={playlistId !== null}>
+    {#if playlistId !== null}
+      <span class="col-header col-drag"></span>
+    {/if}
     <button class="col-header col-num" on:click={() => toggleSort(null)}>
       {#if sortField === null}
         <span class="sort-icon">#</span>
@@ -404,27 +504,17 @@
       {/if}
     </button>
     <span class="col-header col-cover"></span>
-        <button
-            class="col-header col-title"
-            on:click={() => toggleSort("title")}
-        >
+    <button class="col-header col-title" on:click={() => toggleSort("title")}>
       Title
       {#if sortField === "title"}
-                <span class="sort-icon"
-                    >{sortDirection === "asc" ? "▲" : "▼"}</span
-                >
+        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
       {/if}
     </button>
     {#if showAlbum}
-            <button
-                class="col-header col-album"
-                on:click={() => toggleSort("album")}
-            >
+      <button class="col-header col-album" on:click={() => toggleSort("album")}>
         Album
         {#if sortField === "album"}
-                    <span class="sort-icon"
-                        >{sortDirection === "asc" ? "▲" : "▼"}</span
-                    >
+          <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
         {/if}
       </button>
     {/if}
@@ -438,9 +528,7 @@
         />
       </svg>
       {#if sortField === "duration"}
-                <span class="sort-icon"
-                    >{sortDirection === "asc" ? "▲" : "▼"}</span
-                >
+        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
       {/if}
     </button>
   </header>
@@ -450,6 +538,7 @@
     <div
       class="list-body"
       class:no-album={!showAlbum}
+      class:with-drag={playlistId !== null}
       on:scroll={handleScroll}
       bind:this={containerElement}
     >
@@ -468,6 +557,9 @@
               class="track-row"
               class:playing={$currentTrack?.id === track.id}
               class:unavailable
+              class:dragging={draggedIndex === actualIndex}
+              class:drag-over={dragOverIndex === actualIndex}
+              data-track-index={actualIndex}
               on:click={() => handleTrackClick(track, actualIndex)}
               on:dblclick={() => handleTrackDoubleClick(track, actualIndex)}
               on:contextmenu={(e) => handleContextMenu(e, track)}
@@ -476,6 +568,28 @@
               role="button"
               tabindex="0"
             >
+              {#if playlistId !== null}
+                <div
+                  class="drag-handle"
+                  on:pointerdown={(e) => handlePointerDown(e, actualIndex)}
+                  on:click|stopPropagation
+                  on:dblclick|stopPropagation
+                  title="Drag to reorder"
+                  role="button"
+                  tabindex="-1"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    width="16"
+                    height="16"
+                  >
+                    <path
+                      d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"
+                    />
+                  </svg>
+                </div>
+              {/if}
               <span class="col-num">
                 {#if $currentTrack?.id === track.id && $isPlaying}
                   <svg
@@ -562,9 +676,7 @@
                           : formatUpper.replace("MPEG", "MP3")}
                     <span
                       class="quality-tag"
-                                class:high-quality={formatUpper.includes(
-                                    "FLAC",
-                                ) ||
+                      class:high-quality={formatUpper.includes("FLAC") ||
                         formatUpper.includes("WAV") ||
                         formatUpper.includes("HI_RES") ||
                         formatUpper.includes("HIRES") ||
@@ -598,12 +710,7 @@
   {:else}
     <div class="list-body">
       <div class="empty-state">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="48"
-                    height="48"
-                >
+        <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
           <path
             d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
           />
@@ -640,8 +747,16 @@
     flex-shrink: 0;
   }
 
+  .list-header.with-drag {
+    grid-template-columns: 32px 40px 48px 1fr 1fr 80px;
+  }
+
   .list-header.no-album {
     grid-template-columns: 40px 48px 1fr 80px;
+  }
+
+  .list-header.no-album.with-drag {
+    grid-template-columns: 32px 40px 48px 1fr 80px;
   }
 
   .col-header {
@@ -662,6 +777,10 @@
 
   .col-header:hover {
     color: var(--text-primary);
+  }
+
+  .col-header.col-drag {
+    cursor: default;
   }
 
   .col-header.col-num {
@@ -721,8 +840,16 @@
     box-sizing: border-box;
   }
 
+  .list-body.with-drag .track-row {
+    grid-template-columns: 32px 40px 48px 1fr 1fr 80px;
+  }
+
   .list-body.no-album .track-row {
     grid-template-columns: 40px 48px 1fr 80px;
+  }
+
+  .list-body.no-album.with-drag .track-row {
+    grid-template-columns: 32px 40px 48px 1fr 80px;
   }
 
   .track-row:hover {
@@ -736,6 +863,47 @@
 
   .track-row.playing .track-name {
     color: var(--accent-primary);
+  }
+
+  .track-row.dragging {
+    opacity: 0.5;
+    background-color: var(--bg-highlight);
+  }
+
+  .track-row.drag-over {
+    border-top: 2px solid var(--accent-primary);
+    margin-top: -2px;
+  }
+
+  .drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--text-subdued);
+    cursor: grab;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none; /* Prevent default touch behaviors */
+  }
+
+  .track-row:hover .drag-handle {
+    opacity: 1;
+  }
+
+  .drag-handle:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+    background-color: rgba(255, 255, 255, 0.15);
   }
 
   .col-num {

@@ -12,6 +12,8 @@
     import { playTracks, addToQueue } from "$lib/stores/player";
     import {
         getAlbumArtSrc,
+        getTrackCoverSrc,
+        getAlbumCoverSrc,
         addTrackToPlaylist,
         deleteTrack,
         deleteAlbum,
@@ -25,51 +27,111 @@
     } from "$lib/stores/library";
     import { contextMenu } from "$lib/stores/ui";
     import { pluginStore } from "$lib/stores/plugin-store";
+    import { playlistCovers } from "$lib/stores/playlistCovers";
+
+    // Helper functions for playlist covers
+    function initialsFromName(name: string) {
+        if (!name) return "PL";
+        const parts = name.trim().split(/\s+/);
+        const picked = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "");
+        return picked.join("") || name.slice(0, 2).toUpperCase();
+    }
+
+    function hashToColor(str: string) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++)
+            h = (h << 5) - h + str.charCodeAt(i);
+        const hue = Math.abs(h) % 360;
+        return `hsl(${hue} 30% 30%)`;
+    }
+
+    function generateSvgCover(name: string, size = 512) {
+        const initials = initialsFromName(name);
+        const bg = hashToColor(name || "playlist");
+        const svg =
+            `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>` +
+            `<rect width='100%' height='100%' fill='${bg}'/>` +
+            `<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter, system-ui, sans-serif' font-size='${Math.floor(size / 3)}' fill='white' font-weight='700'>${initials}</text>` +
+            `</svg>`;
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    }
+
+    function getPlaylistCover(playlist: { id: number; name: string }): string {
+        const custom = $playlistCovers && $playlistCovers[playlist.id];
+        if (custom) return custom;
+        return generateSvgCover(playlist.name || "Playlist");
+    }
 
     // Create album map for track art lookup
     $: albumMap = new Map($albums.map((a) => [a.id, a]));
 
     // Get track art with proper priority
     function getTrackArt(track: {
+        track_cover_path?: string | null;
         track_cover?: string | null;
         cover_url?: string | null;
         album_id?: number | null;
     }): string | null {
-        // Priority 1: Track's embedded cover
+        // Priority 1: Track's file-based cover
+        if (track.track_cover_path) {
+            return getTrackCoverSrc(track as any);
+        }
+        // Priority 2: Track's base64 cover - old, for migration and as fallback
         if (track.track_cover) {
-        return getAlbumArtSrc(track.track_cover);
+            return getAlbumArtSrc(track.track_cover);
         }
         // Priority 2: External track cover URL
         if (track.cover_url) {
-        return track.cover_url;
+            return track.cover_url;
         }
-        // Priority 3: Album art
+        // Priority 4 & 5: Album art (file-based or base64)
         if (!track.album_id) return null;
         const album = albumMap.get(track.album_id);
-        return album ? getAlbumArtSrc(album.art_data) : null;
+        if (!album) return null;
+        
+        // Priority 4: Album's file-based art
+        if (album.art_path) {
+            return getAlbumCoverSrc(album);
+        }
+        // Priority 5: Album's base64 art - old
+        return album.art_data ? getAlbumArtSrc(album.art_data) : null;
     }
 
     // Get album cover with proper priority
     function getAlbumCover(album: {
         id: number;
+        art_path?: string | null;
         art_data?: string | null;
     }): string | null {
-        // Priority 1: Album art_data
+        // Priority 1: Album's file-based art
+        if (album.art_path) {
+            return getAlbumCoverSrc(album as any);
+        }
+        
+        // Priority 2: Album's base64 art - old
         if (album.art_data) {
-        return getAlbumArtSrc(album.art_data);
+            return getAlbumArtSrc(album.art_data);
         }
 
-        // Priority 2: First track's embedded cover
+        // Priority 3: First track's file-based cover
+        const trackWithCoverPath = $allTracks.find(
+            (t) => t.album_id === album.id && t.track_cover_path,
+        );
+        if (trackWithCoverPath?.track_cover_path) {
+            return getTrackCoverSrc(trackWithCoverPath);
+        }
+
+        // Priority 4: First track's base64 cover - old
         const trackWithCover = $allTracks.find(
-        (t) => t.album_id === album.id && t.track_cover,
+            (t) => t.album_id === album.id && t.track_cover,
         );
         if (trackWithCover?.track_cover) {
-        return getAlbumArtSrc(trackWithCover.track_cover);
+            return getAlbumArtSrc(trackWithCover.track_cover);
         }
 
-        // Priority 3: First track's external cover_url
+        // Priority 5: First track's external cover_url
         const trackWithUrl = $allTracks.find(
-        (t) => t.album_id === album.id && t.cover_url,
+            (t) => t.album_id === album.id && t.cover_url,
         );
         return trackWithUrl?.cover_url || null;
     }
@@ -412,21 +474,18 @@
                 </h2>
                 <div class="playlists-grid">
                     {#each $searchResults.playlists.slice(0, 6) as playlist}
+                        {@const coverSrc = getPlaylistCover(playlist)}
                         <button
                             class="playlist-card"
                             on:click={() => handlePlaylistClick(playlist.id)}
                         >
-                            <div class="playlist-icon">
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    width="32"
-                                    height="32"
-                                >
-                                    <path
-                                        d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
-                                    />
-                                </svg>
+                            <div class="playlist-cover">
+                                <img
+                                    src={coverSrc}
+                                    alt={playlist.name}
+                                    loading="lazy"
+                                    decoding="async"
+                                />
                             </div>
                             <div class="playlist-info">
                                 <span class="playlist-name truncate"
@@ -675,32 +734,28 @@
     .playlist-card {
         background-color: var(--bg-elevated);
         border-radius: var(--radius-md);
-        padding: var(--spacing-md);
+        padding: var(--spacing-sm);
         transition: background-color var(--transition-normal);
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--spacing-sm);
+        text-align: left;
     }
 
     .playlist-card:hover {
         background-color: var(--bg-surface);
     }
 
-    .playlist-icon {
-        width: 60px;
-        height: 60px;
+    .playlist-cover {
+        width: 100%;
+        aspect-ratio: 1;
         border-radius: var(--radius-sm);
-        background: linear-gradient(
-            135deg,
-            var(--accent-primary) 0%,
-            #2a2a2a 100%
-        );
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-primary);
+        overflow: hidden;
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .playlist-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
 
     .playlist-info {

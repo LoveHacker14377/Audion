@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]

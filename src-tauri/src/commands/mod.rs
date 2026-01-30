@@ -5,6 +5,7 @@ pub mod metadata;
 pub mod network;
 pub mod playlist;
 pub mod plugin;
+pub mod covers;
 
 pub use library::*;
 pub use lyrics::*;
@@ -13,4 +14,4 @@ pub use network::*;
 pub use playlist::*;
 pub use plugin::*;
 pub mod window;
-pub use window::*;
+pub use covers::*;

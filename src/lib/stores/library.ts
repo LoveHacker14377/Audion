@@ -1,7 +1,7 @@
 // Library store - manages music library state
 import { writable, derived, get } from 'svelte/store';
 import type { Track, Album, Artist, Playlist } from '$lib/api/tauri';
-import { getLibrary, getPlaylists } from '$lib/api/tauri';
+import { getLibrary, getPlaylists, getAlbumCoverSrc, getAlbumArtSrc } from '$lib/api/tauri';
 
 // BLOB URL CONVERSION
 /**
@@ -328,10 +328,19 @@ export function getTrackAlbumCover(trackId: number): string | null {
  */
 export function getAlbumCoverFromTracks(albumId: number): string | null {
     // Check album art first
-    const albumArt = albumArtCache.get(albumId);
-    if (albumArt) return albumArt;
+    const album = get(albums).find(a => a.id === albumId);
+    if (album) {
+        // Priority 1: Album's file-based art
+        if (album.art_path) {
+            return getAlbumCoverSrc(album);
+        }
+        // Priority 2: Album's base64 art - old
+        if (album.art_data) {
+            return getAlbumArtSrc(album.art_data);
+        }
+    }
 
-    // Get tracks in this album
+    // Priority 3: Get tracks in this album and find first track with cover
     const trackIds = albumToTracksMap.get(albumId);
     if (!trackIds || trackIds.length === 0) return null;
 
@@ -365,10 +374,18 @@ export async function loadLibrary(): Promise<void> {
     lastError.set(null);
 
     try {
+        console.time('[Library] IPC getLibrary');
         const library = await getLibrary();
+        console.timeEnd('[Library] IPC getLibrary');
 
-        // Process tracks: cache metadata, separate heavy data
+        console.log(`[Library] Received ${library.tracks.length} tracks, ${library.albums.length} albums`);
+
+
+        console.time('[Library] Process tracks');
         const lightTracks: Track[] = [];
+        let trackCoversConverted = 0;
+        let trackCoversTotal = 0;
+
         library.tracks.forEach(track => {
             // Cache metadata
             const metadata = stripTrackHeavyData(track);
@@ -376,9 +393,11 @@ export async function loadLibrary(): Promise<void> {
 
             // Cache track cover separately if it exists (CONVERT TO BLOB URL)
             if (track.track_cover) {
+                trackCoversTotal++;
                 const blobUrl = convertBase64ToBlobUrl(track.track_cover);
                 trackCoverCache.set(track.id, blobUrl);
                 createdBlobUrls.add(blobUrl);
+                trackCoversConverted++;
             }
 
             // Build mapping
@@ -397,9 +416,15 @@ export async function loadLibrary(): Promise<void> {
                 track_cover: null, // Don't store in main array
             } as Track);
         });
+        console.timeEnd('[Library] Process tracks');
+        console.log(`[Library] Track covers: ${trackCoversConverted} converted out of ${trackCoversTotal} total`);
 
-        // Process albums: cache metadata, separate album art
+ 
+        console.time('[Library] Process albums');
         const lightAlbums: Album[] = [];
+        let albumArtConverted = 0;
+        let albumArtTotal = 0;
+
         library.albums.forEach(album => {
             // Cache metadata
             const metadata = stripAlbumHeavyData(album);
@@ -407,9 +432,11 @@ export async function loadLibrary(): Promise<void> {
 
             // Cache album art separately if it exists (CONVERT TO BLOB URL)
             if (album.art_data) {
+                albumArtTotal++;
                 const blobUrl = convertBase64ToBlobUrl(album.art_data);
                 albumArtCache.set(album.id, blobUrl);
                 createdBlobUrls.add(blobUrl);
+                albumArtConverted++;
             }
 
             // Store lightweight album (without heavy art_data)
@@ -418,8 +445,10 @@ export async function loadLibrary(): Promise<void> {
                 art_data: null, // Don't store in main array
             } as Album);
         });
+        console.timeEnd('[Library] Process albums');
+        console.log(`[Library] Album art: ${albumArtConverted} converted out of ${albumArtTotal} total`);
 
-        // Update counts
+        // === Update Counts ===
         totalTrackCount = library.tracks.length;
         totalAlbumCount = library.albums.length;
         totalArtistCount = library.artists.length;
@@ -428,18 +457,16 @@ export async function loadLibrary(): Promise<void> {
         albumCount.set(totalAlbumCount);
         artistCount.set(totalArtistCount);
 
-        // Set stores with lightweight data
+        // === Set Stores ===
         tracks.set(lightTracks);
         albums.set(lightAlbums);
         artists.set(library.artists);
 
-        console.log(`[Library] Loaded ${totalTrackCount} tracks, ${totalAlbumCount} albums (lightweight mode)`);
-        console.log(`[Library] Memory: ~${(lightTracks.length * 2) / 1024}KB (vs ~${(library.tracks.length * 200) / 1024}KB full)`);
-
+        
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         lastError.set(message);
-        console.error('Failed to load library:', error);
+        console.error('[Library] Failed to load library:', error);
     } finally {
         isLoading.set(false);
     }

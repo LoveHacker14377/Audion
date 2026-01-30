@@ -9,7 +9,8 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             artist TEXT,
-            art_data TEXT
+            art_data TEXT,
+            art_path TEXT
         );
 
         -- Tracks table
@@ -30,6 +31,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             content_hash TEXT,
             local_src TEXT,
             track_cover TEXT,
+            track_cover_path TEXT,
             FOREIGN KEY (album_id) REFERENCES albums(id)
         );
 
@@ -76,7 +78,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN external_id TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN content_hash TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN local_src TEXT", []);
-    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover TEXT", []); // NEW!
+    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover TEXT", []);
+    
+    // Add path columns for file-based cover storage
+    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover_path TEXT", []);
+    let _ = conn.execute("ALTER TABLE albums ADD COLUMN art_path TEXT", []);
 
     // Create index for content_hash after migration ensures column exists
     let _ = conn.execute(
@@ -87,5 +93,55 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     // Add cover_url to playlists table for existing databases
     let _ = conn.execute("ALTER TABLE playlists ADD COLUMN cover_url TEXT", []);
 
+    // Initialize playlist positions for existing playlists
+    initialize_playlist_positions(conn)?;
+
     Ok(())
+
+    
+}
+
+/// Initialize positions for playlists that don't have them
+/// Safe to run multiple times - only affects playlists with NULL positions
+fn initialize_playlist_positions(conn: &Connection) -> Result<()> {
+    use rusqlite::params;
+    
+    // Get all unique playlist IDs that have tracks without positions
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT playlist_id 
+         FROM playlist_tracks 
+         WHERE position IS NULL"
+    )?;
+    
+    let playlist_ids: Vec<i64> = stmt
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<_>>>()?;
+
+    // For each playlist, assign sequential positions
+    for playlist_id in playlist_ids {
+        // Get all track_ids in this playlist (in insertion order via rowid)
+        let mut track_stmt = conn.prepare(
+            "SELECT track_id 
+             FROM playlist_tracks 
+             WHERE playlist_id = ?1 
+             ORDER BY rowid"
+        )?;
+        
+        let track_ids: Vec<i64> = track_stmt
+            .query_map(params![playlist_id], |row| row.get(0))?
+            .collect::<Result<Vec<_>>>()?;
+
+        // Assign sequential positions
+        for (pos, track_id) in track_ids.iter().enumerate() {
+            conn.execute(
+                "UPDATE playlist_tracks 
+                 SET position = ?1 
+                 WHERE playlist_id = ?2 AND track_id = ?3",
+                params![pos as i64, playlist_id, track_id],
+            )?;
+        }
+    }
+    
+    Ok(())
+
 }

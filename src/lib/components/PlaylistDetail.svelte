@@ -36,6 +36,7 @@
     let isEditing = false;
     let editName = "";
     let coverInput: HTMLInputElement;
+    let coverHovered = false;
 
     function initialsFromName(name: string) {
         if (!name) return "PL";
@@ -63,12 +64,15 @@
         return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
     }
 
-    function getCoverSrc() {
+    // Reactive cover source - updates instantly when playlistCovers changes
+    $: coverSrc = (() => {
         if (!playlist) return generateSvgCover("Playlist");
         const custom = $playlistCovers && $playlistCovers[playlist.id];
         if (custom) return custom;
         return generateSvgCover(playlist.name || "Playlist");
-    }
+    })();
+
+    $: hasCustomCover = playlist && $playlistCovers && !!$playlistCovers[playlist.id];
 
     function handleCoverFile(e: Event) {
         const input = e.target as HTMLInputElement;
@@ -77,9 +81,30 @@
         const reader = new FileReader();
         reader.onload = () => {
             const result = reader.result as string;
-            if (result && playlist) setPlaylistCover(playlist.id, result);
+            if (result && playlist) {
+                setPlaylistCover(playlist.id, result);
+                // Cover will update automatically via reactive statement
+            }
         };
         reader.readAsDataURL(file);
+        // Reset input to allow selecting the same file again
+        input.value = "";
+    }
+
+    async function handleRemoveCover() {
+        if (!playlist) return;
+        
+        if (
+            !(await confirm(`Remove custom cover for "${playlist.name}"?`, {
+                title: "Remove Cover",
+                confirmLabel: "Remove",
+                danger: true,
+            }))
+        )
+            return;
+
+        removePlaylistCover(playlist.id);
+        // Cover will update automatically to SVG via reactive statement
     }
 
     $: totalDuration = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
@@ -291,8 +316,12 @@
                     />
                 </svg>
             </button>
-            <div class="playlist-cover">
-                <img src={getCoverSrc()} alt="Playlist cover" />
+            <div 
+                class="playlist-cover"
+                on:mouseenter={() => coverHovered = true}
+                on:mouseleave={() => coverHovered = false}
+            >
+                <img src={coverSrc} alt="Playlist cover" class="cover-image" />
                 <input
                     type="file"
                     accept="image/*"
@@ -300,6 +329,34 @@
                     on:change={(e) => handleCoverFile(e)}
                     style="display:none"
                 />
+                {#if coverHovered}
+                    <div class="cover-overlay">
+                        {#if hasCustomCover}
+                            <button 
+                                class="cover-overlay-btn cover-delete-btn"
+                                on:click={handleRemoveCover}
+                                title="Remove cover"
+                            >
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                            </button>
+                        {/if}
+                        <button 
+                            class="cover-overlay-btn cover-add-btn"
+                            on:click={() => coverInput?.click()}
+                            title={hasCustomCover ? "Change cover" : "Add cover"}
+                        >
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                {#if hasCustomCover}
+                                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                                {:else}
+                                    <path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/>
+                                {/if}
+                            </svg>
+                        </button>
+                    </div>
+                {/if}
             </div>
             <div class="playlist-info">
                 <span class="playlist-type">Playlist</span>
@@ -379,31 +436,6 @@
                         </button>
                     {/if}
 
-                    <button
-                        class="btn-secondary"
-                        on:click={() => coverInput?.click()}
-                        title="Change cover"
-                    >
-                        Change Cover
-                    </button>
-                    {#if $playlistCovers && playlist && $playlistCovers[playlist.id]}
-                        <button
-                            class="icon-btn"
-                            on:click={() => removePlaylistCover(playlist.id)}
-                            title="Remove cover"
-                        >
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                width="20"
-                                height="20"
-                            >
-                                <path
-                                    d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                                />
-                            </svg>
-                        </button>
-                    {/if}
                     <button
                         class="icon-btn"
                         on:click={startEditing}
@@ -550,13 +582,74 @@
         flex-shrink: 0;
         color: var(--text-subdued);
         box-shadow: var(--shadow-lg);
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
     }
 
-    .playlist-cover img {
+    .cover-image {
         width: 100%;
         height: 100%;
         object-fit: cover;
         display: block;
+        transition: transform 0.3s ease;
+    }
+
+    .playlist-cover:hover .cover-image {
+        transform: scale(1.05);
+    }
+
+    .cover-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            to top,
+            rgba(0, 0, 0, 0.7) 0%,
+            rgba(0, 0, 0, 0.3) 50%,
+            rgba(0, 0, 0, 0) 100%
+        );
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: var(--spacing-sm);
+        opacity: 0;
+        animation: fadeIn 0.2s ease forwards;
+    }
+
+    @keyframes fadeIn {
+        to {
+            opacity: 1;
+        }
+    }
+
+    .cover-overlay-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-full);
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: all var(--transition-fast);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .cover-overlay-btn:hover {
+        background-color: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .cover-delete-btn:hover {
+        background-color: rgba(241, 94, 108, 0.8);
+        border-color: rgba(241, 94, 108, 0.4);
+    }
+
+    .cover-add-btn:hover {
+        background-color: var(--accent-primary);
+        border-color: var(--accent-primary);
     }
 
     .playlist-info {

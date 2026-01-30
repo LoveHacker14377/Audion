@@ -1,6 +1,6 @@
 // Library-related Tauri commands
 use crate::db::{queries, Database};
-use crate::scanner::{extract_metadata, scan_directory};
+use crate::scanner::{cover_storage, extract_metadata, scan_directory};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -51,7 +51,81 @@ pub async fn scan_music(paths: Vec<String>, db: State<'_, Database>) -> Result<S
         for file_path in scan_result.audio_files {
             if let Some(track_data) = extract_metadata(&file_path) {
                 match queries::insert_or_update_track(&conn, &track_data) {
-                    Ok(_) => tracks_added += 1,
+                    Ok(track_id) => {
+                        if track_id > 0 {
+                            // Not a duplicate
+                            tracks_added += 1;
+
+                            // Save track cover to file if present
+                            if let Some(ref cover_bytes) = track_data.track_cover {
+                                match cover_storage::save_track_cover(track_id, cover_bytes) {
+                                    Ok(path) => {
+                                        // Update database with cover path
+                                        if let Err(e) =
+                                            queries::update_track_cover_path(&conn, track_id, Some(&path))
+                                        {
+                                            errors.push(format!(
+                                                "Failed to update cover path for track {}: {}",
+                                                track_id, e
+                                            ));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        errors.push(format!(
+                                            "Failed to save cover for track {}: {}",
+                                            track_id, e
+                                        ));
+                                    }
+                                }
+                            }
+
+                            // Save album art to file if present
+                            if let Some(album_id) = track_data.album.as_ref().and_then(|_| {
+                                // Get album_id from track
+                                conn.query_row(
+                                    "SELECT album_id FROM tracks WHERE id = ?1",
+                                    [track_id],
+                                    |row| row.get::<_, Option<i64>>(0),
+                                )
+                                .ok()
+                                .flatten()
+                            }) {
+                                if let Some(ref art_bytes) = track_data.album_art {
+                                    // Check if album already has art
+                                    let has_art: bool = conn
+                                        .query_row(
+                                            "SELECT art_path IS NOT NULL FROM albums WHERE id = ?1",
+                                            [album_id],
+                                            |row| row.get(0),
+                                        )
+                                        .unwrap_or(false);
+
+                                    if !has_art {
+                                        match cover_storage::save_album_art(album_id, art_bytes) {
+                                            Ok(path) => {
+                                                if let Err(e) = queries::update_album_art_path(
+                                                    &conn,
+                                                    album_id,
+                                                    Some(&path),
+                                                ) {
+                                                    errors.push(format!(
+                                                        "Failed to update art path for album {}: {}",
+                                                        album_id, e
+                                                    ));
+                                                }
+                                            }
+                                            Err(e) => {
+                                                errors.push(format!(
+                                                    "Failed to save art for album {}: {}",
+                                                    album_id, e
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Err(e) => errors.push(format!("Failed to insert {}: {}", file_path, e)),
                 }
             }
@@ -96,6 +170,9 @@ pub async fn rescan_music(db: State<'_, Database>) -> Result<ScanResult, String>
     // Clean up empty albums after track cleanup
     let _ = queries::cleanup_empty_albums(&conn);
 
+    // Clean up orphaned cover files
+    let _ = cover_storage::cleanup_orphaned_covers(&conn);
+
     // Rescan all folders
     for path in folders {
         let scan_result = scan_directory(&path);
@@ -104,7 +181,77 @@ pub async fn rescan_music(db: State<'_, Database>) -> Result<ScanResult, String>
         for file_path in scan_result.audio_files {
             if let Some(track_data) = extract_metadata(&file_path) {
                 match queries::insert_or_update_track(&conn, &track_data) {
-                    Ok(_) => tracks_added += 1,
+                    Ok(track_id) => {
+                        if track_id > 0 {
+                            tracks_added += 1;
+
+                            // Save track cover to file if present
+                            if let Some(ref cover_bytes) = track_data.track_cover {
+                                match cover_storage::save_track_cover(track_id, cover_bytes) {
+                                    Ok(path) => {
+                                        if let Err(e) =
+                                            queries::update_track_cover_path(&conn, track_id, Some(&path))
+                                        {
+                                            errors.push(format!(
+                                                "Failed to update cover path for track {}: {}",
+                                                track_id, e
+                                            ));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        errors.push(format!(
+                                            "Failed to save cover for track {}: {}",
+                                            track_id, e
+                                        ));
+                                    }
+                                }
+                            }
+
+                            // Save album art to file if present
+                            if let Some(album_id) = track_data.album.as_ref().and_then(|_| {
+                                conn.query_row(
+                                    "SELECT album_id FROM tracks WHERE id = ?1",
+                                    [track_id],
+                                    |row| row.get::<_, Option<i64>>(0),
+                                )
+                                .ok()
+                                .flatten()
+                            }) {
+                                if let Some(ref art_bytes) = track_data.album_art {
+                                    let has_art: bool = conn
+                                        .query_row(
+                                            "SELECT art_path IS NOT NULL FROM albums WHERE id = ?1",
+                                            [album_id],
+                                            |row| row.get(0),
+                                        )
+                                        .unwrap_or(false);
+
+                                    if !has_art {
+                                        match cover_storage::save_album_art(album_id, art_bytes) {
+                                            Ok(path) => {
+                                                if let Err(e) = queries::update_album_art_path(
+                                                    &conn,
+                                                    album_id,
+                                                    Some(&path),
+                                                ) {
+                                                    errors.push(format!(
+                                                        "Failed to update art path for album {}: {}",
+                                                        album_id, e
+                                                    ));
+                                                }
+                                            }
+                                            Err(e) => {
+                                                errors.push(format!(
+                                                    "Failed to save art for album {}: {}",
+                                                    album_id, e
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Err(e) => errors.push(format!("Failed to insert {}: {}", file_path, e)),
                 }
             }
@@ -128,8 +275,14 @@ pub async fn rescan_music(db: State<'_, Database>) -> Result<ScanResult, String>
 pub async fn get_library(db: State<'_, Database>) -> Result<Library, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
-    let tracks = queries::get_all_tracks(&conn).map_err(|e| e.to_string())?;
-    let albums = queries::get_all_albums(&conn).map_err(|e| e.to_string())?;
+
+    // Fetch tracks WITHOUT cover data (ultra-fast)
+    let tracks = queries::get_all_tracks_with_paths(&conn).map_err(|e| e.to_string())?;
+
+    // Fetch albums WITHOUT art data (fast)
+    let albums = queries::get_all_albums_with_paths(&conn).map_err(|e| e.to_string())?;
+
+    // Fetch artists
     let artists = queries::get_all_artists(&conn).map_err(|e| e.to_string())?;
 
     Ok(Library {
@@ -175,7 +328,7 @@ pub async fn get_albums_by_artist(
 
     let mut stmt = conn
         .prepare(
-            "SELECT DISTINCT a.id, a.name, a.artist, a.art_data 
+            "SELECT DISTINCT a.id, a.name, a.artist, a.art_data, a.art_path 
          FROM albums a
          INNER JOIN tracks t ON t.album_id = a.id
          WHERE t.artist = ?1
@@ -190,6 +343,7 @@ pub async fn get_albums_by_artist(
                 name: row.get(1)?,
                 artist: row.get(2)?,
                 art_data: row.get(3)?,
+                art_path: row.get(4)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -204,17 +358,17 @@ pub async fn get_albums_by_artist(
 pub async fn delete_track(track_id: i64, db: State<'_, Database>) -> Result<bool, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
-    // Get track path first to delete file if it exists and is local
-    let track_path: Option<(String, Option<String>)> = conn
+    // Get track info before deletion
+    let track_info: Option<(String, Option<String>, Option<String>)> = conn
         .query_row(
-            "SELECT path, source_type FROM tracks WHERE id = ?1",
+            "SELECT path, source_type, track_cover_path FROM tracks WHERE id = ?1",
             [track_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .ok();
 
-    if let Some((path, source_type)) = track_path {
-        // Only delete file if it's a local track (soure_type is null or "local")
+    if let Some((path, source_type, cover_path)) = track_info {
+        // Only delete file if it's a local track
         let is_local = source_type.is_none() || source_type.as_deref() == Some("local");
 
         if is_local {
@@ -226,6 +380,9 @@ pub async fn delete_track(track_id: i64, db: State<'_, Database>) -> Result<bool
                 }
             }
         }
+
+        // Delete cover file
+        let _ = cover_storage::delete_track_cover_file(cover_path.as_deref());
     }
 
     let result = queries::delete_track(&conn, track_id)
@@ -242,6 +399,16 @@ pub async fn delete_track(track_id: i64, db: State<'_, Database>) -> Result<bool
 pub async fn delete_album(album_id: i64, db: State<'_, Database>) -> Result<bool, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
+    // Get album art path before deletion
+    let art_path: Option<String> = conn
+        .query_row(
+            "SELECT art_path FROM albums WHERE id = ?1",
+            [album_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten();
+
     // Get all tracks for this album to delete files
     let tracks = queries::get_tracks_by_album(&conn, album_id).map_err(|e| e.to_string())?;
 
@@ -255,7 +422,13 @@ pub async fn delete_album(album_id: i64, db: State<'_, Database>) -> Result<bool
                 let _ = std::fs::remove_file(path_obj);
             }
         }
+
+        // Delete track cover file
+        let _ = cover_storage::delete_track_cover_file(track.track_cover_path.as_deref());
     }
+
+    // Delete album art file
+    let _ = cover_storage::delete_album_art_file(art_path.as_deref());
 
     queries::delete_album(&conn, album_id).map_err(|e| format!("Failed to delete album: {}", e))
 }

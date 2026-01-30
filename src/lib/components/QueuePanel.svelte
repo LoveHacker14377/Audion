@@ -16,7 +16,7 @@
         shuffledIndex,
     } from "$lib/stores/player";
     import { albums } from "$lib/stores/library";
-    import { formatDuration, getAlbumArtSrc } from "$lib/api/tauri";
+    import { formatDuration, getAlbumArtSrc, getTrackCoverSrc, getAlbumCoverSrc } from "$lib/api/tauri";
 
     import type { Track } from "$lib/api/tauri";
 
@@ -25,14 +25,26 @@
 
     function getTrackArt(track: Track): string | null {
         if (!track) return null;
-        // Priority 1: Track's embedded cover
+        
+        // Priority 1: Track's file-based cover
+        if (track.track_cover_path) return getTrackCoverSrc(track);
+        
+        // Priority 2: Track's base64 cover - old
         if (track.track_cover) return getAlbumArtSrc(track.track_cover);
-        // Priority 2: Streaming cover URL
+        
+        // Priority 3: Streaming cover URL
         if (track.cover_url) return track.cover_url;
-        // Priority 3: Album art
+        
+        // Priority 4 & 5: Album art (file-based or base64)
         if (!track.album_id) return null;
         const album = albumMap.get(track.album_id);
-        return album ? getAlbumArtSrc(album.art_data) : null;
+        if (!album) return null;
+        
+        // Priority 4: Album's file-based art
+        if (album.art_path) return getAlbumCoverSrc(album);
+        
+        // Priority 5: Album's base64 art - old
+        return album.art_data ? getAlbumArtSrc(album.art_data) : null;
     }
 
     // Derived queue state for display

@@ -5,6 +5,8 @@
         getAlbum,
         getTracksByAlbum,
         getAlbumArtSrc,
+        getAlbumCoverSrc,
+        getTrackCoverSrc,
         formatDuration,
     } from "$lib/api/tauri";
     import { playTracks, currentTrack, isPlaying } from "$lib/stores/player";
@@ -198,27 +200,21 @@
                 </svg>
             </button>
             <div class="album-cover">
-                {#if album.art_data}
-                    <!-- Priority 1: Album's own art -->
-                    <img
-                        src={getAlbumArtSrc(album.art_data)}
-                        alt={album.name}
-                        decoding="async"
-                    />
+                {#if album.art_path}
+                    <!-- Priority 1: Album's file-based art -->
+                    <img src={getAlbumCoverSrc(album)} alt={album.name} decoding="async" />
+                {:else if album.art_data}
+                    <!-- Priority 2: Album's base64 art - old -->
+                    <img src={getAlbumArtSrc(album.art_data)} alt={album.name} decoding="async" />
+                {:else if tracks.length > 0 && tracks[0].track_cover_path}
+                    <!-- Priority 3: First track's file-based cover -->
+                    <img src={getTrackCoverSrc(tracks[0])} alt={album.name} decoding="async" />
                 {:else if tracks.length > 0 && tracks[0].track_cover}
-                    <!-- Priority 2: First track's embedded cover -->
-                    <img
-                        src={getAlbumArtSrc(tracks[0].track_cover)}
-                        alt={album.name}
-                        decoding="async"
-                    />
+                    <!-- Priority 4: First track's base64 cover - old -->
+                    <img src={getAlbumArtSrc(tracks[0].track_cover)} alt={album.name} decoding="async" />
                 {:else if tracks.length > 0 && tracks[0].cover_url}
-                    <!-- Priority 3: First track's Tidal cover -->
-                    <img
-                        src={tracks[0].cover_url}
-                        alt={album.name}
-                        decoding="async"
-                    />
+                    <!-- Priority 5: First track's external cover -->
+                    <img src={tracks[0].cover_url} alt={album.name} decoding="async" />
                 {:else}
                     <div class="album-cover-placeholder">
                         <svg
@@ -466,7 +462,7 @@
         overflow-y: auto;
         min-height: 0;
     }
-    */
+    
     .btn-secondary {
         background-color: transparent;
         border: 1px solid var(--border-color);
