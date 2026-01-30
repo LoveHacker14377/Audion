@@ -171,20 +171,20 @@ function startTimeSync(): void {
             return;
         }
 
-            const time = audioElement.currentTime;
-            currentTime.set(time);
+        const time = audioElement.currentTime;
+        currentTime.set(time);
 
-            // Emit timeUpdate event for plugins (throttled to 250ms)
-            const now = Date.now();
-            if (now - lastEventTime >= 250) {
-                pluginEvents.emit('timeUpdate', {
-                    currentTime: time,
-                    duration: audioElement.duration
-                });
-                lastEventTime = now;
-            }
+        // Emit timeUpdate event for plugins (throttled to 250ms)
+        const now = Date.now();
+        if (now - lastEventTime >= 250) {
+            pluginEvents.emit('timeUpdate', {
+                currentTime: time,
+                duration: audioElement.duration
+            });
+            lastEventTime = now;
+        }
 
-            animationFrameId = requestAnimationFrame(updateTime);
+        animationFrameId = requestAnimationFrame(updateTime);
     };
     animationFrameId = requestAnimationFrame(updateTime);
 }
@@ -524,32 +524,68 @@ function shuffleArray<T>(array: T[]): T[] {
 
 // Play a list of tracks starting at index
 export function playTracks(tracks: Track[], startIndex: number = 0): void {
-    queue.set(tracks);
+    const currentQueue = get(queue);
+
+    // Check if the new tracks are effectively the same as the current queue
+    // usage of JSON.stringify is a simple way to check deep equality for arrays of objects
+    // optimization: check length and first/last ID first to avoid expensive stringify
+    let isSameQueue = false;
+
+    if (tracks.length === currentQueue.length) {
+        if (tracks.length === 0) {
+            isSameQueue = true;
+        } else {
+            // Check first and last ID match
+            if (tracks[0].id === currentQueue[0].id &&
+                tracks[tracks.length - 1].id === currentQueue[currentQueue.length - 1].id) {
+                // If ends match, do a full check to be sure (or just trust it for performance?)
+                // Let's do a quick ID check
+                isSameQueue = tracks.every((t, i) => t.id === currentQueue[i].id);
+            }
+        }
+    }
+
+    // Update queue only if different (though setting it again might be harmless store-update-wise, 
+    // we want to know if it CHANGED for shuffle logic)
+    if (!isSameQueue) {
+        queue.set(tracks);
+    }
+
     queueIndex.set(startIndex);
-    userQueueCount.set(0); // Reset user queue when starting fresh
+    userQueueCount.set(0); // Reset user queue when starting fresh context
 
-    // If shuffle is already on, regenerate shuffle order
+    // Shuffle Logic
     if (get(shuffle)) {
-        const indices = tracks.map((_, i) => i);
-        const shuffled = shuffleArray(indices);
-        // Ensure the started track is played first? 
-        // Or finding where it ended up?
-        // Usually clicking a track implies "play this now". 
-        // So we swap it to the current position (e.g. 0 if we start playing?)
-        // Let's just shuffle and find the index.
-        console.log('Regenerating shuffle in playTracks');
-        shuffledIndices.set(shuffled);
+        // FORCE START Logic:
+        // When user plays a track (even if it's in the same queue), we want that track to play NOW,
+        // and we want ALL OTHER tracks to be in the "Next Up" queue (shuffled).
+        // We do NOT want to preserve the old shuffle order because jumping to a track "late" in the 
+        // shuffle order causes all previous tracks to be "skipped" into history.
 
-        // Find where our start track went. 
-        // BUT wait, playTracks usually implies playing THIS track. 
-        // If we simply play shuffle, the user might be confused if we jump to random track.
-        // If startIndex is provided, we play THAT track.
-        // So we should just find where startIndex ended up in shuffled list.
-        const newShuffledIdx = shuffled.indexOf(startIndex);
-        shuffledIndex.set(newShuffledIdx !== -1 ? newShuffledIdx : 0);
+        // 1. Get all indices
+        const allIndices = tracks.map((_, i) => i);
+
+        // 2. Remove startIndex (the track we want to play)
+        const otherIndices = allIndices.filter(i => i !== startIndex);
+
+        // 3. Shuffle the rest
+        const shuffledOthers = shuffleArray(otherIndices);
+
+        // 4. Construct new order: [startIndex, ...shuffledRest]
+        const newShuffledIndices = [startIndex, ...shuffledOthers];
+
+        console.log(`Regenerating shuffle with forced start: ${startIndex}`);
+        shuffledIndices.set(newShuffledIndices);
+
+        // 5. Set cursor to 0 (since our track is now at index 0)
+        shuffledIndex.set(0);
     }
 
     // Emit queueChange event for plugins
+    // If same queue, we might still want to emit if the logical "context" changed, 
+    // but usually plugins care about the list content.
+    // If we filtered or sorted the SAME list, isSameQueue might be false (order matters).
+    // Our ID check strictly checks order. So sorting changes the queue.
     pluginEvents.emit('queueChange', { queue: tracks, index: startIndex });
 
     if (tracks.length > 0 && startIndex < tracks.length) {
