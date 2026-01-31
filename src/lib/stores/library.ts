@@ -392,6 +392,14 @@ export async function loadMoreTracks(): Promise<boolean> {
                 if (track.track_cover_path && !trackCoverCache.has(track.id)) {
                     // (new cover logic uses file paths directly, so we don't need blob URLs as much)
                 }
+                if (track.album_id) {
+                    trackToAlbumMap.set(track.id, track.album_id);
+                    const albumTracks = albumToTracksMap.get(track.album_id) || [];
+                    if (!albumTracks.includes(track.id)) {
+                        albumTracks.push(track.id);
+                        albumToTracksMap.set(track.album_id, albumTracks);
+                    }
+                }
             });
             return true;
         }
@@ -462,6 +470,21 @@ export async function loadLibrary(): Promise<void> {
         albums.set(lightAlbums);
         artists.set(library.artists);
         tracks.set(initialTracks);
+
+        // Initial track processing
+        initialTracks.forEach(track => {
+            const metadata = stripTrackHeavyData(track);
+            trackMetadataCache.set(track.id, metadata);
+
+            if (track.album_id) {
+                trackToAlbumMap.set(track.id, track.album_id);
+                const albumTracks = albumToTracksMap.get(track.album_id) || [];
+                if (!albumTracks.includes(track.id)) {
+                    albumTracks.push(track.id);
+                    albumToTracksMap.set(track.album_id, albumTracks);
+                }
+            }
+        });
 
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

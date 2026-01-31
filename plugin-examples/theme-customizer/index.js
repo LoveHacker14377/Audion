@@ -1410,7 +1410,11 @@
         }
     };
 
-    // Register plugin globally
-    window.ThemeCustomizer = ThemeCustomizer;
-    window.AudionPlugin = ThemeCustomizer;
+    // Register plugin
+    if (typeof Audion !== 'undefined' && Audion.register) {
+        Audion.register(ThemeCustomizer);
+    } else {
+        window.ThemeCustomizer = ThemeCustomizer;
+        window.AudionPlugin = ThemeCustomizer;
+    }
 })();

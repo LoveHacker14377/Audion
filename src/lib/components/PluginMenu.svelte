@@ -66,7 +66,7 @@
                 use:registerMenuSlot
                 bind:this={slotContainer}
             ></div>
-            {#if !slotContainer?.hasChildNodes()}
+            {#if uiSlotManager.getSlotContent("playerbar:menu").length === 0}
                 <div class="empty-state">No active plugins in menu</div>
             {/if}
         </div>
@@ -106,36 +106,18 @@
         background-color: var(--bg-surface);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
-        padding: var(--spacing-sm);
-        min-width: 200px;
-        box-shadow: var(--shadow-lg);
+        padding: 6px;
+        min-width: 220px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
         z-index: 1000;
+        display: flex;
+        flex-direction: column;
     }
 
     .plugin-slot-list {
         display: flex;
         flex-direction: column;
         gap: var(--spacing-xs);
-    }
-
-    /* Style injected buttons to look like menu items */
-    :global(.plugin-slot-list > *) {
-        width: 100%;
-        text-align: left;
-        padding: var(--spacing-sm);
-        border-radius: var(--radius-sm);
-        background: transparent;
-        border: none;
-        color: var(--text-primary);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-sm);
-        font-size: 0.9rem;
-    }
-
-    :global(.plugin-slot-list > *:hover) {
-        background-color: var(--bg-highlight);
     }
 
     .empty-state {

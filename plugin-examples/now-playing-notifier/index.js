@@ -51,7 +51,7 @@
 
     async loadSettings() {
       try {
-        const saved = localStorage.getItem("nowPlayingNotifier_settings");
+        const saved = await this.api.storage.get("settings");
         if (saved) {
           this.settings = { ...this.settings, ...JSON.parse(saved) };
         }
@@ -62,8 +62,8 @@
 
     async saveSettings() {
       try {
-        localStorage.setItem(
-          "nowPlayingNotifier_settings",
+        await this.api.storage.set(
+          "settings",
           JSON.stringify(this.settings),
         );
       } catch (e) {
@@ -1075,7 +1075,11 @@
     },
   };
 
-  // Register plugin globally
-  window.NowPlayingNotifier = NowPlayingNotifier;
-  window.AudionPlugin = NowPlayingNotifier;
+  // Register plugin
+  if (typeof Audion !== "undefined" && Audion.register) {
+    Audion.register(NowPlayingNotifier);
+  } else {
+    window.NowPlayingNotifier = NowPlayingNotifier;
+    window.AudionPlugin = NowPlayingNotifier;
+  }
 })();

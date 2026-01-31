@@ -542,6 +542,10 @@
         }
     };
 
-    window.SpotifyConverter = SpotifyConverter;
-    window.AudionPlugin = SpotifyConverter;
+    if (typeof Audion !== 'undefined' && Audion.register) {
+        Audion.register(SpotifyConverter);
+    } else {
+        window.SpotifyConverter = SpotifyConverter;
+        window.AudionPlugin = SpotifyConverter;
+    }
 })();

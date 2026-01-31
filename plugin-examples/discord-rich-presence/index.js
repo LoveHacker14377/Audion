@@ -325,7 +325,11 @@
     },
   };
 
-  // Register plugin globally
-  window.DiscordRichPresence = DiscordRPC;
-  window.AudionPlugin = DiscordRPC;
+  // Register plugin
+  if (typeof Audion !== "undefined" && Audion.register) {
+    Audion.register(DiscordRPC);
+  } else {
+    window.DiscordRichPresence = DiscordRPC;
+    window.AudionPlugin = DiscordRPC;
+  }
 })();

@@ -2,6 +2,9 @@
 use rusqlite::{Connection, Result};
 
 pub fn init_schema(conn: &Connection) -> Result<()> {
+    // Enable foreign keys for this connection
+    conn.execute("PRAGMA foreign_keys = ON;", [])?;
+
     conn.execute_batch(
         "
         -- Albums table
@@ -32,7 +35,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             local_src TEXT,
             track_cover TEXT,
             track_cover_path TEXT,
-            FOREIGN KEY (album_id) REFERENCES albums(id)
+            FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
         );
 
         -- Playlists table
@@ -79,7 +82,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN content_hash TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN local_src TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover TEXT", []);
-    
+
     // Add path columns for file-based cover storage
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover_path TEXT", []);
     let _ = conn.execute("ALTER TABLE albums ADD COLUMN art_path TEXT", []);
@@ -97,22 +100,20 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     initialize_playlist_positions(conn)?;
 
     Ok(())
-
-    
 }
 
 /// Initialize positions for playlists that don't have them
 /// Safe to run multiple times - only affects playlists with NULL positions
 fn initialize_playlist_positions(conn: &Connection) -> Result<()> {
     use rusqlite::params;
-    
+
     // Get all unique playlist IDs that have tracks without positions
     let mut stmt = conn.prepare(
         "SELECT DISTINCT playlist_id 
          FROM playlist_tracks 
-         WHERE position IS NULL"
+         WHERE position IS NULL",
     )?;
-    
+
     let playlist_ids: Vec<i64> = stmt
         .query_map([], |row| row.get(0))?
         .collect::<Result<Vec<_>>>()?;
@@ -124,9 +125,9 @@ fn initialize_playlist_positions(conn: &Connection) -> Result<()> {
             "SELECT track_id 
              FROM playlist_tracks 
              WHERE playlist_id = ?1 
-             ORDER BY rowid"
+             ORDER BY rowid",
         )?;
-        
+
         let track_ids: Vec<i64> = track_stmt
             .query_map(params![playlist_id], |row| row.get(0))?
             .collect::<Result<Vec<_>>>()?;
@@ -141,7 +142,6 @@ fn initialize_playlist_positions(conn: &Connection) -> Result<()> {
             )?;
         }
     }
-    
-    Ok(())
 
+    Ok(())
 }

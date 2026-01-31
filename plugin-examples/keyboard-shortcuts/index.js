@@ -92,7 +92,11 @@
         }
     };
 
-    // Register plugin globally
-    window.KeyboardShortcuts = KeyboardShortcuts;
-    window.AudionPlugin = KeyboardShortcuts;
+    // Register plugin
+    if (typeof Audion !== 'undefined' && Audion.register) {
+        Audion.register(KeyboardShortcuts);
+    } else {
+        window.KeyboardShortcuts = KeyboardShortcuts;
+        window.AudionPlugin = KeyboardShortcuts;
+    }
 })();

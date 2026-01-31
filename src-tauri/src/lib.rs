@@ -5,6 +5,7 @@ mod commands;
 mod db;
 mod discord;
 mod scanner;
+mod utils;
 
 use db::Database;
 use std::path::PathBuf;
@@ -114,6 +115,10 @@ pub fn run() {
             commands::check_plugin_updates,
             commands::update_plugin,
             commands::save_notification_image, // currently ignored by windows
+            commands::plugin_save_data,
+            commands::plugin_get_data,
+            commands::plugin_list_keys,
+            commands::plugin_clear_data,
             // Network commands
             commands::proxy_fetch,
             // Window commands

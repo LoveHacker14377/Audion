@@ -1,11 +1,8 @@
 # Release Notes
 
-## Version 1.1.9
+## Version 1.1.10
 
-Thanks to @Manga-Knights for the update
+- Improve Several plugins
+- Improve performance when loading large database by using sql query with pagination
+- Correlation IDs in the player store eliminate race conditions during rapid skipping.
 
-- Fix album scroll
-- Fix Shuffle Behavior, Make sure all tracks are in the "Next Up" queue
-- Fix Spotify Converter Plugin, now it can convert playlists with more than 100 tracks
-- Discord Rich Presence by @Manga-Knights
-- Added Playlist reorder

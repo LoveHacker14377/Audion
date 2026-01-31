@@ -455,7 +455,11 @@
         }
     };
 
-    // Register plugin globally
-    window.PlayCounter = PlayCounter;
-    window.AudionPlugin = PlayCounter;
+    // Register plugin
+    if (typeof Audion !== 'undefined' && Audion.register) {
+        Audion.register(PlayCounter);
+    } else {
+        window.PlayCounter = PlayCounter;
+        window.AudionPlugin = PlayCounter;
+    }
 })();

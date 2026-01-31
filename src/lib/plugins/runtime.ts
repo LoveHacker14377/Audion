@@ -153,6 +153,13 @@ export class PluginRuntime {
   // permission manager
   permissionManager: PluginPermissionManager;
 
+  // Private registry for plugin instances and their APIs
+  // Inaccessible to other scripts or plugins
+  private registry = new WeakMap<object, Record<string, any>>();
+  // Track which plugin name is currently being registered (for handoff)
+  private handoffName: string | null = null;
+  private handoffInstance: any | null = null;
+
   constructor(config: PluginRuntimeConfig) {
     this.config = config;
     this.permissionManager = new PluginPermissionManager(config.pluginDir);
@@ -208,49 +215,90 @@ export class PluginRuntime {
     return granted.includes(permission);
   }
 
-  // Load a JS plugin via script tag
+  // Load a JS plugin via fetch and execution in a controlled scope
   private async loadJsPlugin(manifest: AudionPluginManifest): Promise<LoadedPlugin> {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
+    const url = this.getPluginScriptUrl(manifest);
 
-      // Use helper to get browser-loadable URL (handles path conversion internally)
-      script.src = this.getPluginScriptUrl(manifest);
-      script.async = true;
-      script.id = `plugin-${manifest.name}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch JS plugin: ${response.statusText}`);
+      }
 
-      script.onload = () => {
-        // Try various global names the plugin might register under
-        const instance = (window as any)[manifest.name.replace(/\s+/g, '')] ||
-          (window as any)[manifest.name] ||
-          (window as any).AudionPlugin;
-        const plugin: LoadedPlugin = {
-          manifest,
-          instance,
-          enabled: true,
-          grantedPermissions: this.grantedPermissions.get(manifest.name) || [],
-          loadedAt: Date.now(),
-          storage: new PluginStorage(manifest.name),
-          rateLimiters: this.createRateLimiters(),
-        };
+      const code = await response.text();
 
-        // Register plugin BEFORE calling init() so storage APIs work during initialization
-        this.plugins.set(manifest.name, plugin);
+      // Clear handoff before start
+      this.handoffName = manifest.name;
+      this.handoffInstance = null;
 
-        // Call init if available
-        if (instance?.init) {
-          try {
-            instance.init(this.getPluginApi(manifest.name));
-          } catch (err) {
-            this.config.onError?.(manifest.name, err as Error);
+      // Provide a minimal, safe API for registration during execution
+      const Audion = {
+        register: (instance: any) => {
+          if (this.handoffName === manifest.name) {
+            this.handoffInstance = instance;
           }
         }
-
-        resolve(plugin);
       };
 
-      script.onerror = () => reject(new Error(`Failed to load JS plugin: ${manifest.name}`));
-      document.body.appendChild(script);
-    });
+      // Create a function with Audion in scope
+      // This is safer than a global <script> tag as it doesn't pollute 'window'
+      // if the plugin uses 'Audion.register()'
+      try {
+        const fn = new Function('Audion', code);
+        fn(Audion);
+      } catch (err) {
+        console.error(`[PluginRuntime:${manifest.name}] Execution error:`, err);
+        // Fallback for older plugins still using window (though we want to discourage this)
+        this.handoffInstance = (window as any)[manifest.name.replace(/\s+/g, '')] ||
+          (window as any)[manifest.name] ||
+          (window as any).AudionPlugin;
+      }
+
+      const instance = this.handoffInstance;
+      if (!instance) {
+        throw new Error(`Plugin ${manifest.name} did not register an instance`);
+      }
+
+      // Cleanup global if it was used
+      const globalName = manifest.name.replace(/\s+/g, '');
+      if ((window as any)[globalName]) delete (window as any)[globalName];
+      if ((window as any).AudionPlugin) delete (window as any).AudionPlugin;
+
+      const api = this.getPluginApi(manifest.name);
+
+      // Store in private registry
+      this.registry.set(instance, api);
+
+      const plugin: LoadedPlugin = {
+        manifest,
+        instance,
+        enabled: true,
+        grantedPermissions: this.grantedPermissions.get(manifest.name) || [],
+        loadedAt: Date.now(),
+        storage: new PluginStorage(manifest.name, this.config.pluginDir),
+        rateLimiters: this.createRateLimiters(),
+      };
+
+      // Register plugin
+      this.plugins.set(manifest.name, plugin);
+
+      // Call init if available
+      if (instance.init) {
+        try {
+          instance.init(api);
+        } catch (err) {
+          this.config.onError?.(manifest.name, err as Error);
+        }
+      }
+
+      return plugin;
+    } catch (err) {
+      console.error(`[PluginRuntime] Failed to load JS plugin ${manifest.name}:`, err);
+      throw err;
+    } finally {
+      this.handoffName = null;
+      this.handoffInstance = null;
+    }
   }
 
   // Load a WASM plugin
@@ -279,7 +327,7 @@ export class PluginRuntime {
         enabled: true,
         grantedPermissions: this.grantedPermissions.get(manifest.name) || [],
         loadedAt: Date.now(),
-        storage: new PluginStorage(manifest.name),
+        storage: new PluginStorage(manifest.name, this.config.pluginDir),
         rateLimiters: this.createRateLimiters(),
       };
 
@@ -459,6 +507,7 @@ export class PluginRuntime {
 
           // Create a container element for the HTML
           const element = document.createElement('div');
+          element.className = 'menu-item';
           element.innerHTML = html;
 
           uiSlotManager.addContent(slotName, {

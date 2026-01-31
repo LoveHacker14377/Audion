@@ -734,6 +734,10 @@
     }
   };
 
-  window.QobuzSearch = QobuzSearch;
-  window.AudionPlugin = QobuzSearch;
+  if (typeof Audion !== "undefined" && Audion.register) {
+    Audion.register(QobuzSearch);
+  } else {
+    window.QobuzSearch = QobuzSearch;
+    window.AudionPlugin = QobuzSearch;
+  }
 })();

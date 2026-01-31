@@ -19,6 +19,14 @@ export class UISlotManager {
     registerContainer(slotName: UISlotName, container: HTMLElement): void {
         this.containers.set(slotName, container);
 
+        // Ensure shadow root exists for the container
+        if (!container.shadowRoot) {
+            container.attachShadow({ mode: 'open' });
+
+            // Inject a style tag to forward CSS variables
+            this.injectSharedStyles(container.shadowRoot!);
+        }
+
         // Render any pending content
         this.renderSlot(slotName);
     }
@@ -86,17 +94,104 @@ export class UISlotManager {
      */
     private renderSlot(slotName: UISlotName): void {
         const container = this.containers.get(slotName);
-        if (!container) return;
+        if (!container || !container.shadowRoot) return;
 
         const contents = this.slots.get(slotName) || [];
 
-        // Clear existing content
-        container.innerHTML = '';
+        // Clear existing content in shadow root
+        // We keep the style tag (first child)
+        while (container.shadowRoot.childNodes.length > 1) {
+            container.shadowRoot.removeChild(container.shadowRoot.lastChild!);
+        }
 
         // Add all content elements
         contents.forEach(content => {
-            container.appendChild(content.element);
+            container.shadowRoot!.appendChild(content.element);
         });
+    }
+
+    /**
+     * Inject shared styles into shadow root (themes, variables)
+     */
+    private injectSharedStyles(shadow: ShadowRoot): void {
+        const style = document.createElement('style');
+        style.id = 'audion-shared-styles';
+
+        // Forward essential CSS variables for plugins to follow theme
+        style.textContent = `
+            :host {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                --text-primary: var(--text-primary);
+                --text-secondary: var(--text-secondary);
+                --text-subdued: var(--text-subdued);
+                --bg-primary: var(--bg-primary);
+                --bg-surface: var(--bg-surface);
+                --bg-highlight: var(--bg-highlight);
+                --accent-color: var(--accent-color);
+                --border-color: var(--border-color);
+                --radius-sm: var(--radius-sm);
+                --radius-md: var(--radius-md);
+                --spacing-sm: var(--spacing-sm);
+                --spacing-xs: var(--spacing-xs);
+                --transition-fast: var(--transition-fast);
+            }
+            
+            /* Target direct children - premium menu item layout */
+            :host > *:not(style) {
+                width: 100%;
+                box-sizing: border-box;
+                text-align: left;
+                padding: 10px 12px;
+                border-radius: var(--radius-sm);
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                font-family: inherit;
+                text-decoration: none;
+                line-height: 1.2;
+                transform: translateX(0);
+            }
+
+            :host > *:not(style):hover {
+                background-color: var(--bg-highlight);
+                color: var(--text-primary);
+                transform: translateX(4px);
+            }
+
+            /* Sleek, constrained icons */
+            svg, img, i {
+                width: 16px !important;
+                height: 16px !important;
+                min-width: 16px !important;
+                min-height: 16px !important;
+                flex-shrink: 0;
+                display: block;
+                object-fit: contain;
+                opacity: 0.8;
+                transition: opacity var(--transition-fast);
+            }
+
+            :host > *:not(style):hover svg,
+            :host > *:not(style):hover img {
+                opacity: 1;
+            }
+
+            /* Reset for images */
+            img {
+                border-radius: 2px;
+            }
+        `;
+
+        shadow.appendChild(style);
     }
 
     /**

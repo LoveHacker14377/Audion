@@ -843,3 +843,87 @@ pub fn save_notification_image(data_uri: String) -> Result<String, String> {
         .ok_or_else(|| "Failed to convert path to string".to_string())
         .map(|s| s.to_string())
 }
+
+#[tauri::command]
+pub async fn plugin_save_data(
+    plugin_name: String,
+    key: String,
+    value: String,
+    plugin_dir: String,
+) -> Result<(), String> {
+    let safe_name = to_safe_name(&plugin_name);
+    let storage_dir = std::path::PathBuf::from(&plugin_dir)
+        .join(&safe_name)
+        .join("storage");
+    fs::create_dir_all(&storage_dir).map_err(|e| e.to_string())?;
+
+    let file_path = storage_dir.join(format!("{}.json", key));
+    fs::write(file_path, value).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn plugin_get_data(
+    plugin_name: String,
+    key: String,
+    plugin_dir: String,
+) -> Result<Option<String>, String> {
+    let safe_name = to_safe_name(&plugin_name);
+    let file_path = std::path::PathBuf::from(&plugin_dir)
+        .join(&safe_name)
+        .join("storage")
+        .join(format!("{}.json", key));
+
+    if file_path.exists() {
+        let content = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+        Ok(Some(content))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn plugin_list_keys(
+    plugin_name: String,
+    plugin_dir: String,
+) -> Result<Vec<String>, String> {
+    let safe_name = to_safe_name(&plugin_name);
+    let storage_dir = std::path::PathBuf::from(&plugin_dir)
+        .join(&safe_name)
+        .join("storage");
+
+    if !storage_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut keys = Vec::new();
+    if let Ok(entries) = fs::read_dir(storage_dir) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.path().file_stem().and_then(|s| s.to_str()) {
+                keys.push(name.to_string());
+            }
+        }
+    }
+    Ok(keys)
+}
+
+#[tauri::command]
+pub async fn plugin_clear_data(plugin_name: String, plugin_dir: String) -> Result<usize, String> {
+    let safe_name = to_safe_name(&plugin_name);
+    let storage_dir = std::path::PathBuf::from(&plugin_dir)
+        .join(&safe_name)
+        .join("storage");
+
+    if !storage_dir.exists() {
+        return Ok(0);
+    }
+
+    let count = fs::read_dir(&storage_dir)
+        .map(|entries| entries.flatten().count())
+        .unwrap_or(0);
+
+    fs::remove_dir_all(&storage_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&storage_dir).map_err(|e| e.to_string())?;
+
+    Ok(count)
+}

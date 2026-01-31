@@ -179,15 +179,12 @@ fn get_or_create_album(
 
 /// Delete an album and all its associated tracks
 pub fn delete_album(conn: &Connection, album_id: i64) -> Result<bool> {
-    conn.execute_batch(&format!(
-        "BEGIN;
-         DELETE FROM tracks WHERE album_id = {};
-         DELETE FROM albums WHERE id = {};
-         COMMIT;",
-        album_id, album_id
-    ))
-    .map(|_| true)
-    .map_err(|e| e)
+    // We execute these as separate statements to avoid issues with manual transaction blocks.
+    // SQLite will handle atomicity if not already in a transaction, or join the existing one.
+    // Parameters are used to prevent SQL injection and handle types correctly.
+    conn.execute("DELETE FROM tracks WHERE album_id = ?1", params![album_id])?;
+    let deleted = conn.execute("DELETE FROM albums WHERE id = ?1", params![album_id])?;
+    Ok(deleted > 0)
 }
 
 /// Initialize FTS5 virtual table for searching

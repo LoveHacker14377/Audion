@@ -24,6 +24,7 @@
         playlists,
         loadPlaylists,
         loadLibrary,
+        getAlbumCoverFromTracks,
     } from "$lib/stores/library";
     import { contextMenu } from "$lib/stores/ui";
     import { pluginStore } from "$lib/stores/plugin-store";
@@ -88,7 +89,7 @@
         if (!track.album_id) return null;
         const album = albumMap.get(track.album_id);
         if (!album) return null;
-        
+
         // Priority 4: Album's file-based art
         if (album.art_path) {
             return getAlbumCoverSrc(album);
@@ -103,37 +104,7 @@
         art_path?: string | null;
         art_data?: string | null;
     }): string | null {
-        // Priority 1: Album's file-based art
-        if (album.art_path) {
-            return getAlbumCoverSrc(album as any);
-        }
-        
-        // Priority 2: Album's base64 art - old
-        if (album.art_data) {
-            return getAlbumArtSrc(album.art_data);
-        }
-
-        // Priority 3: First track's file-based cover
-        const trackWithCoverPath = $allTracks.find(
-            (t) => t.album_id === album.id && t.track_cover_path,
-        );
-        if (trackWithCoverPath?.track_cover_path) {
-            return getTrackCoverSrc(trackWithCoverPath);
-        }
-
-        // Priority 4: First track's base64 cover - old
-        const trackWithCover = $allTracks.find(
-            (t) => t.album_id === album.id && t.track_cover,
-        );
-        if (trackWithCover?.track_cover) {
-            return getAlbumArtSrc(trackWithCover.track_cover);
-        }
-
-        // Priority 5: First track's external cover_url
-        const trackWithUrl = $allTracks.find(
-            (t) => t.album_id === album.id && t.cover_url,
-        );
-        return trackWithUrl?.cover_url || null;
+        return getAlbumCoverFromTracks(album.id);
     }
 
     function handleTrackClick(index: number) {

@@ -98,8 +98,20 @@ pub async fn scan_music(paths: Vec<String>, db: State<'_, Database>) -> Result<S
 
 #[tauri::command]
 pub async fn add_folder(path: String, db: State<'_, Database>) -> Result<(), String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.exists() || !path_buf.is_dir() {
+        return Err("Invalid path: Not a directory or does not exist".to_string());
+    }
+
+    // Canonicalize path to prevent traversal/obfuscation
+    let canonical_path = path_buf
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve path: {}", e))?;
+    let path_str = canonical_path.to_string_lossy().to_string();
+
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    queries::add_music_folder(&conn, &path).map_err(|e| format!("Failed to add folder: {}", e))?;
+    queries::add_music_folder(&conn, &path_str)
+        .map_err(|e| format!("Failed to add folder: {}", e))?;
     Ok(())
 }
 

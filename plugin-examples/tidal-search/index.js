@@ -1557,7 +1557,11 @@
 
   };
 
-  // Register plugin globally
-  window.TidalSearch = TidalSearch;
-  window.AudionPlugin = TidalSearch;
+  // Register plugin
+  if (typeof Audion !== "undefined" && Audion.register) {
+    Audion.register(TidalSearch);
+  } else {
+    window.TidalSearch = TidalSearch;
+    window.AudionPlugin = TidalSearch;
+  }
 })();

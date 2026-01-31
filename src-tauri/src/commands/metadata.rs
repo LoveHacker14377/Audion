@@ -31,7 +31,21 @@ pub async fn download_and_save_audio(
     app: AppHandle,
     input: DownloadAudioInput,
 ) -> Result<String, String> {
-    let path = Path::new(&input.path);
+    let path = std::path::Path::new(&input.path);
+
+    // Security: Validate path to prevent directory traversal
+    // We expect the path to be absolute or at least not escaping its intended parent
+    if let Some(parent) = path.parent() {
+        // For simplicity, we'll ensure the path doesn't contain traversal components
+        // and that it's a subpath of its own parent (which should be the download dir)
+        crate::utils::resolve_path(
+            parent,
+            path.file_name().unwrap_or_default().to_str().unwrap_or(""),
+        )
+        .map_err(|e| format!("Security Error: {}", e))?;
+    } else {
+        return Err("Invalid path: No parent directory".to_string());
+    }
 
     // Debug: Log input values
     println!("[Metadata] Saving to path: {}", &input.path);
