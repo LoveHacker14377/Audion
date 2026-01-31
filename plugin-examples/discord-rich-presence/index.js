@@ -208,7 +208,7 @@
           if (isValid) {
             return coverUrl;
           }
-        } catch {}
+        } catch { }
       }
 
       // For local files without a valid cover URL, search Tidal
@@ -235,22 +235,37 @@
     },
 
     async searchCoverFromTidal() {
-      // Use Tidal plugin's cover search if available
-      if (window.TidalSearchAPI?.searchCover) {
+      // Use decoupled request instead of direct access if possible
+      if (this.api.request) {
+        try {
+          const trackId = this.currentTrack?.id || null;
+          return await this.api.request("searchCover", {
+            title: this.currentTrack.title,
+            artist: this.currentTrack.artist,
+            trackId,
+            requester: "Discord Rich Presence"
+          });
+        } catch (error) {
+          console.log("[Discord RPC] Cover lookup request failed:", error);
+        }
+      }
+
+      // Fallback to legacy direct call for compatibility during transition
+      else if (window.TidalSearchAPI?.searchCover) {
         try {
           const trackId = this.currentTrack?.id || null;
           return await window.TidalSearchAPI.searchCover(
             this.currentTrack.title,
             this.currentTrack.artist,
-            trackId, // Pass track ID so Tidal can update the database
-            "Discord Rich Presence", // IMPORTANT, must match plugin name exactly
+            trackId,
+            "Discord Rich Presence",
           );
         } catch (error) {
-          console.log("[Discord RPC] Tidal cover search error:", error);
+          console.log("[Discord RPC] Legacy Tidal cover search error:", error);
         }
       } else {
         console.log(
-          "[Discord RPC] Tidal Search plugin not available for cover lookup",
+          "[Discord RPC] No cover lookup provider available",
         );
       }
 

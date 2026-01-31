@@ -2,6 +2,7 @@
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
@@ -189,18 +190,118 @@ pub fn delete_album(conn: &Connection, album_id: i64) -> Result<bool> {
     .map_err(|e| e)
 }
 
-use std::time::Instant;
+/// Initialize FTS5 virtual table for searching
+pub fn init_fts(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS tracks_fts USING fts5(
+            title, 
+            artist, 
+            album, 
+            content='tracks', 
+            content_rowid='id'
+        );
+
+        -- Trigger to keep FTS in sync with tracks
+        CREATE TRIGGER IF NOT EXISTS tracks_ai AFTER INSERT ON tracks BEGIN
+            INSERT INTO tracks_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album);
+        END;
+        CREATE TRIGGER IF NOT EXISTS tracks_ad AFTER DELETE ON tracks BEGIN
+            INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album);
+        END;
+        CREATE TRIGGER IF NOT EXISTS tracks_au AFTER UPDATE ON tracks BEGIN
+            INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album);
+            INSERT INTO tracks_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album);
+        END;"
+    )?;
+    Ok(())
+}
+
+/// Search tracks using FTS5
+pub fn search_tracks(
+    conn: &Connection,
+    query: &str,
+    limit: i32,
+    offset: i32,
+) -> Result<Vec<Track>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, local_src, track_cover_path 
+         FROM tracks 
+         WHERE id IN (SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH ?1)
+         ORDER BY artist, album, track_number, title
+         LIMIT ?2 OFFSET ?3",
+    )?;
+
+    let tracks = stmt
+        .query_map(params![query, limit, offset], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                track_number: row.get(5)?,
+                duration: row.get(6)?,
+                album_id: row.get(7)?,
+                format: row.get(8)?,
+                bitrate: row.get(9)?,
+                source_type: row.get(10)?,
+                cover_url: row.get(11)?,
+                external_id: row.get(12)?,
+                local_src: row.get(13)?,
+                track_cover: None,
+                track_cover_path: row.get(14)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(tracks)
+}
+
+/// Get paginated tracks
+pub fn get_tracks_paginated(conn: &Connection, limit: i32, offset: i32) -> Result<Vec<Track>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, local_src, track_cover_path 
+         FROM tracks 
+         ORDER BY artist, album, track_number, title
+         LIMIT ?1 OFFSET ?2",
+    )?;
+
+    let tracks = stmt
+        .query_map(params![limit, offset], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                track_number: row.get(5)?,
+                duration: row.get(6)?,
+                album_id: row.get(7)?,
+                format: row.get(8)?,
+                bitrate: row.get(9)?,
+                source_type: row.get(10)?,
+                cover_url: row.get(11)?,
+                external_id: row.get(12)?,
+                local_src: row.get(13)?,
+                track_cover: None,
+                track_cover_path: row.get(14)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(tracks)
+}
 
 /// Get all tracks WITH cover data (slow, for migration only)
 pub fn get_all_tracks(conn: &Connection) -> Result<Vec<Track>> {
     let query_start = Instant::now();
     println!("[DB] get_all_tracks: Preparing query...");
-    
+
     let mut stmt = conn.prepare(
         "SELECT id, path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, local_src, track_cover, track_cover_path 
          FROM tracks ORDER BY artist, album, track_number, title",
     )?;
-    
+
     let prepare_time = query_start.elapsed();
     println!("[DB] get_all_tracks: Query prepared in {:?}", prepare_time);
 
@@ -230,8 +331,12 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<Track>> {
 
     let map_time = map_start.elapsed();
     let total_time = query_start.elapsed();
-    
-    println!("[DB] get_all_tracks: Fetched {} tracks in {:?}", tracks.len(), total_time);
+
+    println!(
+        "[DB] get_all_tracks: Fetched {} tracks in {:?}",
+        tracks.len(),
+        total_time
+    );
 
     Ok(tracks)
 }
@@ -240,14 +345,17 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<Track>> {
 pub fn get_all_tracks_lightweight(conn: &Connection) -> Result<Vec<Track>> {
     let query_start = Instant::now();
     println!("[DB] get_all_tracks_lightweight: Preparing query...");
-    
+
     let mut stmt = conn.prepare(
         "SELECT id, path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, local_src 
          FROM tracks ORDER BY artist, album, track_number, title",
     )?;
-    
+
     let prepare_time = query_start.elapsed();
-    println!("[DB] get_all_tracks_lightweight: Query prepared in {:?}", prepare_time);
+    println!(
+        "[DB] get_all_tracks_lightweight: Query prepared in {:?}",
+        prepare_time
+    );
 
     let map_start = Instant::now();
     let tracks = stmt
@@ -275,9 +383,14 @@ pub fn get_all_tracks_lightweight(conn: &Connection) -> Result<Vec<Track>> {
 
     let map_time = map_start.elapsed();
     let total_time = query_start.elapsed();
-    
-    println!("[DB] get_all_tracks_lightweight: Fetched {} tracks in {:?} (prepare: {:?}, map: {:?})", 
-        tracks.len(), total_time, prepare_time, map_time);
+
+    println!(
+        "[DB] get_all_tracks_lightweight: Fetched {} tracks in {:?} (prepare: {:?}, map: {:?})",
+        tracks.len(),
+        total_time,
+        prepare_time,
+        map_time
+    );
 
     Ok(tracks)
 }
@@ -285,7 +398,7 @@ pub fn get_all_tracks_lightweight(conn: &Connection) -> Result<Vec<Track>> {
 /// Get all tracks WITH cover paths only (fast, for on-demand loading)
 pub fn get_all_tracks_with_paths(conn: &Connection) -> Result<Vec<Track>> {
     let query_start = Instant::now();
-    
+
     let mut stmt = conn.prepare(
         "SELECT id, path, title, artist, album, track_number, duration, album_id, format, bitrate, source_type, cover_url, external_id, local_src, track_cover_path 
          FROM tracks ORDER BY artist, album, track_number, title",
@@ -315,7 +428,11 @@ pub fn get_all_tracks_with_paths(conn: &Connection) -> Result<Vec<Track>> {
         .collect::<Result<Vec<_>>>()?;
 
     let total_time = query_start.elapsed();
-    println!("[DB] get_all_tracks_with_paths: Fetched {} tracks in {:?}", tracks.len(), total_time);
+    println!(
+        "[DB] get_all_tracks_with_paths: Fetched {} tracks in {:?}",
+        tracks.len(),
+        total_time
+    );
 
     Ok(tracks)
 }
@@ -387,9 +504,9 @@ pub fn get_album_art_path(conn: &Connection, album_id: i64) -> Result<Option<Str
 /// Get all albums WITH art data (slow, for migration only)
 pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
     let query_start = Instant::now();
-    
-    let mut stmt =
-        conn.prepare("SELECT id, name, artist, art_data, art_path FROM albums ORDER BY artist, name")?;
+
+    let mut stmt = conn
+        .prepare("SELECT id, name, artist, art_data, art_path FROM albums ORDER BY artist, name")?;
 
     let albums = stmt
         .query_map([], |row| {
@@ -404,7 +521,11 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
         .collect::<Result<Vec<_>>>()?;
 
     let total_time = query_start.elapsed();
-    println!("[DB] get_all_albums: Fetched {} albums in {:?}", albums.len(), total_time);
+    println!(
+        "[DB] get_all_albums: Fetched {} albums in {:?}",
+        albums.len(),
+        total_time
+    );
 
     Ok(albums)
 }
@@ -412,9 +533,8 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
 /// Get all albums WITHOUT art data (fast)
 pub fn get_all_albums_lightweight(conn: &Connection) -> Result<Vec<Album>> {
     let query_start = Instant::now();
-    
-    let mut stmt =
-        conn.prepare("SELECT id, name, artist FROM albums ORDER BY artist, name")?;
+
+    let mut stmt = conn.prepare("SELECT id, name, artist FROM albums ORDER BY artist, name")?;
 
     let albums = stmt
         .query_map([], |row| {
@@ -429,7 +549,11 @@ pub fn get_all_albums_lightweight(conn: &Connection) -> Result<Vec<Album>> {
         .collect::<Result<Vec<_>>>()?;
 
     let total_time = query_start.elapsed();
-    println!("[DB] get_all_albums_lightweight: Fetched {} albums in {:?}", albums.len(), total_time);
+    println!(
+        "[DB] get_all_albums_lightweight: Fetched {} albums in {:?}",
+        albums.len(),
+        total_time
+    );
 
     Ok(albums)
 }
@@ -437,7 +561,7 @@ pub fn get_all_albums_lightweight(conn: &Connection) -> Result<Vec<Album>> {
 /// Get all albums WITH paths only (for on-demand loading)
 pub fn get_all_albums_with_paths(conn: &Connection) -> Result<Vec<Album>> {
     let query_start = Instant::now();
-    
+
     let mut stmt =
         conn.prepare("SELECT id, name, artist, art_path FROM albums ORDER BY artist, name")?;
 
@@ -454,14 +578,18 @@ pub fn get_all_albums_with_paths(conn: &Connection) -> Result<Vec<Album>> {
         .collect::<Result<Vec<_>>>()?;
 
     let total_time = query_start.elapsed();
-    println!("[DB] get_all_albums_with_paths: Fetched {} albums in {:?}", albums.len(), total_time);
+    println!(
+        "[DB] get_all_albums_with_paths: Fetched {} albums in {:?}",
+        albums.len(),
+        total_time
+    );
 
     Ok(albums)
 }
 
 pub fn get_all_artists(conn: &Connection) -> Result<Vec<Artist>> {
     let query_start = Instant::now();
-    
+
     let mut stmt = conn.prepare(
         "SELECT artist, COUNT(*) as track_count, COUNT(DISTINCT album) as album_count 
          FROM tracks 
@@ -481,7 +609,11 @@ pub fn get_all_artists(conn: &Connection) -> Result<Vec<Artist>> {
         .collect::<Result<Vec<_>>>()?;
 
     let total_time = query_start.elapsed();
-    println!("[DB] get_all_artists: Fetched {} artists in {:?}", artists.len(), total_time);
+    println!(
+        "[DB] get_all_artists: Fetched {} artists in {:?}",
+        artists.len(),
+        total_time
+    );
 
     Ok(artists)
 }

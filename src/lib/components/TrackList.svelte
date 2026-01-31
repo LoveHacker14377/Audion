@@ -23,6 +23,7 @@
     loadPlaylists,
     loadLibrary,
     getTrackAlbumCover,
+    loadMoreTracks,
   } from "$lib/stores/library";
   import { pluginStore } from "$lib/stores/plugin-store";
   import { goToAlbumDetail } from "$lib/stores/view";
@@ -66,6 +67,13 @@
   );
   $: visibleTracks = sortedTracks.slice(startIndex, endIndex);
   $: offsetY = startIndex * TRACK_ROW_HEIGHT;
+
+  // Infinite scroll: load more when reaching the end of loaded tracks
+  $: {
+    if (endIndex >= sortedTracks.length - 10 && sortedTracks.length > 0) {
+      loadMoreTracks();
+    }
+  }
 
   function handleScroll(e: Event) {
     scrollTop = (e.target as HTMLElement).scrollTop;
@@ -148,12 +156,12 @@
     return !runtime.streamResolvers.has(track.source_type);
   }
 
-    // Filter out external tracks ONLY if we filter completely (old logic).
-    // New logic: show all but mark unavailable.
-    // However, the original filteredTracks logic was checking for resolver existence.
-    // We should probably keep showing them but maybe mark them?
-    // Let's modify filteredTracks to NOT filter based on resolvers,
-    // but relies on the CSS class for visual indication.
+  // Filter out external tracks ONLY if we filter completely (old logic).
+  // New logic: show all but mark unavailable.
+  // However, the original filteredTracks logic was checking for resolver existence.
+  // We should probably keep showing them but maybe mark them?
+  // Let's modify filteredTracks to NOT filter based on resolvers,
+  // but relies on the CSS class for visual indication.
   $: filteredTracks = tracks;
 
   // Sorting state
@@ -332,7 +340,7 @@
         },
         disabled:
           !canDownload(track) ||
-                    (isUnavailable && !isTidalAvailable && !track.local_src), // Enable download if it's the only way to get it? No, if plugin off, can't download.
+          (isUnavailable && !isTidalAvailable && !track.local_src), // Enable download if it's the only way to get it? No, if plugin off, can't download.
       },
       { type: "separator" },
       {
@@ -409,7 +417,7 @@
 
   function handlePointerDown(e: PointerEvent, actualIndex: number) {
     if (!playlistId) return; // Only allow dragging in playlists
-    
+
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation(); // Prevent parent handlers
@@ -460,20 +468,27 @@
       draggedIndex !== dragOverIndex &&
       playlistId
     ) {
-      console.log("Reorder playlist:", playlistId, "from:", draggedIndex, "to:", dragOverIndex);
-      
+      console.log(
+        "Reorder playlist:",
+        playlistId,
+        "from:",
+        draggedIndex,
+        "to:",
+        dragOverIndex,
+      );
+
       try {
         // Update backend
         await reorderPlaylistTracks(playlistId, draggedIndex, dragOverIndex);
-        
+
         console.log("Reorder successful, updating local state");
-        
+
         // Update local state for instant feedback
         const newTracks = [...tracks];
         const [removed] = newTracks.splice(draggedIndex, 1);
         newTracks.splice(dragOverIndex, 0, removed);
         tracks = newTracks;
-        
+
         addToast("Tracks reordered", "success");
       } catch (error) {
         console.error("Failed to reorder tracks:", error);
@@ -492,7 +507,11 @@
 
 <div class="track-list">
   <!-- Header stays fixed -->
-  <header class="list-header" class:no-album={!showAlbum} class:with-drag={playlistId !== null}>
+  <header
+    class="list-header"
+    class:no-album={!showAlbum}
+    class:with-drag={playlistId !== null}
+  >
     {#if playlistId !== null}
       <span class="col-header col-drag"></span>
     {/if}
