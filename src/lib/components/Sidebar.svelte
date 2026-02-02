@@ -6,6 +6,7 @@
         trackCount,
         albumCount,
         artistCount,
+        loadAlbumsAndArtists,
     } from "$lib/stores/library";
     import {
         currentView,
@@ -32,10 +33,10 @@
         getPlaylistTracks,
         renamePlaylist,
     } from "$lib/api/tauri";
+    import { progressiveScan } from "$lib/stores/progressiveScan";
     import { confirm } from "$lib/stores/dialogs";
     import { playTracks, addToQueue } from "$lib/stores/player";
     import { setPlaylistCover } from "$lib/stores/playlistCovers";
-    import { loadLibrary } from "$lib/stores/library";
     import { uiSlotManager } from "$lib/plugins/ui-slots";
 
     import { updates } from "$lib/stores/updates";
@@ -50,33 +51,54 @@
     let slotTop: HTMLDivElement;
     let slotBottom: HTMLDivElement;
 
-    async function handleAddFolder() {
-        try {
-            const path = await selectMusicFolder();
-            if (path) {
-                isScanning = true;
-                scanStatus = "Rescanning Library...";
-                scanError = null;
+import { addToast } from "$lib/stores/toast";
 
-                // Add folder then full rescan to ensure consistency
-                await addFolder(path);
-                const result = await rescanMusic();
+async function handleAddFolder() {
+    try {
+        const path = await selectMusicFolder();
+        if (path) {
+            isScanning = true;
+            scanStatus = "Scanning...";
+            scanError = null;
 
-                if (result.errors.length > 0) {
-                    console.warn("Scan errors:", result.errors);
-                }
+            // Progressive scan: clear existing, stream new tracks in batches
+            await progressiveScan.startScan(true);
 
-                // Reload library after scan
-                await loadLibrary();
-                await loadPlaylists();
+            // Add folder then full rescan
+            await addFolder(path);
+            const result = await rescanMusic();
+
+            if (result.errors.length > 0) {
+                console.warn("Scan errors:", result.errors);
             }
-        } catch (error) {
-            scanError = error instanceof Error ? error.message : String(error);
-            console.error("Scan failed:", error);
-        } finally {
-            isScanning = false;
+
+            console.log(`Scan complete: ${result.tracks_added} added, ${result.tracks_updated} updated, ${result.tracks_deleted} deleted`);
+
+            // Tracks already loaded progressively — just fetch albums/artists
+            await loadAlbumsAndArtists();
+            await loadPlaylists();
+
+            // success toast
+            const parts = [];
+            if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
+            if (result.tracks_updated > 0) parts.push(`${result.tracks_updated} updated`);
+            if (result.tracks_deleted > 0) parts.push(`${result.tracks_deleted} deleted`);
+            
+            const message = parts.length > 0 
+                ? `Library scan complete: ${parts.join(', ')}`
+                : 'Library scan complete';
+            
+            addToast(message, 'success', 4000);
         }
+    } catch (error) {
+        scanError = error instanceof Error ? error.message : String(error);
+        console.error("Scan failed:", error);
+        addToast("Failed to scan music folder", "error");
+    } finally {
+        isScanning = false;
+        progressiveScan.reset();
     }
+}
 
     async function handlePlayPlaylist(id: number) {
         try {

@@ -7,6 +7,8 @@
     resetDatabase,
     selectMusicFolder,
     syncCoverPathsFromFiles,
+    mergeDuplicateCovers, 
+    type MergeCoverResult
   } from "$lib/api/tauri";
   import { loadLibrary } from "$lib/stores/library";
   import UpdatePopup from "./UpdatePopup.svelte";
@@ -121,6 +123,50 @@
       setTimeout(() => {
         syncMessage = "";
       }, 5000);
+    }
+  }
+
+  let isMergingCovers = false;
+  let mergeMessage = "";
+  let mergeSuccess = false;
+
+  async function handleMergeDuplicateCovers() {
+    isMergingCovers = true;
+    mergeMessage = "";
+    mergeSuccess = false;
+
+    try {
+      console.log("[Settings] Starting cover merge...");
+      const result = await mergeDuplicateCovers();
+
+      console.log("[Settings] Merge result:", result);
+
+      if (result.errors.length === 0) {
+        mergeSuccess = true;
+        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(2);
+        mergeMessage = `✓ Successfully merged ${result.covers_merged} duplicate covers across ${result.albums_processed} albums. Saved ${spaceSavedMB} MB of disk space.`;
+
+        // Reload library to refresh cover references
+        console.log("[Settings] Reloading library...");
+        await loadLibrary();
+        console.log("[Settings] Library reloaded");
+      } else {
+        mergeSuccess = false;
+        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(2);
+        mergeMessage = `⚠ Merged ${result.covers_merged} covers (saved ${spaceSavedMB} MB) with ${result.errors.length} errors. Check console.`;
+        console.error("[Settings] Merge errors:", result.errors);
+      }
+    } catch (error) {
+      mergeSuccess = false;
+      mergeMessage = `✗ Failed to merge covers: ${error}`;
+      console.error("[Settings] Merge failed:", error);
+    } finally {
+      isMergingCovers = false;
+
+      // Clear message after 8 seconds
+      setTimeout(() => {
+        mergeMessage = "";
+      }, 8000);
     }
   }
 </script>
@@ -394,7 +440,8 @@
       <!-- Cover Management -->
       <section class="settings-section">
         <h3 class="section-title">Cover Management</h3>
-
+      
+        <!-- Sync Cover Files -->
         <div class="setting-item">
           <div class="danger-item">
             <div class="danger-info">
@@ -424,6 +471,38 @@
               class:error={!syncSuccess}
             >
               {syncMessage}
+            </p>
+          {/if}
+        </div>
+      
+        <!-- Merge Duplicate Covers -->
+        <div class="setting-item">
+          <div class="danger-item">
+            <div class="danger-info">
+              <span class="setting-label">Merge Duplicate Covers</span>
+              <p class="setting-hint">
+                Find and merge identical album covers to save disk space and improve performance
+              </p>
+            </div>
+            <button
+              class="selector-btn"
+              on:click={handleMergeDuplicateCovers}
+              disabled={isMergingCovers}
+            >
+              {#if isMergingCovers}
+                Merging...
+              {:else}
+                Merge Duplicates
+              {/if}
+            </button>
+          </div>
+          {#if mergeMessage}
+            <p
+              class="sync-message"
+              class:success={mergeSuccess}
+              class:error={!mergeSuccess}
+            >
+              {mergeMessage}
             </p>
           {/if}
         </div>

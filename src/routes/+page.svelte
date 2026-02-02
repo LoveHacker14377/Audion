@@ -48,16 +48,30 @@
     }
 
     try {
-      await Promise.all([
-        loadLibrary(),
-        loadPlaylists(),
-        // Initialize plugins to auto-load enabled ones
-        pluginStore.init(),
-      ]);
+      const dataLoadStart = performance.now();
+      await Promise.all([loadLibrary(), loadPlaylists()]);
     } catch (error) {
       console.error("Failed to load library:", error);
     } finally {
       isLoading = false;
+
+      // Lazy load plugins- reduce startup time
+      requestIdleCallback(() => {
+        const pluginLoadStart = performance.now();
+        console.log("  [PLUGINS] Starting lazy load...");
+
+        pluginStore
+          .init()
+          .then(() => {
+            console.log(
+              `  [PLUGINS] Loaded in background: ${(performance.now() - pluginLoadStart).toFixed(2)}ms`,
+            );
+          })
+          .catch((error) => {
+            console.error("[PLUGINS] Failed to load:", error);
+          });
+
+      });
     }
   });
 </script>

@@ -1,11 +1,8 @@
 <script lang="ts">
     import { currentView } from "$lib/stores/view";
     import { tracks, albums, artists } from "$lib/stores/library";
-    import {
-        searchQuery,
-        searchResults,
-        clearSearch,
-    } from "$lib/stores/search";
+    import { isScanning } from "$lib/stores/progressiveScan";  // we Only need isScanning flag
+    import { searchQuery, searchResults, clearSearch } from "$lib/stores/search";
 
     import TrackList from "./TrackList.svelte";
     import AlbumGrid from "./AlbumGrid.svelte";
@@ -39,11 +36,17 @@
         <div class="view-container">
             <header class="view-header">
                 <h1>All Tracks</h1>
+                {#if $isScanning}
+                    <div class="scan-status">
+                        Scanning... {$tracks.length} tracks found
+                    </div>
+                {/if}
             </header>
-            <div class="view-content">
-                <TrackList tracks={$tracks} showAlbum={true} />
-            </div>
+
+        <div class="view-content">
+            <TrackList tracks={$tracks} showAlbum={true} />
         </div>
+    </div>
     {:else if $currentView.type === "albums"}
         <div class="view-container">
             <header class="view-header">
@@ -137,5 +140,11 @@
         justify-content: center;
         height: 100%;
         color: var(--text-subdued);
+    }
+
+    .scan-status {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: var(--spacing-xs);
     }
 </style>
