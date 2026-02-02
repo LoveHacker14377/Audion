@@ -3,13 +3,12 @@
 
 mod commands;
 mod db;
-mod scanner;
 mod discord;
+mod scanner;
 
 use db::Database;
 use std::path::PathBuf;
 use tauri::Manager;
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -61,6 +60,8 @@ pub fn run() {
             commands::add_folder,
             commands::rescan_music,
             commands::get_library,
+            commands::get_tracks_paginated,
+            commands::search_library,
             commands::get_tracks_by_album,
             commands::get_tracks_by_artist,
             commands::get_album,

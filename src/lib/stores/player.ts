@@ -66,6 +66,7 @@ let unsubscribeGainChange: (() => void) | null = null;
 let unsubscribeEnabledChange: (() => void) | null = null;
 let unsubscribeEqEnabledInSetAudio: (() => void) | null = null;
 let rafActive = false;
+let currentSessionId = 0;
 
 // Get the AudioContext (for potential visualizer use)
 export function getAudioContext(): AudioContext | null {
@@ -417,19 +418,22 @@ export function shutdownPlayer(): void {
 // Play a specific track
 export async function playTrack(track: Track): Promise<void> {
     const previousTrack = get(currentTrack);
+    const sessionId = ++currentSessionId;
+
     currentTrack.set(track);
 
     // Get full track with base64 data URI for plugins
-    // This reconstructs track_cover from cache and converts blob URL to data URI
     const fullTrack = await getFullTrack(track.id, true);
-    const trackForPlugins = fullTrack || track;
 
-    // Emit trackChange event for plugins with proper data URI format
+    // Check session ID before proceeding after await
+    if (sessionId !== currentSessionId) return;
+
+    const trackForPlugins = fullTrack || track;
     pluginEvents.emit('trackChange', { track: trackForPlugins, previousTrack });
 
     if (audioElement) {
         try {
-            let src: string;
+            let src: string | undefined;
 
             // Check for local cached version first
             if (track.local_src) {
@@ -440,22 +444,26 @@ export async function playTrack(track: Track): Promise<void> {
                 }
             }
 
+            if (sessionId !== currentSessionId) return;
+
             // If no local source or it failed, try standard resolution
             if (!src!) {
-                // Check if this is an external streaming track
                 if (track.source_type && track.source_type !== 'local') {
-                    // External track - need to resolve stream URL via plugin
                     const { pluginStore } = await import('./plugin-store');
                     const runtime = pluginStore.getRuntime();
 
+                    if (sessionId !== currentSessionId) return;
+
                     if (runtime && track.external_id) {
                         try {
-                            // Resolve fresh stream URL
                             const streamUrl = await runtime.resolveStreamUrl(track.source_type, track.external_id);
+
+                            if (sessionId !== currentSessionId) return;
+
                             if (streamUrl) {
                                 src = streamUrl;
                             } else {
-                                console.error('Failed to resolve stream URL for:', track.source_type, track.external_id);
+                                console.error('Failed to resolve stream URL');
                                 addToast(`Unable to play "${track.title}": Stream URL not found`, 'error');
                                 return;
                             }
@@ -465,15 +473,9 @@ export async function playTrack(track: Track): Promise<void> {
                             return;
                         }
                     } else if (track.path.startsWith('http://') || track.path.startsWith('https://')) {
-                        // Fallback: path is already a URL
                         src = track.path;
-                    } else {
-                        console.error('Cannot play external track: no resolver available or path is not a URL');
-                        addToast(`Cannot play "${track.title}": Missing stream information`, 'error');
-                        return;
                     }
                 } else {
-                    // Local file - convert file path to asset URL
                     try {
                         src = await getAudioSrc(track.path);
                     } catch (err) {
@@ -484,23 +486,23 @@ export async function playTrack(track: Track): Promise<void> {
                 }
             }
 
+            if (sessionId !== currentSessionId) return;
+
+            if (!src) {
+                console.error('Final src resolution failed');
+                return;
+            }
+
             audioElement.src = src;
             try {
                 await audioElement.play();
             } catch (err) {
-                // Ignore AbortError - happens when play() is interrupted by new load
-                if (err instanceof Error && err.name === 'AbortError') {
-                    return;
-                }
-                // Handle "NotSupportedError" or similar playback errors
+                if (err instanceof Error && err.name === 'AbortError') return;
                 console.error('Playback failed:', err);
                 addToast(`Playback failed for "${track.title}": ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
             }
         } catch (error) {
-            // Catch-all for unexpected errors in the setup phase
-            if (error instanceof Error && error.name === 'AbortError') {
-                return;
-            }
+            if (error instanceof Error && error.name === 'AbortError') return;
             console.error('Failed to init track:', error);
             addToast(`Failed to play "${track.title}": Unexpected error`, 'error');
         }

@@ -115,6 +115,14 @@ export async function getLibrary(): Promise<Library> {
     return await invoke('get_library');
 }
 
+export async function getTracksPaginated(limit: number, offset: number): Promise<Track[]> {
+    return await invoke('get_tracks_paginated', { limit, offset });
+}
+
+export async function searchLibrary(query: string, limit: number, offset: number): Promise<Track[]> {
+    return await invoke('search_library', { query, limit, offset });
+}
+
 export async function getTracksByAlbum(albumId: number): Promise<Track[]> {
     return await invoke('get_tracks_by_album', { albumId });
 }

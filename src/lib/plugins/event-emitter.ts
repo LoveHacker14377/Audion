@@ -13,6 +13,7 @@ export interface PluginEvents {
 
 export class EventEmitter<EventMap extends Record<string, any>> {
     private listeners: Map<keyof EventMap, Set<EventListener<any>>> = new Map();
+    private requestHandlers: Map<string, (data: any) => Promise<any>> = new Map();
     // Track which plugin owns which listeners
     private listenerOwners: Map<EventListener<any>, string> = new Map();
     private maxListeners = 10;
@@ -89,6 +90,31 @@ export class EventEmitter<EventMap extends Record<string, any>> {
                 }
             });
         }
+    }
+
+    /**
+     * Set a handler for a request
+     */
+    handleRequest(requestName: string, handler: (data: any) => Promise<any>): void {
+        this.requestHandlers.set(requestName, handler);
+    }
+
+    /**
+     * Make a request and wait for a response
+     */
+    async request<T = any>(requestName: string, data: any): Promise<T> {
+        const handler = this.requestHandlers.get(requestName);
+        if (!handler) {
+            throw new Error(`No handler registered for request: ${requestName}`);
+        }
+        return await handler(data);
+    }
+
+    /**
+     * Check if a request handler exists
+     */
+    hasRequestHandler(requestName: string): boolean {
+        return this.requestHandlers.has(requestName);
     }
 
     /**
