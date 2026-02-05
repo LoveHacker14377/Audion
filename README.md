@@ -67,7 +67,7 @@ Features
 
 ### Plugin System
 
-Extend the core functionality using JavaScript and WASM plugins. For details on creating your own plugins, see the [Plugin Documentation](https://chat.z.ai/c/PLUGINS.md).
+Extend the core functionality using JavaScript and WASM plugins. For details on creating your own plugins, see the [Plugin Documentation]().
 
 * * * * *
 
