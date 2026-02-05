@@ -304,16 +304,14 @@
             class="playlist-header"
             on:contextmenu={handleHeaderContextMenu}
         >
-            <button class="back-btn" on:click={goToPlaylists} aria-label="Back">
+        <button class="back-btn" on:click={goToPlaylists} title="Close">
                 <svg
                     viewBox="0 0 24 24"
                     fill="currentColor"
-                    width="24"
-                    height="24"
+                width="20"
+                height="20"
                 >
-                    <path
-                        d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"
-                    />
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                 </svg>
             </button>
             <div 
@@ -560,11 +558,41 @@
         align-items: center;
         justify-content: center;
         transition: all var(--transition-fast);
+        z-index: 10;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .back-btn::after {
+        content: attr(title);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 12px;
+        background-color: var(--bg-surface);
+        color: var(--text-primary);
+        font-size: 0.75rem;
+        border-radius: var(--radius-sm);
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition-fast);
+        margin-bottom: 8px;
+        box-shadow: var(--shadow-md);
+    }
+
+    .back-btn:hover::after {
+        opacity: 1;
     }
 
     .back-btn:hover {
-        background-color: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        background-color: rgba(220, 38, 38, 0.9);
+        border-color: rgba(220, 38, 38, 0.4);
+        transform: scale(1.05);
+    }
+
+    .back-btn:active {
+        transform: scale(0.95);
     }
 
     .playlist-cover {
