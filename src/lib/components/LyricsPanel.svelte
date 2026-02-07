@@ -19,6 +19,12 @@
 
     let lyricsContainer: HTMLDivElement;
     let lineElements: HTMLDivElement[] = [];
+    let scrollAnimationId: number | null = null;
+    let prevActiveLine = -1;
+
+    function easeOutExpo(t: number): number {
+        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    }
 
     // Combined reactive state for word-by-word sync (single derived for efficiency)
     const wordSyncState = derived(
@@ -91,19 +97,48 @@
         return "future";
     }
 
-    // Scroll to active line
-    $: if ($activeLine >= 0 && lineElements[$activeLine] && lyricsContainer) {
-        const element = lineElements[$activeLine];
+    // Apple Music-style smooth scroll with custom easing
+    $: if ($activeLine >= 0 && lineElements[$activeLine] && lyricsContainer && $activeLine !== prevActiveLine) {
+        prevActiveLine = $activeLine;
+        smoothScrollToActive();
+    }
+
+    function smoothScrollToActive() {
+        if (!lyricsContainer) return;
+        const element = lineElements[prevActiveLine];
+        if (!element) return;
+
+        // Cancel any ongoing scroll animation
+        if (scrollAnimationId) {
+            cancelAnimationFrame(scrollAnimationId);
+        }
+
         const containerHeight = lyricsContainer.clientHeight;
         const elementTop = element.offsetTop;
         const elementHeight = element.clientHeight;
+        const targetScroll = elementTop - containerHeight / 2 + elementHeight / 2;
 
-        // Center the active line
-        const scrollTo = elementTop - containerHeight / 2 + elementHeight / 2;
-        lyricsContainer.scrollTo({
-            top: scrollTo,
-            behavior: "smooth",
-        });
+        const startScroll = lyricsContainer.scrollTop;
+        const distance = targetScroll - startScroll;
+        const duration = 550;
+        let startTime: number | null = null;
+
+        function step(timestamp: number) {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = easeOutExpo(progress);
+
+            lyricsContainer.scrollTop = startScroll + distance * eased;
+
+            if (progress < 1) {
+                scrollAnimationId = requestAnimationFrame(step);
+            } else {
+                scrollAnimationId = null;
+            }
+        }
+
+        scrollAnimationId = requestAnimationFrame(step);
     }
 
     // Seek to a specific lyric line time
@@ -174,6 +209,7 @@
                 <div class="lyrics-lines">
                     {#each $lyricsData.lines as line, i}
                         {@const distance = Math.abs(i - $activeLine)}
+                        {@const clampedDist = Math.min(distance, 6)}
                         {@const hasWordSync =
                             line.words && line.words.length > 0}
                         {@const isActiveLine = i === $activeLine}
@@ -185,6 +221,7 @@
                             class:far={distance >= 3}
                             class:past={i < $activeLine}
                             class:word-sync={hasWordSync && isActiveLine}
+                            style="--line-distance: {clampedDist};"
                             bind:this={lineElements[i]}
                             on:click={() => handleLineClick(line.time)}
                             on:keydown={(e) =>
@@ -333,7 +370,20 @@
         flex: 1;
         overflow-y: auto;
         padding: var(--spacing-xl) var(--spacing-md);
-        scroll-behavior: smooth;
+        mask-image: linear-gradient(
+            to bottom,
+            transparent 0%,
+            black 8%,
+            black 90%,
+            transparent 100%
+        );
+        -webkit-mask-image: linear-gradient(
+            to bottom,
+            transparent 0%,
+            black 8%,
+            black 90%,
+            transparent 100%
+        );
     }
 
     .lyrics-status {
@@ -371,38 +421,74 @@
     .lyrics-lines {
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-md);
+        gap: 2px;
         padding-bottom: 50%;
-        padding-top: var(--spacing-xl);
+        padding-top: var(--spacing-lg);
     }
 
     .lyric-line {
-        font-size: 1.1rem;
-        font-weight: 600;
-        line-height: 1.5;
+        --line-distance: 6;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1.4;
         color: var(--lyrics-inactive);
-        transition: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        padding: 4px 0;
+        letter-spacing: -0.01em;
+        /* Apple Music spring curve with slight overshoot */
+        transition:
+            transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+            color 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+            filter 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
+            opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+            text-shadow 0.45s ease;
+        filter: blur(calc(var(--line-distance) * 0.5px));
+        opacity: calc(1 - var(--line-distance) * 0.1);
+        transform: scale(0.96) translateY(0);
+        transform-origin: left center;
         cursor: pointer;
-        filter: blur(0px);
     }
 
-    /* Distance-based blur effect like Apple Music */
+    .lyric-line:hover {
+        color: var(--text-secondary);
+        filter: blur(0px);
+        opacity: 1;
+    }
+
+    /* Distance-based depth — progressive blur & fade */
     .lyric-line.near {
         color: var(--lyrics-near);
+        filter: blur(0.3px);
+        opacity: 0.85;
+        transform: scale(0.98);
     }
 
     .lyric-line.mid {
         color: var(--lyrics-mid);
+        filter: blur(1px);
+        opacity: 0.65;
+        transform: scale(0.96);
     }
 
     .lyric-line.far {
         color: var(--lyrics-far);
+        filter: blur(calc(var(--line-distance) * 0.5px));
+        opacity: calc(0.55 - var(--line-distance) * 0.05);
+        transform: scale(0.95);
     }
 
+    /* Active line: scale up, glow, no blur */
     .lyric-line.active {
         color: var(--text-primary);
-        font-weight: 700;
+        font-weight: 800;
         filter: blur(0px);
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+
+    :global([data-theme="dark"]) .lyric-line.active {
+        text-shadow:
+            0 0 20px rgba(255, 255, 255, 0.15),
+            0 0 40px rgba(255, 255, 255, 0.06);
     }
 
     /* Style for parenthetical lyrics (background vocals) */
@@ -411,19 +497,26 @@
         opacity: 0.8;
     }
 
+    /* Passed lines mirror future but slightly more faded */
     .lyric-line.past.near {
         color: var(--lyrics-past-near);
-        filter: blur(0.8px);
+        opacity: 0.75;
+        filter: blur(0.6px);
+        transform: scale(0.97);
     }
 
     .lyric-line.past.mid {
         color: var(--lyrics-past-mid);
+        opacity: 0.55;
         filter: blur(1.2px);
+        transform: scale(0.95);
     }
 
     .lyric-line.past.far {
         color: var(--lyrics-past-far);
-        filter: blur(2px);
+        opacity: calc(0.45 - var(--line-distance) * 0.05);
+        filter: blur(calc(var(--line-distance) * 0.6px));
+        transform: scale(0.94);
     }
 
     /* Word highlighting - Apple Music style */
@@ -435,16 +528,22 @@
         -webkit-background-clip: text;
         background-size: 200% 100%;
         will-change: background-position;
+        transition: text-shadow 0.2s ease;
     }
 
+    /* Active word being filled — soft gradient edge (8% feather) */
     .lyric-line.word-sync .lyric-word.highlighted {
         background-image: linear-gradient(
             to right,
             var(--text-primary) 0%,
-            var(--text-primary) calc(var(--word-progress) - 15%),
-            var(--lyrics-inactive) calc(var(--word-progress) + 15%),
+            var(--text-primary) calc(var(--word-progress) - 4%),
+            var(--lyrics-inactive) calc(var(--word-progress) + 4%),
             var(--lyrics-inactive) 100%
         );
+    }
+
+    :global([data-theme="dark"]) .lyric-line.word-sync .lyric-word.highlighted {
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
     }
 
     .lyric-line.word-sync .lyric-word.past {
