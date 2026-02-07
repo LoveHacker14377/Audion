@@ -667,7 +667,7 @@ pub async fn delete_album(album_id: i64, db: State<'_, Database>) -> Result<bool
     let result = queries::delete_album(&conn, album_id).map_err(|e| format!("Failed to delete album: {}", e))?;
     
     log::info!("[AUDIT] Album {} deleted from library", album_id);
-    result
+    Ok(result)
 }
 
 /// Input for adding an external (streaming) track to the library

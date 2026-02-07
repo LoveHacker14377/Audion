@@ -21,6 +21,7 @@ pub struct PresenceData {
     pub current_time: Option<u64>,
     pub duration: Option<u64>,
     pub is_playing: bool,
+    pub listening_text: Option<String>,
 }
 
 #[tauri::command]
@@ -58,14 +59,21 @@ pub fn discord_update_presence(
         // Format:
         // Line 1 (details): Song Title
         // Line 2 (state): Artist - Album (or just Artist)
-        let state_text = if let Some(album) = &data.album {
-            format!("{} • {}", data.artist, album)
+        let listening_text = data
+            .listening_text
+            .as_deref()
+            .filter(|text| !text.trim().is_empty());
+
+        let (details_text, state_text) = if let Some(text) = listening_text {
+            (text.to_string(), data.song_title.clone())
+        } else if let Some(album) = &data.album {
+            (data.song_title.clone(), format!("{} • {}", data.artist, album))
         } else {
-            data.artist.clone()
+            (data.song_title.clone(), data.artist.clone())
         };
 
         let mut activity = activity::Activity::new()
-            .details(&data.song_title)
+            .details(&details_text)
             .state(&state_text)
             .activity_type(activity::ActivityType::Listening); // Set activity type to Listening
 

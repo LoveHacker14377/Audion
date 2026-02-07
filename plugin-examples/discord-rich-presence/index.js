@@ -1077,8 +1077,8 @@
       );
 
       previewContent.innerHTML = `
-        <div class="drpc-discord-card">
-          <div class="drpc-discord-app">Listening to Audion</div>
+          <div class="drpc-discord-card">
+          <div class="drpc-discord-app">Listening to ${mockTrack.artist}</div>
           <div class="drpc-discord-menu">⋯</div>
           
           <div class="drpc-discord-main">
@@ -1284,6 +1284,10 @@
         return;
       }
 
+      const listeningText = this.currentTrack?.artist
+        ? `Listening to ${this.currentTrack.artist}`
+        : "";
+
       const presenceData = {
         song_title: this.formatDetails(),
         artist: this.formatState(),
@@ -1294,6 +1298,7 @@
           : 0,
         duration: this.settings.showProgress ? Math.floor(this.duration) : 0,
         is_playing: this.isPlaying,
+        listening_text: listeningText,
       };
 
       try {

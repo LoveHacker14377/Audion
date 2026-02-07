@@ -107,19 +107,58 @@ $: if ($currentTrack) {
   albumArt = null;
 }
 
-  // Auto-scroll lyrics
-  $: if ($activeLine !== -1 && lyricsContainer) {
+  // Apple Music-style smooth scroll with custom easing
+  let scrollAnimationId: number | null = null;
+  let prevActiveLine = -1;
+
+  $: if ($activeLine !== -1 && lyricsContainer && $activeLine !== prevActiveLine) {
+    prevActiveLine = $activeLine;
     scrollToCurrentLine();
+  }
+
+  function easeOutExpo(t: number): number {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
   }
 
   async function scrollToCurrentLine() {
     await tick();
     if (!lyricsContainer) return;
 
-    const activeLine = lyricsContainer.querySelector(".lyric-line.active");
-    if (activeLine) {
-      activeLine.scrollIntoView({ behavior: "smooth", block: "center" });
+    const activeEl = lyricsContainer.querySelector(".lyric-line.active") as HTMLElement;
+    if (!activeEl) return;
+
+    // Cancel any ongoing scroll animation
+    if (scrollAnimationId) {
+      cancelAnimationFrame(scrollAnimationId);
     }
+
+    const containerRect = lyricsContainer.getBoundingClientRect();
+    const activeRect = activeEl.getBoundingClientRect();
+    const containerCenter = containerRect.height / 2;
+    const activeCenter = activeRect.top - containerRect.top + activeRect.height / 2;
+    const targetScroll = lyricsContainer.scrollTop + (activeCenter - containerCenter);
+
+    const startScroll = lyricsContainer.scrollTop;
+    const distance = targetScroll - startScroll;
+    const duration = 600; // ms — smooth but not sluggish
+    let startTime: number | null = null;
+
+    function step(timestamp: number) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = easeOutExpo(progress);
+
+      lyricsContainer.scrollTop = startScroll + distance * eased;
+
+      if (progress < 1) {
+        scrollAnimationId = requestAnimationFrame(step);
+      } else {
+        scrollAnimationId = null;
+      }
+    }
+
+    scrollAnimationId = requestAnimationFrame(step);
   }
 
   function handleSeekStart(e: MouseEvent) {
@@ -164,11 +203,21 @@ $: if ($currentTrack) {
 
 {#if $isFullScreen}
   <div class="fullscreen-player" transition:fade={{ duration: 300 }}>
-    <!-- Background with blur -->
-    <div
-      class="background-layer"
-      style="background-image: url({albumArt || ''})"
-    ></div>
+    <!-- Apple Music-style animated blurred background -->
+    <div class="bg-canvas">
+      <div
+        class="bg-layer bg-layer-1"
+        style="background-image: url({albumArt || ''})"
+      ></div>
+      <div
+        class="bg-layer bg-layer-2"
+        style="background-image: url({albumArt || ''})"
+      ></div>
+      <div
+        class="bg-layer bg-layer-3"
+        style="background-image: url({albumArt || ''})"
+      ></div>
+    </div>
     <div class="backdrop-layer"></div>
 
     <button class="close-btn" on:click={toggleFullScreen} aria-label="Close FullScreen">
@@ -289,6 +338,7 @@ $: if ($currentTrack) {
           {#if $lyricsData?.lines && $lyricsData.lines.length > 0}
             {#each $lyricsData.lines as line, i}
               {@const distance = Math.abs(i - $activeLine)}
+              {@const clampedDist = Math.min(distance, 6)}
               {@const hasWordSync = line.words && line.words.length > 0}
               {@const isActiveLine = i === $activeLine}
               <div
@@ -299,6 +349,7 @@ $: if ($currentTrack) {
                 class:far={distance >= 3}
                 class:passed={i < $activeLine}
                 class:word-sync={hasWordSync && isActiveLine}
+                style="--line-distance: {clampedDist};"
                 on:click={() => handleLineClick(line.time)}
                 on:keydown={(e) =>
                   e.key === "Enter" && handleLineClick(line.time)}
@@ -347,23 +398,73 @@ $: if ($currentTrack) {
     width: 100vw;
     height: 100vh;
     z-index: 2000;
-    background-color: var(--bg-base);
+    background-color: #000;
+    color: #fff;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  .background-layer {
+  .bg-canvas {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: -60%;
+    width: 220%;
+    height: 220%;
+    z-index: -2;
+    overflow: hidden;
+  }
+
+  .bg-layer {
+    position: absolute;
+    inset: 0;
     background-size: cover;
     background-position: center;
-    filter: blur(60px) brightness(0.4);
-    transform: scale(1.1);
-    z-index: -2;
+    will-change: transform, opacity;
+  }
+
+  .bg-layer-1 {
+    filter: blur(80px) saturate(2.5) brightness(0.45);
+    transform-origin: 30% 30%;
+    animation: bgDrift1 22s ease-in-out infinite alternate;
+  }
+
+  .bg-layer-2 {
+    filter: blur(100px) saturate(2) brightness(0.38);
+    opacity: 0.8;
+    transform-origin: 70% 60%;
+    animation: bgDrift2 28s ease-in-out infinite alternate;
+  }
+
+  .bg-layer-3 {
+    filter: blur(60px) saturate(3) brightness(0.42);
+    opacity: 0.6;
+    mix-blend-mode: screen;
+    transform-origin: 50% 80%;
+    animation: bgDrift3 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes bgDrift1 {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    20%  { transform: translate(15%, -10%) scale(1.15) rotate(2deg); }
+    40%  { transform: translate(-10%, 18%) scale(1.05) rotate(-1deg); }
+    60%  { transform: translate(8%, 12%) scale(1.2) rotate(3deg); }
+    80%  { transform: translate(-18%, -8%) scale(1.1) rotate(-2deg); }
+    100% { transform: translate(12%, -15%) scale(1) rotate(1deg); }
+  }
+
+  @keyframes bgDrift2 {
+    0%   { transform: translate(0, 0) scale(1.1) rotate(0deg); }
+    25%  { transform: translate(-20%, 12%) scale(1) rotate(-3deg); }
+    50%  { transform: translate(15%, -18%) scale(1.2) rotate(2deg); }
+    75%  { transform: translate(-8%, -15%) scale(1.08) rotate(-1deg); }
+    100% { transform: translate(18%, 10%) scale(1.12) rotate(3deg); }
+  }
+
+  @keyframes bgDrift3 {
+    0%   { transform: translate(10%, 5%) scale(1.05) rotate(0deg); }
+    33%  { transform: translate(-15%, -20%) scale(1.25) rotate(-4deg); }
+    66%  { transform: translate(20%, 12%) scale(1) rotate(3deg); }
+    100% { transform: translate(-10%, 18%) scale(1.15) rotate(-2deg); }
   }
 
   .backdrop-layer {
@@ -372,8 +473,12 @@ $: if ($currentTrack) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-base);
-    opacity: 0.85;
+    background:
+      radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.25) 0%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
     z-index: -1;
   }
 
@@ -381,15 +486,16 @@ $: if ($currentTrack) {
     position: absolute;
     top: var(--spacing-lg);
     right: var(--spacing-lg);
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.8);
     z-index: 10;
     opacity: 0.7;
     transition: opacity var(--transition-fast);
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
   }
 
   .close-btn:hover {
     opacity: 1;
-    color: var(--text-primary);
+    color: #fff;
   }
 
   .player-content {
@@ -456,12 +562,15 @@ $: if ($currentTrack) {
     font-size: clamp(1.5rem, 4vw, 2.5rem);
     font-weight: 800;
     line-height: 1.1;
+    color: #fff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
   }
 
   .track-artist {
     font-size: clamp(1rem, 2vw, 1.25rem);
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.75);
     font-weight: 500;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
   }
 
   .player-controls {
@@ -493,14 +602,14 @@ $: if ($currentTrack) {
   .progress-track {
     width: 100%;
     height: 4px;
-    background-color: var(--bg-highlight);
+    background-color: rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-full);
     overflow: hidden;
   }
 
   .progress-fill {
     height: 100%;
-    background-color: var(--text-secondary);
+    background-color: rgba(255, 255, 255, 0.7);
     border-radius: var(--radius-full);
     transition: background-color var(--transition-fast);
   }
@@ -513,11 +622,11 @@ $: if ($currentTrack) {
     position: absolute;
     width: 14px;
     height: 14px;
-    background-color: var(--text-primary);
+    background-color: #fff;
     border-radius: var(--radius-full);
     transform: translateX(-50%) scale(0);
     transition: transform var(--transition-fast);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
   }
 
   .progress-bar:hover .progress-thumb {
@@ -526,9 +635,10 @@ $: if ($currentTrack) {
 
   .time {
     font-size: 0.7rem;
-    color: var(--text-subdued);
+    color: rgba(255, 255, 255, 0.6);
     min-width: 40px;
     text-align: center;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   }
 
   .buttons {
@@ -541,24 +651,31 @@ $: if ($currentTrack) {
   .icon-btn.large {
     width: 48px;
     height: 48px;
+    color: rgba(255, 255, 255, 0.85);
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+  }
+
+  .icon-btn.large:hover {
+    color: #fff;
   }
 
   /*play-btn */
   .play-btn.large {
     width: 64px;
     height: 64px;
-    background-color: var(--text-primary);
-    color: var(--bg-base);
+    background-color: rgba(255, 255, 255, 0.95);
+    color: #000;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all var(--transition-fast);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   }
 
   .play-btn.large:hover {
     transform: scale(1.08);
-    background-color: var(--accent-hover);
+    background-color: #fff;
   }
 
   /* Right Panel (Lyrics) */
@@ -568,29 +685,29 @@ $: if ($currentTrack) {
     overflow: hidden;
     mask-image: linear-gradient(
       to bottom,
-      transparent,
-      black 15%,
-      black 85%,
-      transparent
+      transparent 0%,
+      black 10%,
+      black 88%,
+      transparent 100%
     );
     -webkit-mask-image: linear-gradient(
       to bottom,
-      transparent,
-      black 15%,
-      black 85%,
-      transparent
+      transparent 0%,
+      black 10%,
+      black 88%,
+      transparent 100%
     );
   }
 
   .lyrics-container {
     display: flex;
     flex-direction: column;
-    padding: 40vh 0; /* buffer to center first/last lines */
+    padding: 42vh 0;
     height: 100%;
     overflow-y: auto;
     -ms-overflow-style: none;
     scrollbar-width: none;
-    gap: var(--spacing-sm);
+    gap: 2px;
   }
 
   .lyrics-container::-webkit-scrollbar {
@@ -598,79 +715,114 @@ $: if ($currentTrack) {
   }
 
   .lyric-line {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-subdued);
-    padding: var(--spacing-sm) 0;
-    transition: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
-    filter: blur(0px);
+    --line-distance: 6;
+    font-size: 2rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.25);
+    padding: 6px 0;
+    /* Apple Music spring-like curve: slight overshoot */
+    transition:
+      transform 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+      color 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
+      filter 0.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+      opacity 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
+      text-shadow 0.5s ease;
+    filter: blur(calc(var(--line-distance) * 0.7px));
+    opacity: calc(1 - var(--line-distance) * 0.12);
+    transform: scale(0.95) translateY(0);
+    transform-origin: left center;
     cursor: pointer;
-    line-height: 1.4;
+    line-height: 1.35;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.01em;
   }
 
-  /* Distance-based blur effect like Apple Music */
+  .lyric-line:hover {
+    color: rgba(255, 255, 255, 0.5);
+    filter: blur(0px);
+    opacity: 1;
+  }
+
+  /* Distance-based depth — progressive blur & fade */
   .lyric-line.near {
-    color: var(--text-secondary);
-    filter: blur(1px);
+    color: rgba(255, 255, 255, 0.4);
+    filter: blur(0.5px);
+    opacity: 0.85;
+    transform: scale(0.97);
   }
 
   .lyric-line.mid {
-    color: var(--text-subdued);
-    opacity: 0.8;
-    filter: blur(2px);
+    color: rgba(255, 255, 255, 0.25);
+    filter: blur(1.5px);
+    opacity: 0.6;
+    transform: scale(0.95);
   }
 
   .lyric-line.far {
-    color: var(--text-subdued);
-    opacity: 0.5;
-    filter: blur(3px);
+    color: rgba(255, 255, 255, 0.15);
+    filter: blur(calc(var(--line-distance) * 0.7px));
+    opacity: calc(0.55 - var(--line-distance) * 0.06);
+    transform: scale(0.93);
   }
 
+  /* Active line: scale up, glow, no blur */
   .lyric-line.active {
-    color: var(--text-primary);
+    color: #fff;
     filter: blur(0px);
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    text-shadow:
+      0 0 30px rgba(255, 255, 255, 0.25),
+      0 0 60px rgba(255, 255, 255, 0.1),
+      0 2px 10px rgba(0, 0, 0, 0.4);
   }
 
+  /* Passed lines mirror future but slightly more faded */
   .lyric-line.passed.near {
-    color: var(--text-secondary);
-    opacity: 0.9;
-    filter: blur(1.5px);
+    color: rgba(255, 255, 255, 0.35);
+    opacity: 0.75;
+    filter: blur(1px);
+    transform: scale(0.96);
   }
 
   .lyric-line.passed.mid {
-    color: var(--text-subdued);
-    opacity: 0.7;
-    filter: blur(2.5px);
+    color: rgba(255, 255, 255, 0.2);
+    opacity: 0.5;
+    filter: blur(2px);
+    transform: scale(0.94);
   }
 
   .lyric-line.passed.far {
-    color: var(--text-subdued);
-    opacity: 0.4;
-    filter: blur(3.5px);
+    color: rgba(255, 255, 255, 0.12);
+    opacity: calc(0.45 - var(--line-distance) * 0.06);
+    filter: blur(calc(var(--line-distance) * 0.8px));
+    transform: scale(0.92);
   }
 
   /* Word highlighting - Apple Music style */
   .lyric-word {
     --word-progress: 0%;
-    --highlight-color: var(--text-primary);
-    --future-color: var(--text-subdued);
+    --highlight-color: #fff;
+    --future-color: rgba(255, 255, 255, 0.3);
     display: inline;
     color: transparent;
     background-clip: text;
     -webkit-background-clip: text;
     background-size: 200% 100%;
     will-change: background-position;
+    transition: text-shadow 0.2s ease;
   }
 
+  /* Active word being filled — soft gradient edge (8% feather) */
   .lyric-line.word-sync .lyric-word.highlighted {
     background-image: linear-gradient(
       to right,
       var(--highlight-color) 0%,
-      var(--highlight-color) var(--word-progress),
-      var(--future-color) var(--word-progress),
+      var(--highlight-color) calc(var(--word-progress) - 4%),
+      var(--future-color) calc(var(--word-progress) + 4%),
       var(--future-color) 100%
     );
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.2);
   }
 
   .lyric-line.word-sync .lyric-word.past {
@@ -712,7 +864,8 @@ $: if ($currentTrack) {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 1.5rem;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
   }
 </style>
