@@ -215,7 +215,7 @@ export class PluginRuntime {
     return granted.includes(permission);
   }
 
-  // Load a JS plugin via fetch and execution in a controlled scope
+  // Load a JS plugin via blob URL script injection (CSP-safe, no unsafe-eval required)
   private async loadJsPlugin(manifest: AudionPluginManifest): Promise<LoadedPlugin> {
     const url = this.getPluginScriptUrl(manifest);
 
@@ -231,30 +231,47 @@ export class PluginRuntime {
       this.handoffName = manifest.name;
       this.handoffInstance = null;
 
-      // Provide a minimal, safe API for registration during execution
-      const Audion = {
-        register: (instance: any) => {
-          if (this.handoffName === manifest.name) {
-            this.handoffInstance = instance;
-          }
+      // Create a unique callback name for this plugin
+      const callbackId = `__audion_plugin_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      // Set up the registration callback on window temporarily
+      (window as any)[callbackId] = (instance: any) => {
+        if (this.handoffName === manifest.name) {
+          this.handoffInstance = instance;
         }
       };
 
-      // Create a function with Audion in scope
-      // This is safer than a global <script> tag as it doesn't pollute 'window'
-      // if the plugin uses 'Audion.register()'
-      try {
-        const fn = new Function('Audion', code);
-        fn(Audion);
-      } catch (err) {
-        console.error(`[PluginRuntime:${manifest.name}] Execution error:`, err);
-        // Fallback for older plugins still using window (though we want to discourage this)
-        this.handoffInstance = (window as any)[manifest.name.replace(/\s+/g, '')] ||
+      // Wrap the plugin code to provide Audion.register in scope
+      // This creates a closure that doesn't require eval
+      const wrappedCode = `
+(function() {
+  const Audion = {
+    register: function(instance) {
+      if (window["${callbackId}"]) {
+        window["${callbackId}"](instance);
+      }
+    }
+  };
+  ${code}
+})();
+`;
+
+      // Execute via blob URL script injection (CSP-safe)
+      await this.executeViaBlob(wrappedCode, manifest.name);
+
+      // Clean up callback
+      delete (window as any)[callbackId];
+
+      // Check for instance via handoff or legacy global patterns
+      let instance = this.handoffInstance;
+      if (!instance) {
+        // Fallback for older plugins still using window globals
+        const globalName = manifest.name.replace(/\s+/g, '');
+        instance = (window as any)[globalName] ||
           (window as any)[manifest.name] ||
           (window as any).AudionPlugin;
       }
 
-      const instance = this.handoffInstance;
       if (!instance) {
         throw new Error(`Plugin ${manifest.name} did not register an instance`);
       }
@@ -299,6 +316,31 @@ export class PluginRuntime {
       this.handoffName = null;
       this.handoffInstance = null;
     }
+  }
+
+  // Execute JavaScript code via blob URL script injection (CSP-safe alternative to eval/new Function)
+  private executeViaBlob(code: string, pluginName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const script = document.createElement('script');
+      script.id = `plugin-${pluginName.replace(/\s+/g, '-')}`;
+      script.src = blobUrl;
+
+      script.onload = () => {
+        // Clean up blob URL after execution
+        URL.revokeObjectURL(blobUrl);
+        resolve();
+      };
+
+      script.onerror = (event) => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error(`Failed to execute plugin script: ${pluginName}`));
+      };
+
+      document.head.appendChild(script);
+    });
   }
 
   // Load a WASM plugin
@@ -860,6 +902,74 @@ export class PluginRuntime {
         }
       }
     };
+
+    // Lyrics API (always available)
+    api.lyrics = {
+      // Get all lyrics for the currently playing track
+      getCurrentTrackLyrics: async () => {
+        try {
+          const { getCurrentTrackLyrics } = await import('$lib/stores/lyrics');
+          return await getCurrentTrackLyrics();
+        } catch (error) {
+          console.error('[PluginRuntime] Failed to get current track lyrics:', error);
+          return null;
+        }
+      },
+      // Get the active lyric line for the currently playing track
+      getCurrentTrackActiveLyric: async () => {
+        try {
+          const { getCurrentTrackActiveLyric } = await import('$lib/stores/lyrics');
+          return await getCurrentTrackActiveLyric();
+        } catch (error) {
+          console.error('[PluginRuntime] Failed to get current active lyric:', error);
+          return null;
+        }
+      },
+      // Get lyrics for a specific track path
+      getLyrics: async (musicPath: string) => {
+        try {
+          const { getLyrics } = await import('$lib/stores/lyrics');
+          return await getLyrics(musicPath);
+        } catch (error) {
+          console.error('[PluginRuntime] Failed to get lyrics:', error);
+          return null;
+        }
+      },
+      // Get active lyric for a specific track at a specific time
+      getCurrentLyric: async (musicPath: string, currentTime: number) => {
+        try {
+          const { getCurrentLyric } = await import('$lib/stores/lyrics');
+          return await getCurrentLyric(musicPath, currentTime);
+        } catch (error) {
+          console.error('[PluginRuntime] Failed to get current lyric:', error);
+          return null;
+        }
+      }
+    };
+
+    // Request API - allows inter-plugin communication
+    api.request = async <T = any>(requestName: string, data: any): Promise<T> => {
+      try {
+        // Check if a handler is registered for this request
+        if (!pluginEvents.hasRequestHandler(requestName)) {
+          throw new Error(`No handler registered for request: ${requestName}`);
+        }
+
+        console.log(`[PluginRuntime:${pluginName}] Making request: ${requestName}`);
+        return await pluginEvents.request<T>(requestName, data);
+      } catch (error) {
+        console.error(`[PluginRuntime:${pluginName}] Request '${requestName}' failed:`, error);
+        throw error;
+      }
+    };
+
+    // Allow plugins to handle requests from other plugins
+    // Plugins register handlers that other plugins can call via api.request()
+    api.handleRequest = (requestName: string, handler: (data: any) => Promise<any>) => {
+      pluginEvents.handleRequest(requestName, handler);
+      console.log(`[PluginRuntime:${pluginName}] Registered handler for request: '${requestName}'`);
+    };
+
 
     return api;
   }
