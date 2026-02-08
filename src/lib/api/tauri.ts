@@ -147,6 +147,10 @@ export async function rescanMusic(): Promise<ScanResult> {
     return await invoke('rescan_music');
 }
 
+export async function getDefaultMusicDirs(): Promise<string[]> {
+    return await invoke('get_default_music_dirs');
+}
+
 export async function getLibrary(): Promise<Library> {
     return await invoke('get_library');
 }

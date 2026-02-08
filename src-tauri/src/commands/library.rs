@@ -757,3 +757,60 @@ pub async fn reset_database(db: State<'_, Database>) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Return a list of default music directories that exist on this device.
+/// On Android this checks common paths like /storage/emulated/0/Music, Download, etc.
+/// On desktop this checks the user's Music directory.
+#[tauri::command]
+pub fn get_default_music_dirs() -> Vec<String> {
+    let mut dirs = Vec::new();
+
+    // Standard dirs crate paths
+    if let Some(audio_dir) = dirs::audio_dir() {
+        if audio_dir.is_dir() {
+            dirs.push(audio_dir.to_string_lossy().to_string());
+        }
+    }
+
+    // Home directory based paths
+    if let Some(home) = dirs::home_dir() {
+        let candidates = [
+            home.join("Music"),
+            home.join("music"),
+            home.join("Download"),
+            home.join("Downloads"),
+        ];
+        for c in &candidates {
+            if c.is_dir() {
+                let s = c.to_string_lossy().to_string();
+                if !dirs.contains(&s) {
+                    dirs.push(s);
+                }
+            }
+        }
+    }
+
+    // Android-specific external storage paths
+    #[cfg(target_os = "android")]
+    {
+        let android_paths = [
+            "/storage/emulated/0/Music",
+            "/storage/emulated/0/Download",
+            "/storage/emulated/0/Downloads",
+            "/storage/emulated/0/DCIM",
+            "/sdcard/Music",
+            "/sdcard/Download",
+        ];
+        for p in &android_paths {
+            let path = std::path::PathBuf::from(p);
+            if path.is_dir() {
+                let s = path.to_string_lossy().to_string();
+                if !dirs.contains(&s) {
+                    dirs.push(s);
+                }
+            }
+        }
+    }
+
+    dirs
+}

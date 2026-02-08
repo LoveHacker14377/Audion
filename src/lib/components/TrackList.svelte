@@ -73,6 +73,14 @@
   // 2: Pre-compute playing track ID
   $: playingTrackId = $currentTrack?.id ?? null;
 
+  // Mobile view mode: determines layout on small screens
+  // 'album' = numbered list, no covers | 'playlist' = covers + info | 'library' = covers + full info
+  $: mobileViewMode = (!showAlbum && playbackContext?.type === 'album')
+      ? 'album'
+      : (playbackContext?.type === 'playlist')
+        ? 'playlist'
+        : 'library';
+
   // 3: Memoize availability check results
   const availabilityCache = new Map<number, boolean>();
 
@@ -710,6 +718,9 @@
       class:no-album={!showAlbum}
       class:with-drag={playlistId !== null && !multiSelectMode}
       class:multiselect={multiSelectMode}
+      class:mobile-album={mobileViewMode === 'album'}
+      class:mobile-playlist={mobileViewMode === 'playlist'}
+      class:mobile-library={mobileViewMode === 'library'}
       on:scroll={handleScroll}
       on:click={handleBodyClick}
       on:dblclick={handleBodyDoubleClick}
@@ -791,6 +802,12 @@
                       d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
                     />
                   </svg>
+                  <span class="equalizer-bars">
+                    <span class="eq-bar"></span>
+                    <span class="eq-bar"></span>
+                    <span class="eq-bar"></span>
+                    <span class="eq-bar"></span>
+                  </span>
                 {:else}
                   {actualIndex + 1}
                 {/if}
@@ -1351,6 +1368,11 @@
     grid-template-columns: 40px 40px 48px 1fr 80px;
   }
 
+  /* ── Equalizer bars (hidden by default, shown on mobile album view) ── */
+  .equalizer-bars {
+    display: none;
+  }
+
   /* ── Mobile ── */
   @media (max-width: 768px) {
     /* Hide the entire header row on mobile */
@@ -1358,44 +1380,9 @@
       display: none;
     }
 
-    /* Simplified 3-column row: cover + title/artist + duration */
-    .track-row {
-      grid-template-columns: 44px 1fr 52px;
-      gap: var(--spacing-sm);
-      padding: var(--spacing-xs) var(--spacing-sm);
-      padding-left: var(--spacing-sm);
-      height: 60px;
-      min-height: 60px;
-    }
-
-    /* Hide index number on mobile */
-    .col-num {
+    /* Hide quality tags on mobile to save space */
+    .quality-tag {
       display: none;
-    }
-
-    /* Hide album column on mobile */
-    .col-album {
-      display: none;
-    }
-
-    /* Override all grid variations on mobile */
-    .list-body.with-drag .track-row,
-    .list-body.no-album .track-row,
-    .list-body.no-album.with-drag .track-row {
-      grid-template-columns: 44px 1fr 52px;
-    }
-
-    .list-body.multiselect .track-row,
-    .list-body.multiselect.no-album .track-row {
-      grid-template-columns: 36px 44px 1fr 52px;
-    }
-
-    /* Slightly larger covers on mobile for touch */
-    .cover-wrapper,
-    .cover-image,
-    .cover-placeholder {
-      width: 44px;
-      height: 44px;
     }
 
     /* Hide play overlay on mobile (uses tap instead) */
@@ -1403,32 +1390,256 @@
       display: none;
     }
 
-    /* Larger track name for readability */
-    .track-name {
-      font-size: 0.9375rem;
-    }
-
-    .track-artist {
-      font-size: 0.75rem;
-    }
-
-    /* Compact duration */
-    .col-duration {
-      font-size: 0.75rem;
-    }
-
     /* Drag handle always visible on mobile for playlist reorder */
     .drag-handle {
       opacity: 1;
     }
 
-    .list-body.with-drag .track-row {
-      grid-template-columns: 28px 44px 1fr 52px;
+    /* ─── Base track row (shared) ─── */
+    .track-row {
+      gap: var(--spacing-sm);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      height: 60px;
+      min-height: 60px;
     }
 
-    /* Hide quality tags on very small screens to save space */
-    .quality-tag {
+    /* ─────────────────────────────────────────────────
+       ALBUM VIEW — Numbered, no covers, clean & minimal
+       Grid: [number] [title] [duration]
+    ───────────────────────────────────────────────── */
+    .list-body.mobile-album .track-row {
+      grid-template-columns: 32px 1fr 48px;
+      padding-left: var(--spacing-sm);
+    }
+
+    .list-body.mobile-album .col-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9375rem;
+      color: var(--text-subdued);
+    }
+
+    .list-body.mobile-album .track-row.playing .col-num {
+      color: var(--accent-primary);
+    }
+
+    /* Hide cover art in album view */
+    .list-body.mobile-album .col-cover {
       display: none;
+    }
+
+    /* Hide album column */
+    .list-body.mobile-album .col-album {
+      display: none;
+    }
+
+    /* Show equalizer bars, hide music note on album mobile */
+    .list-body.mobile-album .equalizer-bars {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 2px;
+      height: 16px;
+      width: 16px;
+    }
+
+    .list-body.mobile-album .playing-icon {
+      display: none;
+    }
+
+    .eq-bar {
+      width: 3px;
+      background-color: var(--accent-primary);
+      border-radius: 1px;
+      animation: eq-bounce 1.2s ease-in-out infinite;
+    }
+
+    .eq-bar:nth-child(1) {
+      height: 60%;
+      animation-delay: 0s;
+    }
+
+    .eq-bar:nth-child(2) {
+      height: 100%;
+      animation-delay: 0.2s;
+    }
+
+    .eq-bar:nth-child(3) {
+      height: 40%;
+      animation-delay: 0.4s;
+    }
+
+    .eq-bar:nth-child(4) {
+      height: 80%;
+      animation-delay: 0.6s;
+    }
+
+    @keyframes eq-bounce {
+      0%, 100% { height: 20%; }
+      50% { height: 100%; }
+    }
+
+    /* Title in album view — bold, prominent */
+    .list-body.mobile-album .track-name {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .list-body.mobile-album .track-artist {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* Duration compact */
+    .list-body.mobile-album .col-duration {
+      font-size: 0.75rem;
+      color: var(--text-subdued);
+    }
+
+    /* Drag variant for album */
+    .list-body.mobile-album.with-drag .track-row {
+      grid-template-columns: 28px 32px 1fr 48px;
+    }
+
+    /* Multiselect variant for album */
+    .list-body.mobile-album.multiselect .track-row {
+      grid-template-columns: 36px 32px 1fr 48px;
+    }
+
+    /* ─────────────────────────────────────────────────
+       PLAYLIST VIEW — Cover art + info, Spotify-style
+       Grid: [cover] [title+artist] [duration]
+    ───────────────────────────────────────────────── */
+    .list-body.mobile-playlist .track-row {
+      grid-template-columns: 48px 1fr 48px;
+      padding-left: var(--spacing-sm);
+    }
+
+    /* Hide track number in playlist view */
+    .list-body.mobile-playlist .col-num {
+      display: none;
+    }
+
+    /* Hide album column */
+    .list-body.mobile-playlist .col-album {
+      display: none;
+    }
+
+    /* Cover art sizing */
+    .list-body.mobile-playlist .cover-wrapper,
+    .list-body.mobile-playlist .cover-image,
+    .list-body.mobile-playlist .cover-placeholder {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Title + Artist stacked */
+    .list-body.mobile-playlist .track-name {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .list-body.mobile-playlist .track-artist {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Duration compact */
+    .list-body.mobile-playlist .col-duration {
+      font-size: 0.75rem;
+      color: var(--text-subdued);
+    }
+
+    /* Drag variant for playlist */
+    .list-body.mobile-playlist.with-drag .track-row {
+      grid-template-columns: 28px 48px 1fr 48px;
+    }
+
+    /* Multiselect variant for playlist */
+    .list-body.mobile-playlist.multiselect .track-row {
+      grid-template-columns: 36px 48px 1fr 48px;
+    }
+
+    /* ─────────────────────────────────────────────────
+       LIBRARY VIEW — Full info with cover + album context
+       Grid: [cover] [title+artist] [duration]
+    ───────────────────────────────────────────────── */
+    .list-body.mobile-library .track-row {
+      grid-template-columns: 48px 1fr 48px;
+      padding-left: var(--spacing-sm);
+    }
+
+    /* Hide track number in library view */
+    .list-body.mobile-library .col-num {
+      display: none;
+    }
+
+    /* Hide album column (show album name under artist instead) */
+    .list-body.mobile-library .col-album {
+      display: none;
+    }
+
+    /* Cover art sizing */
+    .list-body.mobile-library .cover-wrapper,
+    .list-body.mobile-library .cover-image,
+    .list-body.mobile-library .cover-placeholder {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Title + Artist stacked */
+    .list-body.mobile-library .track-name {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .list-body.mobile-library .track-artist {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Duration compact */
+    .list-body.mobile-library .col-duration {
+      font-size: 0.75rem;
+      color: var(--text-subdued);
+    }
+
+    /* Drag variant for library */
+    .list-body.mobile-library.with-drag .track-row {
+      grid-template-columns: 28px 48px 1fr 48px;
+    }
+
+    /* Multiselect variant for library */
+    .list-body.mobile-library.multiselect .track-row,
+    .list-body.mobile-library.multiselect.no-album .track-row {
+      grid-template-columns: 36px 48px 1fr 48px;
+    }
+
+    /* ─── Shared playing state accents ─── */
+    .track-row.playing .track-name {
+      color: var(--accent-primary);
+    }
+
+    .track-row.playing .col-num {
+      color: var(--accent-primary);
+    }
+
+    /* ─── Downloaded icon compact ─── */
+    .downloaded-icon {
+      margin-left: 2px;
+    }
+
+    .downloaded-icon svg {
+      width: 12px;
+      height: 12px;
     }
   }
 </style>

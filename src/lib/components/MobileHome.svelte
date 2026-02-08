@@ -1,12 +1,11 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { tracks, albums, artists, getAlbumCoverFromTracks } from '$lib/stores/library';
-    import { getAlbumArtSrc, getTrackCoverSrc, type Album, type Artist, type Track } from '$lib/api/tauri';
+    import { tracks, albums, artists, getAlbumCoverFromTracks, loadAlbumsAndArtists, loadPlaylists } from '$lib/stores/library';
+    import { getAlbumArtSrc, getTrackCoverSrc, selectMusicFolder, addFolder, rescanMusic, getDefaultMusicDirs, type Album, type Artist, type Track } from '$lib/api/tauri';
     import { playTracks } from '$lib/stores/player';
     import { goToAlbumDetail, goToArtistDetail, goToSettings } from '$lib/stores/view';
-    import { uiSlotManager } from '$lib/plugins/ui-slots';
-
-    let pluginSlot: HTMLDivElement;
+    import { progressiveScan, isScanning } from '$lib/stores/progressiveScan';
+    import { addToast } from '$lib/stores/toast';
+    import { isMobile } from '$lib/stores/mobile';
 
     // Greeting based on time of day
     function getGreeting(): string {
@@ -43,29 +42,106 @@
         playTracks(recentTracks, index);
     }
 
-    onMount(() => {
-        if (pluginSlot) {
-            uiSlotManager.registerContainer('mobile:home', pluginSlot);
+    async function handleAddFolder() {
+        try {
+            if ($isMobile) {
+                // On mobile (Android): scan default music directories automatically
+                const dirs = await getDefaultMusicDirs();
+                if (dirs.length === 0) {
+                    addToast('No music folders found on this device', 'error');
+                    return;
+                }
+
+                await progressiveScan.startScan(true);
+
+                for (const dir of dirs) {
+                    try {
+                        await addFolder(dir);
+                    } catch (e) {
+                        console.warn(`Failed to add folder ${dir}:`, e);
+                    }
+                }
+
+                const result = await rescanMusic();
+
+                if (result.errors.length > 0) {
+                    console.warn('Scan errors:', result.errors);
+                }
+
+                await loadAlbumsAndArtists();
+                await loadPlaylists();
+
+                const parts = [];
+                if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
+                if (result.tracks_updated > 0) parts.push(`${result.tracks_updated} updated`);
+                if (result.tracks_deleted > 0) parts.push(`${result.tracks_deleted} deleted`);
+
+                const message = parts.length > 0
+                    ? `Scan complete: ${parts.join(', ')}`
+                    : 'Scan complete — no tracks found';
+
+                addToast(message, 'success', 4000);
+            } else {
+                // On desktop: use folder picker dialog
+                const path = await selectMusicFolder();
+                if (path) {
+                    await progressiveScan.startScan(true);
+                    await addFolder(path);
+                    const result = await rescanMusic();
+
+                    if (result.errors.length > 0) {
+                        console.warn('Scan errors:', result.errors);
+                    }
+
+                    await loadAlbumsAndArtists();
+                    await loadPlaylists();
+
+                    const parts = [];
+                    if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
+                    if (result.tracks_updated > 0) parts.push(`${result.tracks_updated} updated`);
+                    if (result.tracks_deleted > 0) parts.push(`${result.tracks_deleted} deleted`);
+
+                    const message = parts.length > 0
+                        ? `Scan complete: ${parts.join(', ')}`
+                        : 'Scan complete — no new tracks found';
+
+                    addToast(message, 'success', 4000);
+                }
+            }
+        } catch (error) {
+            console.error('Scan failed:', error);
+            addToast('Failed to scan music folder', 'error');
+        } finally {
+            progressiveScan.reset();
         }
-        return () => {
-            uiSlotManager.unregisterContainer('mobile:home');
-        };
-    });
+    }
+
 </script>
 
 <div class="mobile-home">
     <!-- Header with greeting + settings gear -->
     <header class="home-header">
         <h1>{getGreeting()}</h1>
-        <button class="settings-btn" on:click={goToSettings} title="Settings">
+        <div class="header-actions">
+            {#if $isScanning}
+                <div class="scanning-indicator">
+                    <div class="scanning-spinner"></div>
+                    <span>Scanning…</span>
+                </div>
+            {:else}
+                <button class="add-music-btn" on:click={handleAddFolder} title="Add Music Folder">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12.5 9.5v3H16v2h-3.5v3h-2v-3H7v-2h3.5v-3h2z"/>
+                    </svg>
+                </button>
+            {/if}
+            <button class="settings-btn" on:click={goToSettings} title="Settings">
             <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
                 <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
             </svg>
         </button>
+        </div>
     </header>
-
-    <!-- Plugin slot for home screen -->
-    <div class="plugin-slot" bind:this={pluginSlot}></div>
 
     <!-- Quick Play Grid (Spotify-style 2-column compact cards) -->
     {#if quickPlayAlbums.length > 0}
@@ -176,11 +252,24 @@
     <!-- Empty state if no content -->
     {#if $tracks.length === 0 && $albums.length === 0}
         <div class="empty-home">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="56" height="56">
+                <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12.5 9.5v3H16v2h-3.5v3h-2v-3H7v-2h3.5v-3h2z"/>
             </svg>
             <h2>Welcome to Audion</h2>
-            <p>Add a music folder from Settings to get started</p>
+            <p>Add a music folder to start listening</p>
+            {#if $isScanning}
+                <div class="empty-scanning">
+                    <div class="scanning-spinner large"></div>
+                    <span>Scanning your music…</span>
+                </div>
+            {:else}
+                <button class="empty-cta" on:click={handleAddFolder}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    Add Music Folder
+                </button>
+            {/if}
         </div>
     {/if}
 
@@ -212,6 +301,65 @@
         color: var(--text-primary);
     }
 
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+    }
+
+    .add-music-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-full);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .add-music-btn:hover {
+        color: var(--text-primary);
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .add-music-btn:active {
+        color: var(--accent-primary);
+    }
+
+    .scanning-indicator {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        color: var(--accent-primary);
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 0 var(--spacing-sm);
+    }
+
+    .scanning-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(29, 185, 84, 0.3);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .scanning-spinner.large {
+        width: 24px;
+        height: 24px;
+        border-width: 3px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
     .settings-btn {
         width: 40px;
         height: 40px;
@@ -230,14 +378,6 @@
     .settings-btn:hover {
         color: var(--text-primary);
         background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .plugin-slot {
-        display: flex;
-        flex-direction: column;
-        gap: var(--spacing-sm);
-        padding: 0 var(--spacing-md);
-        margin-bottom: var(--spacing-sm);
     }
 
     /* ===== Quick Play Grid (Spotify 2-col compact cards) ===== */
@@ -442,6 +582,42 @@
     .empty-home p {
         font-size: 0.875rem;
         color: var(--text-secondary);
+    }
+
+    .empty-cta {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+        padding: 14px 28px;
+        background-color: var(--accent-primary);
+        color: var(--bg-base);
+        font-size: 1rem;
+        font-weight: 700;
+        border: none;
+        border-radius: var(--radius-full);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .empty-cta:active {
+        transform: scale(0.97);
+        background-color: var(--accent-hover);
+    }
+
+    .empty-cta svg {
+        flex-shrink: 0;
+    }
+
+    .empty-scanning {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-lg);
+        color: var(--accent-primary);
+        font-size: 0.875rem;
+        font-weight: 500;
     }
 
     /* ===== Bottom Spacer ===== */

@@ -667,6 +667,93 @@
                 .tidal-toast.error {
                     background: var(--error-color, #f15e6c);
                 }
+
+                /* ═══ Mobile Responsive ═══ */
+                @media (max-width: 768px) {
+                    #tidal-search-panel {
+                        width: 100vw;
+                        height: 100vh;
+                        max-height: 100vh;
+                        top: 0; left: 0;
+                        transform: none;
+                        border-radius: 0;
+                        border: none;
+                        padding: 16px;
+                    }
+                    #tidal-search-panel.open {
+                        transform: none;
+                    }
+
+                    .tidal-search-header h2 {
+                        font-size: 18px;
+                    }
+                    .tidal-close-btn {
+                        min-width: 44px;
+                        min-height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    .tidal-search-controls {
+                        flex-direction: column;
+                        gap: 10px;
+                    }
+                    .tidal-search-input {
+                        font-size: 16px; /* prevent iOS zoom */
+                        padding: 14px 16px;
+                    }
+                    .tidal-mode-btn {
+                        padding: 12px;
+                        min-height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    .tidal-results-container {
+                        max-height: none;
+                        flex: 1;
+                        padding-bottom: calc(60px + 64px); /* bottom nav + mini player */
+                    }
+
+                    /* Track items: always show save btn on mobile */
+                    .tidal-track-item {
+                        padding: 12px 8px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+                    .tidal-play-overlay {
+                        display: none;
+                    }
+                    .tidal-save-btn {
+                        width: 44px;
+                        height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    /* Artist items */
+                    .tidal-artist-item {
+                        padding: 12px 8px;
+                        min-height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    /* Quality selector */
+                    .tidal-quality-selector select {
+                        min-height: 44px;
+                        padding: 8px 12px;
+                        font-size: 14px;
+                    }
+
+                    /* Toast: account for bottom nav */
+                    .tidal-toast {
+                        bottom: calc(60px + 64px + 16px);
+                        max-width: 90vw;
+                    }
+
+                    /* Download progress: account for bottom nav */
+                    .tidal-download-progress {
+                        bottom: calc(60px + 64px + 16px);
+                        max-width: 90vw;
+                        min-width: auto;
+                    }
+                }
             `;
       document.head.appendChild(style);
     },

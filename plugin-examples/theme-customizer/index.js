@@ -1810,6 +1810,137 @@
                     width: 20px;
                     height: 20px;
                 }
+
+                /* ═══ Mobile Responsive ═══ */
+                @media (max-width: 768px) {
+                    #theme-picker-panel {
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        border-radius: 0;
+                        border: none;
+                    }
+
+                    .theme-picker-header {
+                        padding: 12px 16px;
+                    }
+                    .theme-picker-title {
+                        font-size: 16px;
+                    }
+                    .theme-picker-close {
+                        min-width: 44px;
+                        min-height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+                    .preview-toggle-btn {
+                        min-height: 44px;
+                        padding: 10px 14px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    /* Stack body vertically on mobile */
+                    .theme-picker-body {
+                        flex-direction: column;
+                        overflow-y: auto;
+                    }
+                    .theme-list-section {
+                        flex: none;
+                        max-height: none;
+                        border-right: none;
+                        border-bottom: 1px solid var(--border-color);
+                        padding: 12px;
+                        padding-bottom: calc(12px + 60px + 64px); /* account for bottom nav + mini player */
+                    }
+
+                    /* 2 columns for theme cards on mobile */
+                    .theme-grid,
+                    .theme-grid.premade {
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 8px;
+                    }
+
+                    .theme-card {
+                        padding: 8px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+                    .theme-card:hover {
+                        transform: none;
+                    }
+
+                    /* Editor section on mobile */
+                    .theme-editor-section {
+                        padding: 16px;
+                        padding-bottom: calc(16px + 60px + 64px);
+                    }
+
+                    .theme-details-header {
+                        flex-direction: column;
+                        text-align: center;
+                        gap: 12px;
+                    }
+                    .theme-details-name {
+                        font-size: 22px;
+                    }
+
+                    .theme-palette-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 8px;
+                    }
+
+                    .color-control-group {
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 8px;
+                    }
+
+                    .color-input-wrapper {
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    .theme-actions {
+                        flex-direction: column;
+                    }
+                    .theme-action-btn {
+                        min-height: 48px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    .action-btn {
+                        min-height: 44px;
+                        -webkit-tap-highlight-color: transparent;
+                    }
+
+                    .custom-theme-header h3 {
+                        font-size: 20px;
+                    }
+                    .custom-theme-header h3::before {
+                        font-size: 32px;
+                        width: 56px;
+                        height: 56px;
+                    }
+
+                    .custom-theme-actions {
+                        flex-wrap: wrap;
+                    }
+
+                    /* Mock preview: hide sidebar on mobile */
+                    .mock-sidebar {
+                        display: none;
+                    }
+                    .mock-content-header {
+                        padding: 16px;
+                    }
+                    .mock-content-title {
+                        font-size: 22px;
+                    }
+                    .mock-content-body {
+                        padding: 16px;
+                    }
+                    .mock-player-bar {
+                        padding: 12px 16px;
+                        gap: 12px;
+                    }
+                }
             `;
             document.head.appendChild(style);
         },
