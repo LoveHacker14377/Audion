@@ -19,16 +19,68 @@
     import PluginManager from "./PluginManager.svelte";
     import Settings from "./Settings.svelte";
 
+    import { tick } from 'svelte';
+
     $: isSearching = $searchQuery.length > 0;
     $: isLibraryView = ['tracks', 'albums', 'artists', 'playlists'].includes($currentView.type);
     import GlobalShortcuts from "./GlobalShortcuts.svelte";
+
+    // Mobile search bar state
+    let mobileSearchInput = '';
+    let mobileSearchInputEl: HTMLInputElement;
+    let mobileSearchTimer: ReturnType<typeof setTimeout>;
+    let mobileSearchVisible = false;
+
+    function handleMobileSearchInput() {
+        clearTimeout(mobileSearchTimer);
+        mobileSearchTimer = setTimeout(() => {
+            searchQuery.set(mobileSearchInput);
+        }, 200);
+    }
+
+    function openMobileSearch() {
+        mobileSearchVisible = true;
+        tick().then(() => mobileSearchInputEl?.focus());
+    }
+
+    function closeMobileSearch() {
+        mobileSearchVisible = false;
+        mobileSearchInput = '';
+        clearSearch();
+    }
 </script>
 
 <main class="main-view">
     <GlobalShortcuts />
 
-    <!-- Mobile: Horizontal library sub-tabs (Spotify pill style) -->
-    {#if $isMobile && isLibraryView && !isSearching}
+    <!-- Mobile: Search bar + library sub-tabs (Spotify pill style) -->
+    {#if $isMobile && isLibraryView}
+        <div class="mobile-library-header">
+            <div class="mobile-search-bar">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+                <input
+                    type="text"
+                    class="search-input"
+                    placeholder="Search your library..."
+                    bind:value={mobileSearchInput}
+                    bind:this={mobileSearchInputEl}
+                    on:input={handleMobileSearchInput}
+                    on:keydown={(e) => e.key === 'Escape' && closeMobileSearch()}
+                    spellcheck="false"
+                />
+                {#if mobileSearchInput}
+                    <button class="search-clear" on:click={closeMobileSearch} aria-label="Clear search">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                {/if}
+            </div>
+        </div>
+
+        {#if !isSearching}
         <div class="mobile-library-tabs-wrapper">
             <div class="mobile-library-tabs">
                 <button class="lib-tab" class:active={$currentView.type === 'tracks'} on:click={goToTracks}>
@@ -45,6 +97,7 @@
                 </button>
             </div>
         </div>
+        {/if}
     {/if}
 
     {#if isSearching}
@@ -187,7 +240,61 @@
     margin-top: var(--spacing-xs);
     }
 
-    /* ===== Mobile Library Tabs (Spotify pill style) ===== */
+    /* ===== Mobile Library Header (search + tabs) ===== */
+    .mobile-library-header {
+        flex-shrink: 0;
+        padding: var(--spacing-md) var(--spacing-md) 0;
+        background-color: var(--bg-base);
+    }
+
+    .mobile-search-bar {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        background-color: var(--bg-elevated);
+        border-radius: var(--radius-md);
+        padding: 0 var(--spacing-md);
+        height: 40px;
+    }
+
+    .mobile-search-bar .search-icon {
+        color: var(--text-subdued);
+        flex-shrink: 0;
+    }
+
+    .search-input {
+        flex: 1;
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        min-width: 0;
+        height: 100%;
+        user-select: text;
+        -webkit-user-select: text;
+    }
+
+    .search-input::placeholder {
+        color: var(--text-subdued);
+    }
+
+    .search-clear {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-subdued);
+        padding: 4px;
+        min-height: 28px;
+        min-width: 28px;
+        border-radius: var(--radius-full);
+        transition: color var(--transition-fast);
+    }
+
+    .search-clear:active {
+        color: var(--text-primary);
+    }
+
     .mobile-library-tabs-wrapper {
         flex-shrink: 0;
         padding: var(--spacing-md) var(--spacing-md) 0;

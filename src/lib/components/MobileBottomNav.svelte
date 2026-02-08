@@ -7,7 +7,7 @@
     import PluginMenu from '$lib/components/PluginMenu.svelte';
     import { onMount } from 'svelte';
 
-    type MobileTab = 'home' | 'search' | 'library' | 'plugins';
+    type MobileTab = 'home' | 'library' | 'plugins';
 
     let pluginSlot: HTMLDivElement;
 
@@ -22,28 +22,22 @@
     }
 
     // Derive active tab from current state
-    $: activeTab = deriveActiveTab($mobileSearchOpen, $currentView.type);
+    $: activeTab = deriveActiveTab($currentView.type);
 
-    function deriveActiveTab(searchOpen: boolean, viewType: string): MobileTab {
-        if (searchOpen) return 'search';
+    function deriveActiveTab(viewType: string): MobileTab {
         if (viewType === 'home') return 'home';
         if (viewType === 'plugins' || viewType === 'settings') return 'plugins';
         return 'library';
     }
 
     function handleTabClick(tab: MobileTab) {
-        // Close search when switching to non-search tab
-        if (tab !== 'search') {
-            mobileSearchOpen.set(false);
-            clearSearch();
-        }
+        // Close search when switching tabs
+        mobileSearchOpen.set(false);
+        clearSearch();
 
         switch (tab) {
             case 'home':
                 goToHome();
-                break;
-            case 'search':
-                mobileSearchOpen.set(true);
                 break;
             case 'library':
                 // Return to last active library sub-view
@@ -80,17 +74,6 @@
             <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
         </svg>
         <span>Home</span>
-    </button>
-
-    <button
-        class="nav-item"
-        class:active={activeTab === 'search'}
-        on:click={() => handleTabClick('search')}
-    >
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-        <span>Search</span>
     </button>
 
     <button

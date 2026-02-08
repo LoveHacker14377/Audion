@@ -145,29 +145,6 @@
     {#if $isMobile}
       <!-- ========= MOBILE LAYOUT (Spotify-like) ========= -->
       <div class="mobile-layout">
-        {#if $mobileSearchOpen}
-          <div class="mobile-search-header">
-            <div class="mobile-search-bar">
-              <svg class="search-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-              </svg>
-              <input
-                type="text"
-                class="mobile-search-input"
-                placeholder="What do you want to listen to?"
-                bind:value={mobileSearchInput}
-                bind:this={mobileSearchInputEl}
-                on:input={handleMobileSearchInput}
-                on:keydown={(e) => e.key === 'Escape' && closeMobileSearch()}
-                spellcheck="false"
-              />
-              <button class="mobile-search-cancel" on:click={closeMobileSearch}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        {/if}
-
         <div class="mobile-content">
           <MainView />
         </div>
@@ -267,55 +244,11 @@
     background-color: var(--bg-base);
   }
 
-  .mobile-search-header {
-    padding: var(--spacing-md);
-    padding-top: var(--spacing-lg);
-    background-color: var(--bg-base);
-    flex-shrink: 0;
-  }
-
-  .mobile-search-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    background-color: var(--bg-elevated);
-    border-radius: var(--radius-md);
-    padding: 0 var(--spacing-md);
-    height: 48px;
-  }
-
-  .mobile-search-bar .search-icon {
-    color: var(--text-subdued);
-    flex-shrink: 0;
-  }
-
-  .mobile-search-input {
-    flex: 1;
-    background: none;
-    border: none;
-    outline: none;
-    color: var(--text-primary);
-    font-size: 1rem;
-    min-width: 0;
-    height: 100%;
-    user-select: text;
-    -webkit-user-select: text;
-  }
-
-  .mobile-search-input::placeholder {
-    color: var(--text-subdued);
-  }
-
-  .mobile-search-cancel {
-    color: var(--text-primary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    padding: 8px;
-    flex-shrink: 0;
-  }
-
   .mobile-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     overflow: hidden;
   }
 </style>

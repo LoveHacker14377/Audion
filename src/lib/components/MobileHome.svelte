@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { tracks, albums, artists } from '$lib/stores/library';
-    import { getAlbumArtSrc, getTrackCoverSrc, getAlbumCoverSrc, type Album, type Artist, type Track } from '$lib/api/tauri';
+    import { tracks, albums, artists, getAlbumCoverFromTracks } from '$lib/stores/library';
+    import { getAlbumArtSrc, getTrackCoverSrc, type Album, type Artist, type Track } from '$lib/api/tauri';
     import { playTracks } from '$lib/stores/player';
     import { goToAlbumDetail, goToArtistDetail, goToSettings } from '$lib/stores/view';
     import { uiSlotManager } from '$lib/plugins/ui-slots';
@@ -29,9 +29,7 @@
     $: quickPlayAlbums = $albums.slice(0, 6);
 
     function getAlbumArt(album: Album): string | null {
-        if (album.art_path) return getAlbumCoverSrc(album);
-        if (album.art_data) return getAlbumArtSrc(album.art_data);
-        return null;
+        return getAlbumCoverFromTracks(album.id);
     }
 
     function getTrackArt(track: Track): string | null {
