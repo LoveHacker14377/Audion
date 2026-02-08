@@ -181,7 +181,24 @@ api.ui.registerSlot('sidebar:top', element, 10); // Priority 10
 - `sidebar:bottom`: Bottom of the sidebar, above the "Add Music" button.
 - `playerbar:left`: Left side of player bar (near track info).
 - `playerbar:right`: Right side of player bar (near volume).
-- `playerbar:menu`: Dedicated popup menu for plugins (triggered by plugin icon).
+- `playerbar:menu`: Dedicated popup menu for plugins (triggered by plugin icon). **Works on both desktop and mobile.**
+- `mobile:home`: Mobile home screen content area.
+- `mobile:bottomnav`: Mobile bottom navigation area.
+
+#### Mobile Considerations
+
+On mobile, the app uses a Spotify-like bottom navigation layout. Plugins registered to `playerbar:menu` are accessible from the PluginMenu button in the mobile mini-player bar. For mobile-specific content:
+
+```javascript
+// Register a widget on the mobile home screen
+const widget = document.createElement('div');
+widget.innerHTML = '<p>My mobile widget</p>';
+api.ui.registerSlot('mobile:home', widget);
+```
+
+- Plugin modals should use `max-width: 90vw` and `max-height: 85vh` for responsive sizing.
+- Touch targets should be at least 44×44px.
+- Avoid `hover` effects for primary interactions; use `:active` for touch feedback.
 
 ### Storage (`api.storage`)
 *Requires `storage:local` permission.*

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import "../app.css";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import MainView from "$lib/components/MainView.svelte";
@@ -23,7 +23,10 @@
   import { isMiniPlayer } from "$lib/stores/ui";
   import { pluginStore } from "$lib/stores/plugin-store";
   import { appSettings } from "$lib/stores/settings";
-  import { isMobile, isMobileSidebarOpen, closeMobileSidebar } from "$lib/stores/mobile";
+  import { isMobile, mobileSearchOpen } from "$lib/stores/mobile";
+  import MobileBottomNav from "$lib/components/MobileBottomNav.svelte";
+  import { searchQuery, clearSearch } from "$lib/stores/search";
+  import { currentView, goToHome } from "$lib/stores/view";
   import PluginUpdateDialog from "$lib/components/PluginUpdateDialog.svelte";
 
   let isLoading = true;
@@ -34,6 +37,38 @@
     if (!$appSettings.developerMode) {
       e.preventDefault();
     }
+  }
+
+  // Mobile search handling
+  let mobileSearchInput = '';
+  let mobileSearchInputEl: HTMLInputElement;
+  let mobileSearchTimer: ReturnType<typeof setTimeout>;
+
+  function handleMobileSearchInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    mobileSearchInput = target.value;
+    clearTimeout(mobileSearchTimer);
+    mobileSearchTimer = setTimeout(() => {
+      searchQuery.set(mobileSearchInput);
+    }, 200);
+  }
+
+  function closeMobileSearch() {
+    mobileSearchOpen.set(false);
+    mobileSearchInput = '';
+    clearSearch();
+  }
+
+  // Auto-focus mobile search input when opened
+  $: if ($mobileSearchOpen && mobileSearchInputEl) {
+    tick().then(() => mobileSearchInputEl?.focus());
+  }
+
+  // On mobile, default to home view on first load
+  let mobileInitialized = false;
+  $: if ($isMobile && !mobileInitialized && !isLoading) {
+    mobileInitialized = true;
+    goToHome();
   }
 
   onMount(async () => {
@@ -107,42 +142,62 @@
       <p>Loading your music library...</p>
     </div>
   {:else}
-    <div class="app-layout" class:mobile={$isMobile}>
-      <!-- Mobile sidebar overlay -->
-      {#if $isMobile}
-        {#if $isMobileSidebarOpen}
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div class="sidebar-overlay" on:click={closeMobileSidebar} role="presentation"></div>
-          <div class="sidebar-drawer">
-            <Sidebar on:navigate={closeMobileSidebar} />
+    {#if $isMobile}
+      <!-- ========= MOBILE LAYOUT (Spotify-like) ========= -->
+      <div class="mobile-layout">
+        {#if $mobileSearchOpen}
+          <div class="mobile-search-header">
+            <div class="mobile-search-bar">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+              <input
+                type="text"
+                class="mobile-search-input"
+                placeholder="What do you want to listen to?"
+                bind:value={mobileSearchInput}
+                bind:this={mobileSearchInputEl}
+                on:input={handleMobileSearchInput}
+                on:keydown={(e) => e.key === 'Escape' && closeMobileSearch()}
+                spellcheck="false"
+              />
+              <button class="mobile-search-cancel" on:click={closeMobileSearch}>
+                Cancel
+              </button>
+            </div>
           </div>
         {/if}
-      {:else}
-        <Sidebar />
-      {/if}
-      <MainView />
-      {#if !$isMobile}
-        <LyricsPanel />
-        <QueuePanel />
-      {/if}
+
+        <div class="mobile-content">
+          <MainView />
+        </div>
+      </div>
+
+      <!-- PlayerBar always rendered for audio element -->
+      <PlayerBar bind:audioElementRef={audioElement} hidden={$isMiniPlayer} />
+      <MobileBottomNav />
+
       <FullScreenPlayer />
       <ContextMenu />
-    </div>
-    <PlayerBar bind:audioElementRef={audioElement} hidden={$isMiniPlayer} />
-    {#if !$isMobile}
-      <MiniPlayer />
-    {/if}
-    <!-- Mobile: Queue and Lyrics as full-screen overlays -->
-    {#if $isMobile}
       <QueuePanel />
       <LyricsPanel />
-    {/if}
-    <ToastContainer />
-    {#if !$isMobile}
+    {:else}
+      <!-- ========= DESKTOP LAYOUT ========= -->
+      <div class="app-layout">
+        <Sidebar />
+        <MainView />
+        <LyricsPanel />
+        <QueuePanel />
+        <FullScreenPlayer />
+        <ContextMenu />
+      </div>
+      <PlayerBar bind:audioElementRef={audioElement} hidden={$isMiniPlayer} />
+      <MiniPlayer />
       <KeyboardShortcuts />
       <KeyboardShortcutsHelp />
     {/if}
 
+    <ToastContainer />
     {#if $pluginStore.pendingUpdates.length > 0}
       <PluginUpdateDialog on:close={() => pluginStore.clearPendingUpdates()} />
     {/if}
@@ -203,46 +258,64 @@
     overflow: hidden;
   }
 
-  /* Mobile sidebar drawer overlay */
-  .sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.6);
-    z-index: 200;
-    animation: fadeIn 0.2s ease;
-  }
-
-  .sidebar-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 280px;
-    max-width: 85vw;
-    height: 100%;
-    z-index: 201;
-    animation: slideInLeft 0.25s ease;
+  /* ========= MOBILE LAYOUT ========= */
+  .mobile-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background-color: var(--bg-base);
   }
 
-  @keyframes slideInLeft {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(0);
-    }
+  .mobile-search-header {
+    padding: var(--spacing-md);
+    padding-top: var(--spacing-lg);
+    background-color: var(--bg-base);
+    flex-shrink: 0;
   }
 
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  .mobile-search-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background-color: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    padding: 0 var(--spacing-md);
+    height: 48px;
   }
 
-  /* Mobile layout adjustments */
-  .app-layout.mobile {
-    flex-direction: column;
+  .mobile-search-bar .search-icon {
+    color: var(--text-subdued);
+    flex-shrink: 0;
+  }
+
+  .mobile-search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 1rem;
+    min-width: 0;
+    height: 100%;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .mobile-search-input::placeholder {
+    color: var(--text-subdued);
+  }
+
+  .mobile-search-cancel {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 8px;
+    flex-shrink: 0;
+  }
+
+  .mobile-content {
+    flex: 1;
+    overflow: hidden;
   }
 </style>

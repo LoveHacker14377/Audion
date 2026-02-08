@@ -628,6 +628,13 @@
     min-height: 0;
     overflow-y: auto;
     padding-bottom: calc(var(--player-height) + var(--spacing-lg));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (max-width: 768px) {
+    .plugin-content {
+      padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-xl));
+    }
   }
 
   .plugin-grid {

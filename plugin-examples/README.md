@@ -80,3 +80,48 @@ Each plugin requires:
     window.AudionPlugin = MyPlugin;
 })();
 ```
+
+## UI Slots
+
+Plugins with the `ui:inject` permission can register UI elements into predefined slots:
+
+| Slot Name | Location | Description |
+|---|---|---|
+| `playerbar:left` | Player bar (left side) | Next to track info |
+| `playerbar:right` | Player bar (right side) | Next to volume controls |
+| `playerbar:menu` | Plugin dropdown menu | **Auto-mirrored to mobile home** (see below) |
+| `sidebar:top` | Sidebar (top area) | Desktop only |
+| `sidebar:bottom` | Sidebar (bottom area) | Desktop only |
+| `mobile:home` | Mobile home screen | Shown on the mobile Home tab |
+| `mobile:bottomnav` | Mobile bottom navigation | Shown in the bottom nav area |
+
+### Automatic Mobile Mirroring
+
+For **backward compatibility**, content registered to `playerbar:menu` is **automatically cloned** to `mobile:home`. This means existing plugins that use `playerbar:menu` will appear on the mobile Home screen without any code changes.
+
+- The mirrored elements delegate click events back to the original element.
+- Removal from `playerbar:menu` also removes the mirrored clone.
+- To opt out or add custom mobile-only content, register directly to `mobile:home`.
+
+### Registering to Slots
+
+```javascript
+// Register a button in the plugin menu (works on both desktop & mobile automatically)
+const btn = document.createElement('button');
+btn.textContent = 'My Action';
+btn.onclick = () => { /* do something */ };
+api.ui.registerSlot('playerbar:menu', btn);
+
+// Optionally register mobile-specific content (in addition to or instead of mirroring)
+const mobileWidget = document.createElement('div');
+mobileWidget.innerHTML = '<p>My mobile widget</p>';
+api.ui.registerSlot('mobile:home', mobileWidget);
+```
+
+### Mobile Considerations
+
+- `playerbar:menu` content is auto-mirrored to the mobile Home screen
+- Plugin modals should use `max-width: 90vw` and `max-height: 85vh` for responsive sizing
+- Fixed-position widgets should account for the bottom nav (60px) and mini player (64px)
+- Touch targets should be at least 44×44px
+- Use `-webkit-tap-highlight-color: transparent` on interactive elements

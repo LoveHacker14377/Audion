@@ -1,10 +1,10 @@
 // Player store - manages audio playback state
 import { writable, derived, get } from 'svelte/store';
 import type { Track } from '$lib/api/tauri';
-import { getAudioSrc, getAlbumArtSrc } from '$lib/api/tauri';
+import { getAudioSrc, getAlbumArtSrc, getTrackCoverSrc } from '$lib/api/tauri';
 import { addToast } from '$lib/stores/toast';
 import { EventEmitter, type PluginEvents } from '$lib/plugins/event-emitter';
-import { tracks as libraryTracks, getFullTrack } from '$lib/stores/library';
+import { tracks as libraryTracks, getFullTrack, getAlbumCoverFromTracks } from '$lib/stores/library';
 import { appSettings } from '$lib/stores/settings';
 import { equalizer, EQ_FREQUENCIES } from '$lib/stores/equalizer';
 
@@ -316,6 +316,7 @@ export function setAudioElement(element: HTMLAudioElement): void {
 
     const handleDurationChange = () => {
         duration.set(audioElement?.duration ?? 0);
+        updateMediaSessionPosition();
     };
 
     const handleSeeked = (e: Event) => {
@@ -329,12 +330,15 @@ export function setAudioElement(element: HTMLAudioElement): void {
     const handlePlay = () => {
         isPlaying.set(true);
         pluginEvents.emit('playStateChange', { isPlaying: true });
+        updateMediaSessionPlaybackState('playing');
+        updateMediaSessionPosition();
         startTimeSync();
     };
 
     const handlePause = () => {
         isPlaying.set(false);
         pluginEvents.emit('playStateChange', { isPlaying: false });
+        updateMediaSessionPlaybackState('paused');
         stopTimeSync();
     };
 
@@ -442,6 +446,12 @@ export function cleanupPlayer(): void {
     currentTime.set(0);
     duration.set(0);
 
+    // 8. Clear Media Session
+    updateMediaSessionPlaybackState('none');
+    if ('mediaSession' in navigator) {
+        try { navigator.mediaSession.metadata = null; } catch (_) { /* ignore */ }
+    }
+
     console.log('[Player] Cleanup complete');
 }
 
@@ -460,6 +470,106 @@ export function shutdownPlayer(): void {
             console.warn('[Player] AudioContext close error:', err);
         });
         audioContext = null;
+    }
+}
+
+// ── Media Session API (Now Playing notification / lock screen controls) ──
+// Works in Android WebView, desktop browsers, and any environment that supports
+// the Web MediaSession API. Provides notification shade artwork, lock screen
+// controls, and hardware media button support.
+
+let mediaSessionInitialized = false;
+
+function initMediaSessionHandlers(): void {
+    if (mediaSessionInitialized || !('mediaSession' in navigator)) return;
+
+    const ms = navigator.mediaSession;
+
+    ms.setActionHandler('play', () => togglePlay());
+    ms.setActionHandler('pause', () => togglePlay());
+    ms.setActionHandler('previoustrack', () => previousTrack());
+    ms.setActionHandler('nexttrack', () => nextTrack());
+    ms.setActionHandler('seekto', (details) => {
+        if (details.seekTime != null && audioElement) {
+            const dur = audioElement.duration;
+            if (dur && isFinite(dur)) {
+                audioElement.currentTime = details.seekTime;
+            }
+        }
+    });
+    ms.setActionHandler('seekbackward', (details) => {
+        if (audioElement) {
+            audioElement.currentTime = Math.max(0, audioElement.currentTime - (details.seekOffset || 10));
+        }
+    });
+    ms.setActionHandler('seekforward', (details) => {
+        if (audioElement) {
+            const dur = audioElement.duration || Infinity;
+            audioElement.currentTime = Math.min(dur, audioElement.currentTime + (details.seekOffset || 10));
+        }
+    });
+
+    mediaSessionInitialized = true;
+    console.log('[Player] MediaSession action handlers registered');
+}
+
+function updateMediaSessionMetadata(track: Track): void {
+    if (!('mediaSession' in navigator)) return;
+
+    // Initialize handlers on first use (needs user gesture context)
+    initMediaSessionHandlers();
+
+    // Resolve artwork URL
+    const artworkSources: MediaImage[] = [];
+    const coverSrc = getTrackCoverSrc(track);
+
+    // Also try album cover as fallback
+    const albumCover = track.album_id ? getAlbumCoverFromTracks(track.album_id) : null;
+    const artUrl = coverSrc || albumCover;
+
+    if (artUrl) {
+        // MediaSession accepts data: URIs, asset:// URIs, and http(s) URLs.
+        // data: URIs and http(s) work directly. Tauri asset:// protocol URLs
+        // are served by the WebView and work within its context.
+        artworkSources.push(
+            { src: artUrl, sizes: '512x512', type: 'image/jpeg' }
+        );
+    }
+
+    try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title || 'Unknown Title',
+            artist: track.artist || 'Unknown Artist',
+            album: track.album || '',
+            artwork: artworkSources,
+        });
+    } catch (err) {
+        console.warn('[Player] Failed to set MediaSession metadata:', err);
+    }
+}
+
+function updateMediaSessionPlaybackState(state: 'playing' | 'paused' | 'none'): void {
+    if (!('mediaSession' in navigator)) return;
+    try {
+        navigator.mediaSession.playbackState = state;
+    } catch (err) {
+        // Ignore — some environments don't support playbackState setter
+    }
+}
+
+function updateMediaSessionPosition(): void {
+    if (!('mediaSession' in navigator) || !audioElement) return;
+    const dur = audioElement.duration;
+    if (!dur || !isFinite(dur)) return;
+
+    try {
+        navigator.mediaSession.setPositionState({
+            duration: dur,
+            playbackRate: audioElement.playbackRate || 1,
+            position: Math.min(audioElement.currentTime, dur),
+        });
+    } catch (err) {
+        // Ignore — setPositionState not supported everywhere
     }
 }
 
@@ -544,6 +654,8 @@ export async function playTrack(track: Track): Promise<void> {
             audioElement.src = src;
             try {
                 await audioElement.play();
+                // Update Media Session (notification shade / lock screen)
+                updateMediaSessionMetadata(track);
             } catch (err) {
                 if (err instanceof Error && err.name === 'AbortError') return;
                 console.error('Playback failed:', err);

@@ -946,6 +946,17 @@
     overflow-y: auto;
     padding: var(--spacing-md);
     padding-bottom: calc(var(--player-height) + var(--spacing-lg));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (max-width: 768px) {
+    .settings-content {
+      padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-xl));
+    }
+
+    .view-header h1 {
+      font-size: 1.5rem;
+    }
   }
 
   .settings-container {
@@ -1784,6 +1795,8 @@
 
     .settings-content {
       padding: var(--spacing-sm);
+      /* Preserve bottom padding for fixed bottom nav (60px) + mini player (64px) + margin */
+      padding-bottom: calc(140px + var(--spacing-xl));
     }
 
     .settings-container {

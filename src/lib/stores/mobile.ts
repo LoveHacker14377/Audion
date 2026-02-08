@@ -74,3 +74,6 @@ export function closeMobileSidebar() {
 export function openMobileSidebar() {
     isMobileSidebarOpen.set(true);
 }
+
+// Mobile search state (for bottom nav Search tab)
+export const mobileSearchOpen = writable(false);

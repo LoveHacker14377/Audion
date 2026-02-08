@@ -2,6 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Storage: read music files (API 33+ uses granular media permissions) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Storage: legacy read permission for API 32 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Background playback: foreground service to keep audio alive -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- Keep CPU awake during audio playback -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 

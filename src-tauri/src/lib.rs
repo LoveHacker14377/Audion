@@ -22,7 +22,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_os::init());
 
     // Global shortcuts are desktop-only (not available on Android/iOS)
     #[cfg(desktop)]
@@ -230,9 +231,6 @@ pub fn run() {
                     commands::plugin_clear_data,
                     // Network commands
                     commands::proxy_fetch,
-                    // Window commands
-                    commands::window::get_window_start_mode,
-                    commands::window::set_window_start_mode,
                 ]
             }
         })

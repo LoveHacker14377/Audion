@@ -1,8 +1,10 @@
 <script lang="ts">
-    import { currentView } from "$lib/stores/view";
+    import { currentView, goToTracks, goToAlbums, goToArtists, goToPlaylists } from "$lib/stores/view";
     import { tracks, albums, artists } from "$lib/stores/library";
     import { isScanning } from "$lib/stores/progressiveScan";  // we Only need isScanning flag
     import { searchQuery, searchResults, clearSearch } from "$lib/stores/search";
+    import { isMobile } from "$lib/stores/mobile";
+    import MobileHome from "./MobileHome.svelte";
 
     import TrackList from "./TrackList.svelte";
     import AlbumGrid from "./AlbumGrid.svelte";
@@ -18,11 +20,32 @@
     import Settings from "./Settings.svelte";
 
     $: isSearching = $searchQuery.length > 0;
+    $: isLibraryView = ['tracks', 'albums', 'artists', 'playlists'].includes($currentView.type);
     import GlobalShortcuts from "./GlobalShortcuts.svelte";
 </script>
 
 <main class="main-view">
     <GlobalShortcuts />
+
+    <!-- Mobile: Horizontal library sub-tabs (Spotify pill style) -->
+    {#if $isMobile && isLibraryView && !isSearching}
+        <div class="mobile-library-tabs-wrapper">
+            <div class="mobile-library-tabs">
+                <button class="lib-tab" class:active={$currentView.type === 'tracks'} on:click={goToTracks}>
+                    Songs
+                </button>
+                <button class="lib-tab" class:active={$currentView.type === 'albums'} on:click={goToAlbums}>
+                    Albums
+                </button>
+                <button class="lib-tab" class:active={$currentView.type === 'artists'} on:click={goToArtists}>
+                    Artists
+                </button>
+                <button class="lib-tab" class:active={$currentView.type === 'playlists'} on:click={goToPlaylists}>
+                    Playlists
+                </button>
+            </div>
+        </div>
+    {/if}
 
     {#if isSearching}
         <div class="view-container">
@@ -94,6 +117,10 @@
         <div class="view-container no-padding">
             <Settings />
         </div>
+    {:else if $currentView.type === "home"}
+        <div class="view-container no-padding">
+            <MobileHome />
+        </div>
     {:else}
         <div class="view-container">
             <div class="empty-state">
@@ -137,6 +164,13 @@
     .view-content {
         flex: 1;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 768px) {
+        .view-content {
+            padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-md));
+        }
     }
 
     .empty-state {
@@ -151,5 +185,61 @@
     font-size: 0.875rem;
     color: var(--text-secondary);
     margin-top: var(--spacing-xs);
+    }
+
+    /* ===== Mobile Library Tabs (Spotify pill style) ===== */
+    .mobile-library-tabs-wrapper {
+        flex-shrink: 0;
+        padding: var(--spacing-md) var(--spacing-md) 0;
+        background-color: var(--bg-base);
+    }
+
+    .mobile-library-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
+
+    .mobile-library-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .lib-tab {
+        flex-shrink: 0;
+        padding: 8px 16px;
+        border-radius: var(--radius-full);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        background-color: rgba(255, 255, 255, 0.07);
+        border: none;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        -webkit-tap-highlight-color: transparent;
+        white-space: nowrap;
+    }
+
+    .lib-tab.active {
+        background-color: var(--accent-primary);
+        color: var(--bg-base);
+    }
+
+    .lib-tab:active:not(.active) {
+        background-color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Mobile view header adjustments */
+    @media (max-width: 768px) {
+        .view-header h1 {
+            font-size: 1.25rem;
+        }
+
+        .view-header {
+            padding: var(--spacing-md);
+        }
     }
 </style>

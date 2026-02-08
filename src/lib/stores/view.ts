@@ -2,6 +2,7 @@
 import { writable, get, derived } from 'svelte/store';
 
 export type ViewType =
+    | 'home'
     | 'tracks'
     | 'tracks-multiselect'
     | 'albums'
@@ -92,6 +93,10 @@ export function goForward(): void {
 // Navigation helpers
 export function navigateTo(type: ViewType, id?: number, name?: string): void {
     currentView.set({ type, id, name });
+}
+
+export function goToHome(): void {
+    currentView.set({ type: 'home' });
 }
 
 export function goToTracks(): void {

@@ -315,11 +315,7 @@ a:hover {
     --sidebar-width: 0px;
     --player-height: 64px;
     --header-height: 48px;
-  }
-
-  .hide-mobile {
-    display: none !important;
-  }
+    --mobile-bottom-inset: 130px; /* 60px nav + 64px player + 6px margin */
   .show-mobile {
     display: initial !important;
   }
@@ -344,5 +340,24 @@ a:hover {
   /* Cards: no hover transform on touch */
   .card:hover {
     transform: none;
+  }
+
+  /* Bottom padding for scrollable content (above fixed nav + player) */
+  .main-view .view-content {
+    padding-bottom: 140px;
+  }
+
+  /* Prevent accidental text selection on swipeable areas */
+  .carousel-container,
+  .quick-play-grid,
+  .mobile-library-tabs,
+  .bottom-nav {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* Hide scrollbars in carousels */
+  .carousel-container::-webkit-scrollbar {
+    display: none;
   }
 }

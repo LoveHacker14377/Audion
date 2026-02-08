@@ -187,7 +187,7 @@
     });
 </script>
 
-<footer class="player-bar" class:hidden class:mobile={$isMobile}>
+<footer class="player-bar" class:hidden class:mobile={$isMobile} class:mobile-no-track={$isMobile && !$currentTrack}>
     <!-- Hidden audio element -->
     <audio bind:this={audioElement} crossorigin="anonymous"></audio>
 
@@ -269,6 +269,7 @@
                         <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
                     </svg>
                 </button>
+                <PluginMenu />
             </div>
         </div>
     {:else}
@@ -835,13 +836,28 @@
         gap: var(--spacing-sm);
     }
 
-    /* Mobile player bar styles */
+    /* Mobile player bar styles - Fixed above bottom nav */
     .player-bar.mobile {
-        height: var(--player-height, 64px);
+        position: fixed;
+        bottom: calc(60px + env(safe-area-inset-bottom));
+        left: 0;
+        width: 100%;
+        height: 64px;
         display: flex;
         flex-direction: column;
         padding: 0;
         gap: 0;
+        z-index: 900;
+        background-color: #2a2a2a;
+        border-top: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .player-bar.mobile-no-track {
+        visibility: hidden;
+        height: 0;
+        overflow: hidden;
+        border: none;
+        pointer-events: none;
     }
 
     .mobile-progress {

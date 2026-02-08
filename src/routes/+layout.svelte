@@ -4,7 +4,7 @@
   import { theme } from "$lib/stores/theme";
   import { cleanupPlayer } from "$lib/stores/player";
   import { migrateCoversToFiles } from "$lib/api/tauri";
-  import { initMobileDetection } from "$lib/stores/mobile";
+  import { initMobileDetection, isMobile } from '$lib/stores/mobile';
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
   import ProgressiveScanStatus from "$lib/components/ProgressiveScanStatus.svelte";
@@ -123,7 +123,9 @@
   }
 </script>
 
-<TitleBar />
+{#if !$isMobile}
+  <TitleBar />
+{/if}
 <ConfirmDialog />
 <ProgressiveScanStatus />
 
@@ -142,7 +144,7 @@
   </div>
 {/if}
 
-<div class="app-content">
+<div class="app-content" class:mobile={$isMobile}>
   <slot />
 </div>
 
@@ -215,5 +217,9 @@
   .migration-text {
     font-size: 0.9rem;
     font-weight: 500;
+  }
+
+  .app-content.mobile {
+    padding-top: 0;
   }
 </style>

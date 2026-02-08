@@ -9,8 +9,25 @@
     "core:default",
     "opener:default",
     "dialog:default",
+    "dialog:allow-open",
     "notification:default",
+    "os:default",
     "fs:allow-read",
+    "fs:allow-write",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "$APPDATA/audion/**"
+        },
+        {
+          "path": "$AUDIO/**"
+        },
+        {
+          "path": "$MUSIC/**"
+        }
+      ]
+    },
     {
       "identifier": "fs:allow-read-file",
       "allow": [

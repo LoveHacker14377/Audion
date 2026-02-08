@@ -1,7 +1,7 @@
 // UI Slot system for plugins
 // Provides formal extension points in the UI
 
-export type UISlotName = 'playerbar:left' | 'playerbar:right' | 'sidebar:top' | 'sidebar:bottom' | 'playerbar:menu';
+export type UISlotName = 'playerbar:left' | 'playerbar:right' | 'sidebar:top' | 'sidebar:bottom' | 'playerbar:menu' | 'mobile:home' | 'mobile:bottomnav';
 
 export interface UISlotContent {
     pluginName: string;
@@ -39,9 +39,51 @@ export class UISlotManager {
     }
 
     /**
+     * Slot alias map: content added to a source slot is auto-cloned to target slots.
+     * This provides backward compatibility so plugins registering to 'playerbar:menu'
+     * automatically appear in 'mobile:home' without any plugin code changes.
+     */
+    private static readonly SLOT_MIRRORS: Partial<Record<UISlotName, UISlotName[]>> = {
+        'playerbar:menu': ['mobile:home'],
+    };
+
+    /** Track cloned elements so we can clean them up on removal */
+    private mirrorElements: Map<string, { slot: UISlotName; element: HTMLElement }[]> = new Map();
+
+    /**
      * Add plugin content to a slot
      */
     addContent(slotName: UISlotName, content: UISlotContent): void {
+        this._addToSlot(slotName, content);
+
+        // Auto-mirror: clone content to aliased mobile slots
+        const mirrors = UISlotManager.SLOT_MIRRORS[slotName];
+        if (mirrors) {
+            const key = `${slotName}::${content.pluginName}`;
+            // Remove old mirrors first
+            this._removeMirrors(key);
+            const entries: { slot: UISlotName; element: HTMLElement }[] = [];
+
+            for (const targetSlot of mirrors) {
+                const clonedElement = content.element.cloneNode(true) as HTMLElement;
+                // Copy event listeners by re-dispatching click to original
+                clonedElement.addEventListener('click', () => {
+                    content.element.click();
+                });
+                const mirrorContent: UISlotContent = {
+                    pluginName: content.pluginName,
+                    element: clonedElement,
+                    priority: content.priority,
+                };
+                this._addToSlot(targetSlot, mirrorContent);
+                entries.push({ slot: targetSlot, element: clonedElement });
+            }
+            this.mirrorElements.set(key, entries);
+        }
+    }
+
+    /** Internal: add content to a single slot without triggering mirrors */
+    private _addToSlot(slotName: UISlotName, content: UISlotContent): void {
         if (!this.slots.has(slotName)) {
             this.slots.set(slotName, []);
         }
@@ -51,18 +93,28 @@ export class UISlotManager {
         // Check if plugin already has content in this slot
         const existingIndex = slotContents.findIndex(c => c.pluginName === content.pluginName);
         if (existingIndex >= 0) {
-            // Replace existing content
             slotContents[existingIndex] = content;
         } else {
-            // Add new content
             slotContents.push(content);
         }
 
-        // Sort by priority
         slotContents.sort((a, b) => a.priority - b.priority);
-
-        // Re-render the slot
         this.renderSlot(slotName);
+    }
+
+    /** Remove cloned mirror elements for a given key */
+    private _removeMirrors(key: string): void {
+        const entries = this.mirrorElements.get(key);
+        if (!entries) return;
+        for (const { slot, element } of entries) {
+            const contents = this.slots.get(slot);
+            if (contents) {
+                const filtered = contents.filter(c => c.element !== element);
+                this.slots.set(slot, filtered);
+                this.renderSlot(slot);
+            }
+        }
+        this.mirrorElements.delete(key);
     }
 
     /**
@@ -74,8 +126,11 @@ export class UISlotManager {
 
         const filtered = slotContents.filter(c => c.pluginName !== pluginName);
         this.slots.set(slotName, filtered);
-
         this.renderSlot(slotName);
+
+        // Also remove mirrors
+        const key = `${slotName}::${pluginName}`;
+        this._removeMirrors(key);
     }
 
     /**
@@ -87,6 +142,12 @@ export class UISlotManager {
             this.slots.set(slotName, filtered);
             this.renderSlot(slotName);
         });
+        // Clean up all mirrors for this plugin
+        for (const [key] of this.mirrorElements) {
+            if (key.endsWith(`::${pluginName}`)) {
+                this._removeMirrors(key);
+            }
+        }
     }
 
     /**
@@ -188,6 +249,24 @@ export class UISlotManager {
             /* Reset for images */
             img {
                 border-radius: 2px;
+            }
+
+            /* Mobile: larger touch targets */
+            @media (max-width: 768px) {
+                :host > *:not(style) {
+                    padding: 14px 12px;
+                    min-height: 44px;
+                    -webkit-tap-highlight-color: transparent;
+                }
+
+                :host > *:not(style):hover {
+                    transform: none;
+                }
+
+                :host > *:not(style):active {
+                    background-color: var(--bg-highlight);
+                    color: var(--text-primary);
+                }
             }
         `;
 

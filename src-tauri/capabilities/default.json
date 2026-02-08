@@ -25,6 +25,7 @@
     "opener:default",
     "dialog:default",
     "notification:default",
+    "os:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-unregister-all",

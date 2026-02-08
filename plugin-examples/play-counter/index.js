@@ -97,6 +97,17 @@
                     transition: all 250ms ease;
                 }
 
+                /* Mobile: position above bottom nav + mini player */
+                @media (max-width: 768px) {
+                    #play-counter-widget {
+                        bottom: calc(60px + 64px + 16px); /* nav + player + gap */
+                        right: 12px;
+                        left: 12px;
+                        min-width: auto;
+                        max-width: 100%;
+                    }
+                }
+
                 #play-counter-widget:hover {
                     background: #282828;
                     transform: translateY(-2px);

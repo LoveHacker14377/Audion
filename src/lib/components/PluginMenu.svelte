@@ -114,6 +114,22 @@
         flex-direction: column;
     }
 
+    /* On mobile, make the dropdown wider and better positioned */
+    @media (max-width: 768px) {
+        .plugin-dropdown {
+            right: -8px;
+            min-width: 260px;
+            max-width: calc(100vw - 32px);
+            padding: 8px;
+            border-radius: var(--radius-lg);
+        }
+
+        .icon-btn {
+            width: 44px;
+            height: 44px;
+        }
+    }
+
     .plugin-slot-list {
         display: flex;
         flex-direction: column;
