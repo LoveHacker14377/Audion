@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fade, fly } from "svelte/transition";
   import { derived } from "svelte/store";
-  import { isFullScreen, toggleFullScreen } from "$lib/stores/ui";
+  import { isFullScreen, toggleFullScreen, isQueueVisible, toggleQueue } from "$lib/stores/ui";
   import {
     currentTrack,
     isPlaying,
@@ -12,7 +12,14 @@
     currentTime,
     duration,
     seek,
+    shuffle,
+    repeat,
+    toggleShuffle,
+    cycleRepeat,
   } from "$lib/stores/player";
+  import { isMobile } from "$lib/stores/mobile";
+  import { lyricsVisible, toggleLyrics } from "$lib/stores/lyrics";
+  import { goToArtistDetail } from "$lib/stores/view";
 
   // Seek to a specific lyric line time
   function handleLineClick(lineTime: number) {
@@ -220,13 +227,31 @@ $: if ($currentTrack) {
     </div>
     <div class="backdrop-layer"></div>
 
-    <button class="close-btn" on:click={toggleFullScreen} aria-label="Close FullScreen">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
-        <path
-          d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
-        />
-      </svg>
-    </button>
+    {#if $isMobile}
+      <!-- Mobile: Spotify-style header with chevron down -->
+      <div class="mobile-header">
+        <button class="chevron-btn" on:click={toggleFullScreen} aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+          </svg>
+        </button>
+        <span class="now-playing-label">Now Playing</span>
+        <button class="chevron-btn" on:click={toggleQueue} aria-label="Queue">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+            <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+          </svg>
+        </button>
+      </div>
+    {:else}
+      <!-- Desktop: corner close button -->
+      <button class="close-btn" on:click={toggleFullScreen} aria-label="Close FullScreen">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+          <path
+            d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
+          />
+        </svg>
+      </button>
+    {/if}
 
     <div class="player-content">
       <!-- Left Panel: Art & Controls -->
@@ -257,9 +282,15 @@ $: if ($currentTrack) {
           <h1 class="track-title">
             {$currentTrack?.title || "Unknown Title"}
           </h1>
-          <h2 class="track-artist">
+          <span
+            class="track-artist"
+            role="button"
+            tabindex="0"
+            on:click={() => { if ($currentTrack?.artist) { toggleFullScreen(); goToArtistDetail($currentTrack.artist); } }}
+            on:keydown={(e) => { if (e.key === 'Enter' && $currentTrack?.artist) { toggleFullScreen(); goToArtistDetail($currentTrack.artist); } }}
+          >
             {$currentTrack?.artist || "Unknown Artist"}
-          </h2>
+          </span>
         </div>
 
         <div class="player-controls">
@@ -268,8 +299,14 @@ $: if ($currentTrack) {
             <div
               class="progress-bar"
               on:mousedown={handleSeekStart}
+              on:touchstart|preventDefault={(e) => { isSeeking = true; const touch = e.touches[0]; const bar = e.currentTarget; const rect = bar.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); }}
+              on:touchmove|preventDefault={(e) => { if (isSeeking) { const touch = e.touches[0]; const bar = e.currentTarget; const rect = bar.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); } }}
+              on:touchend={() => isSeeking = false}
               role="slider"
               aria-label="Seek"
+              aria-valuenow={Math.round($progress * 100)}
+              aria-valuemin="0"
+              aria-valuemax="100"
               tabindex="0"
             >
               <div class="progress-track">
@@ -287,6 +324,11 @@ $: if ($currentTrack) {
           </div>
 
           <div class="buttons">
+            <button class="icon-btn shuffle-repeat" class:active={$shuffle} on:click={toggleShuffle} aria-label="Shuffle">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+              </svg>
+            </button>
             <button class="icon-btn large" on:click={previousTrack} aria-label="Previous">
               <svg
                 viewBox="0 0 24 24"
@@ -327,6 +369,24 @@ $: if ($currentTrack) {
               >
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
               </svg>
+            </button>
+            <button class="icon-btn shuffle-repeat" class:active={$repeat !== 'none'} on:click={cycleRepeat} aria-label="Repeat: {$repeat}">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+              </svg>
+              {#if $repeat === 'one'}
+                <span class="repeat-one-badge">1</span>
+              {/if}
+            </button>
+          </div>
+
+          <!-- Secondary row: Lyrics toggle -->
+          <div class="secondary-controls">
+            <button class="secondary-btn" class:active={$lyricsVisible} on:click={toggleLyrics} aria-label="Lyrics">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+              </svg>
+              <span>Lyrics</span>
             </button>
           </div>
         </div>
@@ -869,12 +929,121 @@ $: if ($currentTrack) {
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
   }
 
+  /* ── Shuffle / Repeat buttons ── */
+  .icon-btn.shuffle-repeat {
+    width: 36px;
+    height: 36px;
+    color: rgba(255, 255, 255, 0.5);
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+    position: relative;
+    transition: color 0.2s ease;
+  }
+
+  .icon-btn.shuffle-repeat.active {
+    color: #1db954;
+  }
+
+  .repeat-one-badge {
+    position: absolute;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #1db954;
+    bottom: 2px;
+    right: 2px;
+  }
+
+  /* ── Secondary controls row (Lyrics, etc.) ── */
+  .secondary-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-xs);
+  }
+
+  .secondary-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .secondary-btn.active {
+    color: #1db954;
+  }
+
+  .secondary-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  /* ── Mobile header (chevron + Now Playing) ── */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .chevron-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.8);
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s ease;
+  }
+
+  .chevron-btn:active {
+    opacity: 0.5;
+  }
+
+  .now-playing-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Track artist is tappable */
+  .track-artist {
+    cursor: pointer;
+  }
+
+  .track-artist:hover {
+    text-decoration: underline;
+  }
+
   /* ── Mobile ── */
   @media (max-width: 768px) {
+    .fullscreen-player {
+      /* Ensure it covers safe areas */
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
     .player-content {
       grid-template-columns: 1fr;
-      padding: var(--spacing-md);
-      padding-top: 60px;
+      padding: 0 var(--spacing-lg);
+      padding-top: 0;
       gap: var(--spacing-md);
       overflow-y: auto;
       align-items: start;
@@ -885,23 +1054,28 @@ $: if ($currentTrack) {
       padding-left: 0;
       height: auto;
       max-height: none;
+      gap: var(--spacing-md);
     }
 
     .art-container {
-      max-width: min(280px, 60vw);
+      max-width: min(320px, 75vw);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
     .track-info {
       text-align: center;
       align-items: center;
+      width: 100%;
     }
 
     .track-title {
-      font-size: 1.4rem;
+      font-size: 1.35rem;
+      font-weight: 700;
     }
 
     .track-artist {
       font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.7);
     }
 
     .player-controls {
@@ -909,12 +1083,45 @@ $: if ($currentTrack) {
       align-items: center;
     }
 
+    .progress-bar-container {
+      width: 100%;
+    }
+
+    .progress-track {
+      height: 4px;
+    }
+
+    .progress-fill {
+      background-color: #1db954;
+    }
+
+    .progress-thumb {
+      transform: translateX(-50%) scale(1);
+      width: 12px;
+      height: 12px;
+    }
+
     .buttons {
-      gap: var(--spacing-lg);
+      gap: var(--spacing-md);
+      width: 100%;
+      justify-content: space-between;
+      max-width: 320px;
+    }
+
+    .play-btn.large {
+      width: 60px;
+      height: 60px;
+      background-color: #fff;
+      color: #000;
+    }
+
+    .icon-btn.large {
+      width: 44px;
+      height: 44px;
     }
 
     .right-panel {
-      max-height: 40vh;
+      max-height: 35vh;
     }
 
     .lyrics-container {

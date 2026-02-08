@@ -192,84 +192,61 @@
     <audio bind:this={audioElement} crossorigin="anonymous"></audio>
 
     {#if $isMobile}
-        <!-- MOBILE PLAYER BAR: Compact 2-row layout -->
-        <!-- Row 1: Progress bar (full width, thin) -->
-        <div class="mobile-progress">
-            <div
-                class="progress-bar"
-                bind:this={seekBarElement}
-                on:mousedown={handleSeekStart}
-                on:touchstart|preventDefault={(e) => { isSeeking = true; const touch = e.touches[0]; if (seekBarElement) { const rect = seekBarElement.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); } }}
-                on:touchmove|preventDefault={(e) => { if (isSeeking && seekBarElement) { const touch = e.touches[0]; const rect = seekBarElement.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); } }}
-                on:touchend={() => isSeeking = false}
-                role="slider"
-                aria-label="Seek"
-                aria-valuenow={Math.round($progress * 100)}
-                aria-valuemin="0"
-                aria-valuemax="100"
-                tabindex="0"
-            >
-                <div class="progress-track">
-                    <div class="progress-fill" style="width: {$progress * 100}%"></div>
-                </div>
+        <!-- SPOTIFY-STYLE MOBILE MINI-PLAYER -->
+        <div class="mini-player-tap" on:click={toggleFullScreen} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && toggleFullScreen()}>
+            <!-- Thin progress line at top edge -->
+            <div class="mini-progress">
+                <div class="mini-progress-bg"></div>
+                <div class="mini-progress-fill" style="width: {$progress * 100}%"></div>
             </div>
-        </div>
-        <!-- Row 2: Track info + controls -->
-        <div class="mobile-controls">
-            <div class="track-info" on:click={toggleFullScreen} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && toggleFullScreen()}>
+
+            <!-- Main content row -->
+            <div class="mini-content">
+                <!-- Left: Album art -->
                 {#if $currentTrack}
-                    <div class="album-art mobile-art">
+                    <div class="mini-art">
                         {#if albumArt && !imageLoadFailed}
                             <img src={albumArt} alt="Album art" decoding="async" on:error={() => (imageLoadFailed = true)} />
                         {:else}
-                            <div class="album-art-placeholder">
+                            <div class="mini-art-placeholder">
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                                     <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
                                 </svg>
                             </div>
                         {/if}
                     </div>
-                    <div class="track-details">
-                        <span class="track-title truncate">{$currentTrack.title || "Unknown Title"}</span>
-                        <span class="track-artist truncate">{$currentTrack.artist || "Unknown Artist"}</span>
+
+                    <!-- Middle: Track info -->
+                    <div class="mini-info">
+                        <span class="mini-title">{$currentTrack.title || "Unknown Title"}</span>
+                        <span class="mini-artist">{$currentTrack.artist || "Unknown Artist"}</span>
                     </div>
                 {:else}
-                    <div class="no-track"><span>No track playing</span></div>
+                    <div class="mini-info">
+                        <span class="mini-title" style="color: var(--text-subdued)">No track playing</span>
+                    </div>
                 {/if}
-            </div>
-            <div class="mobile-btns">
-                <button class="icon-btn" on:click={previousTrack} title="Previous">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                        <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-                    </svg>
-                </button>
-                <button class="play-btn" on:click={togglePlay} title={$isPlaying ? "Pause" : "Play"}>
-                    {#if $isPlaying}
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+
+                <!-- Right: Controls (stop propagation so taps don't open fullscreen) -->
+                <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+                <div class="mini-controls" on:click|stopPropagation on:keydown|stopPropagation role="group">
+                    <button class="mini-btn" on:click={togglePlay} title={$isPlaying ? "Pause" : "Play"}>
+                        {#if $isPlaying}
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                            </svg>
+                        {:else}
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        {/if}
+                    </button>
+                    <button class="mini-btn" on:click={nextTrack} title="Next">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                         </svg>
-                    {:else}
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                            <path d="M8 5v14l11-7z" />
-                        </svg>
-                    {/if}
-                </button>
-                <button class="icon-btn" on:click={nextTrack} title="Next">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-                    </svg>
-                </button>
-                <button
-                    class="icon-btn"
-                    class:active={$isQueueVisible}
-                    on:click={toggleQueue}
-                    title="Queue"
-                >
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                        <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
-                    </svg>
-                </button>
-                <PluginMenu />
+                    </button>
+                </div>
             </div>
         </div>
     {:else}
@@ -836,20 +813,25 @@
         gap: var(--spacing-sm);
     }
 
-    /* Mobile player bar styles - Fixed above bottom nav */
+    /* =========================================
+       SPOTIFY-STYLE MOBILE MINI-PLAYER
+       ========================================= */
     .player-bar.mobile {
         position: fixed;
         bottom: calc(60px + env(safe-area-inset-bottom));
-        left: 0;
-        width: 100%;
+        left: 8px;
+        right: 8px;
+        width: auto;
         height: 64px;
-        display: flex;
-        flex-direction: column;
+        display: block;
         padding: 0;
         gap: 0;
         z-index: 900;
-        background-color: #2a2a2a;
-        border-top: 1px solid rgba(0, 0, 0, 0.3);
+        background-color: #282828;
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
     }
 
     .player-bar.mobile-no-track {
@@ -860,69 +842,132 @@
         pointer-events: none;
     }
 
-    .mobile-progress {
+    /* The entire mini-player is tappable to open fullscreen */
+    .mini-player-tap {
         width: 100%;
-        padding: 0;
-        flex-shrink: 0;
-    }
-
-    .mobile-progress .progress-bar {
-        width: 100%;
-        height: 4px;
+        height: 100%;
         cursor: pointer;
         position: relative;
-        display: flex;
-        align-items: center;
+        -webkit-tap-highlight-color: transparent;
     }
 
-    .mobile-progress .progress-track {
+    /* Thin progress line at the very top */
+    .mini-progress {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        z-index: 1;
+    }
+
+    .mini-progress-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 3px;
-        background-color: var(--bg-highlight);
-        border-radius: 0;
+        height: 100%;
+        background-color: #404040;
+    }
+
+    .mini-progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background-color: #1db954;
+        transition: width 0.3s linear;
+    }
+
+    /* Main content row */
+    .mini-content {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding: 0 12px 0 8px;
+        gap: 12px;
+    }
+
+    /* Album art */
+    .mini-art {
+        width: 48px;
+        height: 48px;
+        border-radius: 4px;
+        overflow: hidden;
+        flex-shrink: 0;
+        background-color: #333;
+    }
+
+    .mini-art img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .mini-art-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-subdued);
+        background-color: #333;
+    }
+
+    /* Track info */
+    .mini-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
         overflow: hidden;
     }
 
-    .mobile-progress .progress-fill {
-        height: 100%;
-        background-color: var(--accent-primary);
-        border-radius: 0;
+    .mini-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.3;
     }
 
-    .mobile-controls {
+    .mini-artist {
+        font-size: 12px;
+        color: #b3b3b3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 1px;
+        line-height: 1.3;
+    }
+
+    /* Control buttons */
+    .mini-controls {
         display: flex;
         align-items: center;
-        padding: 0 var(--spacing-sm);
-        gap: var(--spacing-sm);
-        flex: 1;
-        min-width: 0;
-    }
-
-    .mobile-controls .track-info {
-        flex: 1;
-        min-width: 0;
-        cursor: pointer;
-    }
-
-    .mobile-art {
-        width: 44px;
-        height: 44px;
-    }
-
-    .mobile-btns {
-        display: flex;
-        align-items: center;
-        gap: 0;
+        gap: 8px;
         flex-shrink: 0;
     }
 
-    .mobile-btns .icon-btn {
-        width: 44px;
-        height: 44px;
+    .mini-btn {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        background: none;
+        border: none;
+        cursor: pointer;
+        border-radius: 50%;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s ease;
     }
 
-    .mobile-btns .play-btn {
-        width: 38px;
-        height: 38px;
+    .mini-btn:active {
+        opacity: 0.6;
     }
 </style>

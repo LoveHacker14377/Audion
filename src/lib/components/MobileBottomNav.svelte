@@ -4,6 +4,7 @@
     import { clearSearch } from '$lib/stores/search';
     import { currentTrack } from '$lib/stores/player';
     import { uiSlotManager } from '$lib/plugins/ui-slots';
+    import PluginMenu from '$lib/components/PluginMenu.svelte';
     import { onMount } from 'svelte';
 
     type MobileTab = 'home' | 'search' | 'library' | 'plugins';
@@ -114,6 +115,12 @@
         <span>Plugins</span>
     </button>
 
+    <!-- Plugin menu (moved from PlayerBar on mobile) -->
+    <div class="nav-plugin-menu">
+        <PluginMenu />
+        <span class="nav-plugin-label">Menu</span>
+    </div>
+
     <!-- Plugin slot for bottom nav extensions -->
     <div class="plugin-slot" bind:this={pluginSlot}></div>
 </nav>
@@ -174,6 +181,59 @@
         display: block;
         width: 24px;
         height: 24px;
+    }
+
+    .nav-plugin-menu {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-subdued);
+        text-align: center;
+        gap: 2px;
+        padding: 4px 12px;
+        min-width: 64px;
+        min-height: 48px;
+        -webkit-tap-highlight-color: transparent;
+        position: relative;
+    }
+
+    .nav-plugin-menu :global(.plugin-menu-container) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 0;
+    }
+
+    .nav-plugin-menu :global(.icon-btn) {
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+        min-height: 24px !important;
+        color: var(--text-subdued) !important;
+        padding: 0 !important;
+        background: none !important;
+        border: none !important;
+    }
+
+    .nav-plugin-menu :global(.icon-btn svg) {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .nav-plugin-label {
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--text-subdued);
+        line-height: 1;
+        display: block;
+    }
+
+    /* Override PluginMenu dropdown positioning for bottom nav */
+    .nav-plugin-menu :global(.plugin-dropdown) {
+        right: 0;
+        bottom: 100%;
+        margin-bottom: 8px;
     }
 
     .plugin-slot {
