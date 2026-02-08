@@ -1350,4 +1350,85 @@
   .list-header.multiselect.no-album {
     grid-template-columns: 40px 40px 48px 1fr 80px;
   }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    /* Hide the entire header row on mobile */
+    .list-header {
+      display: none;
+    }
+
+    /* Simplified 3-column row: cover + title/artist + duration */
+    .track-row {
+      grid-template-columns: 44px 1fr 52px;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      padding-left: var(--spacing-sm);
+      height: 60px;
+      min-height: 60px;
+    }
+
+    /* Hide index number on mobile */
+    .col-num {
+      display: none;
+    }
+
+    /* Hide album column on mobile */
+    .col-album {
+      display: none;
+    }
+
+    /* Override all grid variations on mobile */
+    .list-body.with-drag .track-row,
+    .list-body.no-album .track-row,
+    .list-body.no-album.with-drag .track-row {
+      grid-template-columns: 44px 1fr 52px;
+    }
+
+    .list-body.multiselect .track-row,
+    .list-body.multiselect.no-album .track-row {
+      grid-template-columns: 36px 44px 1fr 52px;
+    }
+
+    /* Slightly larger covers on mobile for touch */
+    .cover-wrapper,
+    .cover-image,
+    .cover-placeholder {
+      width: 44px;
+      height: 44px;
+    }
+
+    /* Hide play overlay on mobile (uses tap instead) */
+    .cover-play-overlay {
+      display: none;
+    }
+
+    /* Larger track name for readability */
+    .track-name {
+      font-size: 0.9375rem;
+    }
+
+    .track-artist {
+      font-size: 0.75rem;
+    }
+
+    /* Compact duration */
+    .col-duration {
+      font-size: 0.75rem;
+    }
+
+    /* Drag handle always visible on mobile for playlist reorder */
+    .drag-handle {
+      opacity: 1;
+    }
+
+    .list-body.with-drag .track-row {
+      grid-template-columns: 28px 44px 1fr 52px;
+    }
+
+    /* Hide quality tags on very small screens to save space */
+    .quality-tag {
+      display: none;
+    }
+  }
 </style>

@@ -81,7 +81,7 @@ export async function setMiniPlayer(enable: boolean) {
                 // Restore original window state
                 if (originalWindowState) {
                     // Restore min size first
-                    await appWindow.setMinSize(new LogicalSize(900, 600));
+                    await appWindow.setMinSize(new LogicalSize(320, 480));
                     await appWindow.setSize(new LogicalSize(
                         originalWindowState.width,
                         originalWindowState.height
@@ -93,7 +93,7 @@ export async function setMiniPlayer(enable: boolean) {
                     originalWindowState = null;
                 } else {
                     // Fallback: restore to default size
-                    await appWindow.setMinSize(new LogicalSize(900, 600));
+                    await appWindow.setMinSize(new LogicalSize(320, 480));
                     await appWindow.setSize(new LogicalSize(1280, 800));
                 }
             }

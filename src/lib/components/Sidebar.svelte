@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, createEventDispatcher } from "svelte";
     import {
         playlists,
         loadPlaylists,
@@ -43,6 +43,13 @@
     import UpdatePopup from "./UpdatePopup.svelte";
 
     import { currentPlaylistId } from '$lib/stores/player';
+
+    const dispatch = createEventDispatcher();
+
+    function navigateAndClose(fn: () => void) {
+        fn();
+        dispatch('navigate');
+    }
 
     let isScanning = false;
     let scanStatus = "Scanning...";
@@ -315,7 +322,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("tracks")}
-                        on:click={goToTracks}
+                        on:click={() => navigateAndClose(goToTracks)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -335,7 +342,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("albums")}
-                        on:click={goToAlbums}
+                        on:click={() => navigateAndClose(goToAlbums)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -355,7 +362,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("artists")}
-                        on:click={goToArtists}
+                        on:click={() => navigateAndClose(goToArtists)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -383,7 +390,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("playlists")}
-                        on:click={goToPlaylists}
+                        on:click={() => navigateAndClose(goToPlaylists)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -408,7 +415,7 @@
                                 playlist.id !== undefined &&
                                 $currentView.id === playlist.id}
                             class:playing={isPlaylistPlaying(playlist.id, currentPlaylistIdValue, isPlayingValue)}
-                            on:click={() => goToPlaylistDetail(playlist.id)}
+                            on:click={() => navigateAndClose(() => goToPlaylistDetail(playlist.id))}
                             on:contextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
                         >
                             {#if isPlaylistPlaying(playlist.id, currentPlaylistIdValue, isPlayingValue)}
@@ -446,7 +453,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("plugins")}
-                        on:click={goToPlugins}
+                        on:click={() => navigateAndClose(goToPlugins)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -465,7 +472,7 @@
                     <button
                         class="nav-item"
                         class:active={isActive("settings")}
-                        on:click={goToSettings}
+                        on:click={() => navigateAndClose(goToSettings)}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -817,5 +824,23 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* Mobile: sidebar fills its container (the drawer) */
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 100%;
+            border-right: none;
+            height: 100%;
+        }
+
+        .sidebar-header {
+            padding-top: var(--spacing-md);
+        }
+
+        .nav-item {
+            padding: 14px var(--spacing-md);
+            min-height: 48px;
+        }
     }
 </style>

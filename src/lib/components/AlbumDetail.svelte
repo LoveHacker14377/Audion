@@ -506,4 +506,52 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .album-header {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: var(--spacing-md);
+            gap: var(--spacing-md);
+        }
+
+        .back-btn {
+            top: var(--spacing-sm);
+            left: var(--spacing-sm);
+        }
+
+        .album-cover {
+            width: 160px;
+            height: 160px;
+        }
+
+        .album-info {
+            align-items: center;
+        }
+
+        .album-title {
+            font-size: 1.5rem;
+            word-break: break-word;
+        }
+
+        .album-meta {
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .album-actions {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .play-all-btn,
+        .btn-secondary {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            font-size: 0.875rem;
+            min-height: 44px;
+        }
+    }
 </style>

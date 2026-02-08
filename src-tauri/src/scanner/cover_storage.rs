@@ -4,7 +4,17 @@ use rusqlite::{Connection, Result};
 use std::fs;
 use std::path::PathBuf;
 use std::collections::HashSet;
+use std::sync::OnceLock;
 use crate::security;
+
+/// App data directory set from Tauri's app.path().app_data_dir()
+/// This ensures cross-platform compatibility (desktop + Android/iOS)
+static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Initialize the app data directory. Must be called during app setup.
+pub fn init_app_data_dir(dir: PathBuf) {
+    let _ = APP_DATA_DIR.set(dir);
+}
 
 /// Image format detection
 #[derive(Debug, Clone, Copy)]
@@ -53,15 +63,29 @@ impl ImageFormat {
 }
 
 /// Get the covers directory path
-/// Returns: AppData/Roaming/com.audion.app/covers/
-pub fn get_covers_directory() -> Result<PathBuf, String> {
-    // Get the app data directory
-    let app_data = std::env::var("APPDATA")
-        .map_err(|_| "Failed to get APPDATA environment variable".to_string())?;
-    
-    let covers_dir = PathBuf::from(app_data)
-        .join("com.audion.app")
-        .join("covers");
+/// Uses the app data dir set by Tauri (cross-platform),
+/// with fallback to APPDATA on Windows for backwards compatibility.
+pub fn get_covers_directory() -> std::result::Result<PathBuf, String> {
+    let base_dir = if let Some(dir) = APP_DATA_DIR.get() {
+        // Use Tauri-provided app data dir (works on all platforms)
+        dir.clone()
+    } else {
+        // Fallback: try APPDATA (Windows) or dirs crate
+        #[cfg(target_os = "windows")]
+        {
+            let app_data = std::env::var("APPDATA")
+                .map_err(|_| "Failed to get APPDATA environment variable".to_string())?;
+            PathBuf::from(app_data).join("com.audion.app")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            dirs::data_dir()
+                .ok_or_else(|| "Failed to get data directory".to_string())?
+                .join("com.audion.app")
+        }
+    };
+
+    let covers_dir = base_dir.join("covers");
 
     // Create directories if they don't exist
     fs::create_dir_all(&covers_dir)

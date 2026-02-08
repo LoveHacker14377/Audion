@@ -22,4 +22,14 @@
     }
 
     /* Adjust position if miniplayer or mobile layouts needed later */
+
+    @media (max-width: 768px) {
+        .toast-container {
+            right: 0;
+            left: 0;
+            bottom: 72px; /* Above mobile player bar (64px) */
+            align-items: center;
+            padding: 0 var(--spacing-sm);
+        }
+    }
 </style>

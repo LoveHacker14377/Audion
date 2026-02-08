@@ -973,4 +973,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    .plugin-grid {
+      grid-template-columns: 1fr;
+      gap: var(--spacing-md);
+    }
+
+    .remove-btn {
+      opacity: 1;
+    }
+  }
 </style>

@@ -10,10 +10,19 @@
     export let albums: Album[] = [];
 
     // Virtual Scrolling Configuration
-    const ALBUM_CARD_WIDTH = 180;
-    const GRID_GAP = 24;
-    const ALBUM_CARD_HEIGHT = 260;
+    const ALBUM_CARD_WIDTH_DESKTOP = 180;
+    const ALBUM_CARD_WIDTH_MOBILE = 140;
+    const GRID_GAP_DESKTOP = 24;
+    const GRID_GAP_MOBILE = 8;
+    const ALBUM_CARD_HEIGHT_DESKTOP = 260;
+    const ALBUM_CARD_HEIGHT_MOBILE = 210;
     const OVERSCAN = 2;
+
+    // Responsive values based on viewport
+    $: isMobileView = containerWidth > 0 && containerWidth < 600;
+    $: ALBUM_CARD_WIDTH = isMobileView ? ALBUM_CARD_WIDTH_MOBILE : ALBUM_CARD_WIDTH_DESKTOP;
+    $: GRID_GAP = isMobileView ? GRID_GAP_MOBILE : GRID_GAP_DESKTOP;
+    $: ALBUM_CARD_HEIGHT = isMobileView ? ALBUM_CARD_HEIGHT_MOBILE : ALBUM_CARD_HEIGHT_DESKTOP;
 
     let containerHeight = 600;
     let containerWidth = 800;
@@ -347,7 +356,7 @@ $: {
                 class="virtual-content"
                 style="
                     transform: translateY({virtualScrollState.offsetY}px);
-                    grid-template-columns: repeat({virtualScrollState.columns}, minmax(180px, 1fr));
+                    grid-template-columns: repeat({virtualScrollState.columns}, minmax({ALBUM_CARD_WIDTH}px, 1fr));
                 "
             >
             {#each visibleAlbumsWithMetadata as { album, coverSrc } (album.id)}
@@ -690,5 +699,42 @@ $: {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .album-grid-container {
+            padding: var(--spacing-sm);
+        }
+
+        .virtual-content {
+            gap: var(--spacing-sm);
+        }
+
+        .album-card {
+            padding: var(--spacing-sm);
+        }
+
+        .album-art {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .album-name {
+            font-size: 0.8125rem;
+        }
+
+        .album-artist {
+            font-size: 0.75rem;
+        }
+
+        /* Hide play overlay on mobile — tapping the card navigates */
+        .play-overlay {
+            display: none;
+        }
+
+        .now-playing-badge {
+            font-size: 0.625rem;
+            padding: 2px 6px;
+        }
     }
 </style>

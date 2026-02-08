@@ -409,4 +409,66 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .artist-header {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: var(--spacing-md);
+            gap: var(--spacing-md);
+        }
+
+        .back-btn {
+            top: var(--spacing-sm);
+            left: var(--spacing-sm);
+        }
+
+        .artist-avatar {
+            width: 120px;
+            height: 120px;
+        }
+
+        .artist-initial {
+            font-size: 2.5rem;
+        }
+
+        .artist-info {
+            align-items: center;
+        }
+
+        .artist-name {
+            font-size: 1.5rem;
+            word-break: break-word;
+        }
+
+        .artist-meta {
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .artist-actions {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .play-all-btn,
+        .btn-secondary {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            font-size: 0.875rem;
+            min-height: 44px;
+        }
+
+        .tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab {
+            min-height: 44px;
+            white-space: nowrap;
+        }
+    }
 </style>

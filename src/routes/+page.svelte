@@ -23,6 +23,7 @@
   import { isMiniPlayer } from "$lib/stores/ui";
   import { pluginStore } from "$lib/stores/plugin-store";
   import { appSettings } from "$lib/stores/settings";
+  import { isMobile, isMobileSidebarOpen, closeMobileSidebar } from "$lib/stores/mobile";
   import PluginUpdateDialog from "$lib/components/PluginUpdateDialog.svelte";
 
   let isLoading = true;
@@ -106,19 +107,41 @@
       <p>Loading your music library...</p>
     </div>
   {:else}
-    <div class="app-layout">
-      <Sidebar />
+    <div class="app-layout" class:mobile={$isMobile}>
+      <!-- Mobile sidebar overlay -->
+      {#if $isMobile}
+        {#if $isMobileSidebarOpen}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <div class="sidebar-overlay" on:click={closeMobileSidebar} role="presentation"></div>
+          <div class="sidebar-drawer">
+            <Sidebar on:navigate={closeMobileSidebar} />
+          </div>
+        {/if}
+      {:else}
+        <Sidebar />
+      {/if}
       <MainView />
-      <LyricsPanel />
-      <QueuePanel />
+      {#if !$isMobile}
+        <LyricsPanel />
+        <QueuePanel />
+      {/if}
       <FullScreenPlayer />
       <ContextMenu />
     </div>
     <PlayerBar bind:audioElementRef={audioElement} hidden={$isMiniPlayer} />
-    <MiniPlayer />
+    {#if !$isMobile}
+      <MiniPlayer />
+    {/if}
+    <!-- Mobile: Queue and Lyrics as full-screen overlays -->
+    {#if $isMobile}
+      <QueuePanel />
+      <LyricsPanel />
+    {/if}
     <ToastContainer />
-    <KeyboardShortcuts />
-    <KeyboardShortcutsHelp />
+    {#if !$isMobile}
+      <KeyboardShortcuts />
+      <KeyboardShortcutsHelp />
+    {/if}
 
     {#if $pluginStore.pendingUpdates.length > 0}
       <PluginUpdateDialog on:close={() => pluginStore.clearPendingUpdates()} />
@@ -178,5 +201,48 @@
     flex: 1;
     display: flex;
     overflow: hidden;
+  }
+
+  /* Mobile sidebar drawer overlay */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .sidebar-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100%;
+    z-index: 201;
+    animation: slideInLeft 0.25s ease;
+    background-color: var(--bg-base);
+  }
+
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Mobile layout adjustments */
+  .app-layout.mobile {
+    flex-direction: column;
   }
 </style>

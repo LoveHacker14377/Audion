@@ -190,4 +190,35 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .artist-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-sm);
+        }
+
+        .artist-card {
+            padding: var(--spacing-sm);
+            gap: var(--spacing-sm);
+        }
+
+        .artist-avatar {
+            width: 100px;
+            height: 100px;
+        }
+
+        .artist-initial {
+            font-size: 2rem;
+        }
+
+        .artist-name {
+            font-size: 0.875rem;
+        }
+
+        .artist-meta {
+            font-size: 0.75rem;
+        }
+    }
 </style>

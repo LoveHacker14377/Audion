@@ -252,4 +252,25 @@
         display: flex;
         flex-direction: column;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .context-menu {
+            min-width: 200px;
+            max-width: calc(100vw - 32px);
+        }
+
+        .menu-item,
+        .menu-item.has-submenu {
+            padding: var(--spacing-md);
+            font-size: 1rem;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
+
+        .submenu {
+            max-height: 250px;
+        }
+    }
 </style>

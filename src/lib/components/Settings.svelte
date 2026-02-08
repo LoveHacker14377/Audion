@@ -1774,4 +1774,25 @@
     color: var(--text-primary);
     font-weight: 600;
   }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    .view-header h1 {
+      font-size: 1.5rem;
+      padding-left: var(--spacing-sm);
+    }
+
+    .settings-content {
+      padding: var(--spacing-sm);
+    }
+
+    .settings-container {
+      padding: 0;
+    }
+
+    .settings-section {
+      padding: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+  }
 </style>

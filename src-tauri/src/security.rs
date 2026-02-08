@@ -75,22 +75,35 @@ pub fn safe_delete_file(path: &Path) -> Result<bool, String> {
         path
     );
 
-    // Move to trash instead of permanent deletion
-    match trash::delete(path) {
-        Ok(()) => {
-            log::info!("[AUDIT] File successfully moved to trash: {:?}", path);
-            Ok(true)
+    // On desktop, move to trash; on mobile, delete directly
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    {
+        match trash::delete(path) {
+            Ok(()) => {
+                log::info!("[AUDIT] File successfully moved to trash: {:?}", path);
+                Ok(true)
+            }
+            Err(e) => {
+                log::error!("[AUDIT] Failed to move file to trash: {:?} - {}", path, e);
+                // Fallback: try permanent deletion if trash fails (e.g., network drives)
+                log::warn!("[AUDIT] Attempting permanent deletion as fallback: {:?}", path);
+                std::fs::remove_file(path).map_err(|e| {
+                    format!("Failed to delete file {:?}: {}", path, e)
+                })?;
+                log::info!("[AUDIT] File permanently deleted (trash unavailable): {:?}", path);
+                Ok(true)
+            }
         }
-        Err(e) => {
-            log::error!("[AUDIT] Failed to move file to trash: {:?} - {}", path, e);
-            // Fallback: try permanent deletion if trash fails (e.g., network drives)
-            log::warn!("[AUDIT] Attempting permanent deletion as fallback: {:?}", path);
-            std::fs::remove_file(path).map_err(|e| {
-                format!("Failed to delete file {:?}: {}", path, e)
-            })?;
-            log::info!("[AUDIT] File permanently deleted (trash unavailable): {:?}", path);
-            Ok(true)
-        }
+    }
+
+    // On mobile (Android/iOS), just delete directly - no trash API
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        std::fs::remove_file(path).map_err(|e| {
+            format!("Failed to delete file {:?}: {}", path, e)
+        })?;
+        log::info!("[AUDIT] File permanently deleted: {:?}", path);
+        Ok(true)
     }
 }
 

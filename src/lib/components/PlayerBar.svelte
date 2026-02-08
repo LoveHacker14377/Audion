@@ -30,6 +30,7 @@
     import { uiSlotManager } from "$lib/plugins/ui-slots";
     import PluginMenu from "$lib/components/PluginMenu.svelte";
     import { goToArtistDetail } from "$lib/stores/view";
+    import { isMobile } from "$lib/stores/mobile";
     import type { Album } from "$lib/api/tauri";
 
     export let audioElementRef: HTMLAudioElement | null = null;
@@ -186,12 +187,94 @@
     });
 </script>
 
-<footer class="player-bar" class:hidden>
+<footer class="player-bar" class:hidden class:mobile={$isMobile}>
     <!-- Hidden audio element -->
     <audio bind:this={audioElement} crossorigin="anonymous"></audio>
 
+    {#if $isMobile}
+        <!-- MOBILE PLAYER BAR: Compact 2-row layout -->
+        <!-- Row 1: Progress bar (full width, thin) -->
+        <div class="mobile-progress">
+            <div
+                class="progress-bar"
+                bind:this={seekBarElement}
+                on:mousedown={handleSeekStart}
+                on:touchstart|preventDefault={(e) => { isSeeking = true; const touch = e.touches[0]; if (seekBarElement) { const rect = seekBarElement.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); } }}
+                on:touchmove|preventDefault={(e) => { if (isSeeking && seekBarElement) { const touch = e.touches[0]; const rect = seekBarElement.getBoundingClientRect(); const pos = (touch.clientX - rect.left) / rect.width; seek(Math.max(0, Math.min(1, pos))); } }}
+                on:touchend={() => isSeeking = false}
+                role="slider"
+                aria-label="Seek"
+                aria-valuenow={Math.round($progress * 100)}
+                aria-valuemin="0"
+                aria-valuemax="100"
+                tabindex="0"
+            >
+                <div class="progress-track">
+                    <div class="progress-fill" style="width: {$progress * 100}%"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Row 2: Track info + controls -->
+        <div class="mobile-controls">
+            <div class="track-info" on:click={toggleFullScreen} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && toggleFullScreen()}>
+                {#if $currentTrack}
+                    <div class="album-art mobile-art">
+                        {#if albumArt && !imageLoadFailed}
+                            <img src={albumArt} alt="Album art" decoding="async" on:error={() => (imageLoadFailed = true)} />
+                        {:else}
+                            <div class="album-art-placeholder">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                </svg>
+                            </div>
+                        {/if}
+                    </div>
+                    <div class="track-details">
+                        <span class="track-title truncate">{$currentTrack.title || "Unknown Title"}</span>
+                        <span class="track-artist truncate">{$currentTrack.artist || "Unknown Artist"}</span>
+                    </div>
+                {:else}
+                    <div class="no-track"><span>No track playing</span></div>
+                {/if}
+            </div>
+            <div class="mobile-btns">
+                <button class="icon-btn" on:click={previousTrack} title="Previous">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                        <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                    </svg>
+                </button>
+                <button class="play-btn" on:click={togglePlay} title={$isPlaying ? "Pause" : "Play"}>
+                    {#if $isPlaying}
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                        </svg>
+                    {:else}
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                    {/if}
+                </button>
+                <button class="icon-btn" on:click={nextTrack} title="Next">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                    </svg>
+                </button>
+                <button
+                    class="icon-btn"
+                    class:active={$isQueueVisible}
+                    on:click={toggleQueue}
+                    title="Queue"
+                >
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    {:else}
+
     <!-- Track info -->
-    <div class="track-info">
+    <div class="track-info desktop-track-info">
         {#if $currentTrack}
             <div class="album-art">
                 {#if albumArt && !imageLoadFailed}
@@ -491,6 +574,7 @@
             </svg>
         </button>
     </div>
+    {/if}
 </footer>
 
 <style>
@@ -749,5 +833,80 @@
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
+    }
+
+    /* Mobile player bar styles */
+    .player-bar.mobile {
+        height: var(--player-height, 64px);
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        gap: 0;
+    }
+
+    .mobile-progress {
+        width: 100%;
+        padding: 0;
+        flex-shrink: 0;
+    }
+
+    .mobile-progress .progress-bar {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .mobile-progress .progress-track {
+        width: 100%;
+        height: 3px;
+        background-color: var(--bg-highlight);
+        border-radius: 0;
+        overflow: hidden;
+    }
+
+    .mobile-progress .progress-fill {
+        height: 100%;
+        background-color: var(--accent-primary);
+        border-radius: 0;
+    }
+
+    .mobile-controls {
+        display: flex;
+        align-items: center;
+        padding: 0 var(--spacing-sm);
+        gap: var(--spacing-sm);
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mobile-controls .track-info {
+        flex: 1;
+        min-width: 0;
+        cursor: pointer;
+    }
+
+    .mobile-art {
+        width: 44px;
+        height: 44px;
+    }
+
+    .mobile-btns {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        flex-shrink: 0;
+    }
+
+    .mobile-btns .icon-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .mobile-btns .play-btn {
+        width: 38px;
+        height: 38px;
     }
 </style>

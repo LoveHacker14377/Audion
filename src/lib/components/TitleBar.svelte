@@ -7,6 +7,7 @@
         clearSearch,
         searchResults,
     } from "$lib/stores/search";
+    import { isMobile, toggleMobileSidebar } from "$lib/stores/mobile";
     import MenuBar from "./MenuBar.svelte";
     import Breadcrumbs from "./Breadcrumbs.svelte";
 
@@ -32,6 +33,7 @@
 
     let canGoBack = false;
     let canGoForward = false;
+    let mobileSearchOpen = false;
 
     function handleSearchInput(e: Event) {
         const target = e.target as HTMLInputElement;
@@ -109,189 +111,279 @@
     });
 </script>
 
-<div class="titlebar">
+<div class="titlebar" class:mobile={$isMobile}>
     <div class="titlebar-left">
         <div class="left-controls">
-            <!-- Menu Dropdown -->
-            <MenuBar />
-
-            <!-- Navigation -->
-            <div class="nav-group">
+            <!-- Mobile: Hamburger menu -->
+            {#if $isMobile}
                 <button
-                    class="nav-btn"
-                    on:click={goBack}
-                    disabled={!canGoBack}
-                    title="Go back (Alt+Left)"
-                    aria-label="Go Back"
+                    class="nav-btn hamburger-btn"
+                    on:click={toggleMobileSidebar}
+                    aria-label="Open menu"
                 >
                     <svg
-                        width="16"
-                        height="16"
+                        width="20"
+                        height="20"
                         viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                        fill="currentColor"
                     >
-                        <polyline points="15 18 9 12 15 6"></polyline>
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
                     </svg>
                 </button>
-                <button
-                    class="nav-btn"
-                    on:click={goForward}
-                    disabled={!canGoForward}
-                    title="Go forward (Alt+Right)"
-                    aria-label="Go Forward"
-                >
-                    <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </button>
-            </div>
+            {:else}
+                <!-- Desktop: Menu Dropdown -->
+                <MenuBar />
+            {/if}
 
-            <!-- Breadcrumbs -->
-            <div class="breadcrumbs-wrapper">
-                <Breadcrumbs />
-            </div>
+            <!-- Navigation (hide on mobile) -->
+            {#if !$isMobile}
+                <div class="nav-group">
+                    <button
+                        class="nav-btn"
+                        on:click={goBack}
+                        disabled={!canGoBack}
+                        title="Go back (Alt+Left)"
+                        aria-label="Go Back"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <button
+                        class="nav-btn"
+                        on:click={goForward}
+                        disabled={!canGoForward}
+                        title="Go forward (Alt+Right)"
+                        aria-label="Go Forward"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Breadcrumbs -->
+                <div class="breadcrumbs-wrapper">
+                    <Breadcrumbs />
+                </div>
+            {/if}
         </div>
-        <!-- Left Drag Region -->
-        <div class="drag-region" data-tauri-drag-region></div>
+        <!-- Left Drag Region (desktop only) -->
+        {#if !$isMobile}
+            <div class="drag-region" data-tauri-drag-region></div>
+        {/if}
     </div>
 
     <!-- Center Search Bar -->
-    <div class="titlebar-center">
-        <div class="search-input-wrapper">
-            <svg
-                class="search-icon"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                width="18"
-                height="18"
-            >
-                <path
-                    d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                />
-            </svg>
-            <input
-                type="text"
-                class="search-input"
-                placeholder="Search..."
-                bind:value={searchInput}
-                bind:this={searchInputEl}
-                on:input={handleSearchInput}
-                on:keydown={handleKeydown}
-                spellcheck="false"
-                title="Search (Ctrl+F)"
-            />
-            {#if searchInput}
-                {#if $searchResults.hasResults}
-                    <span class="search-count">
-                        {$searchResults.tracks.length +
-                            $searchResults.albums.length +
-                            $searchResults.artists.length +
-                            $searchResults.playlists.length} results
-                    </span>
-                {/if}
-                <button
-                    class="clear-search"
-                    on:click={handleClearSearch}
-                    title="Clear search (Esc)"
-                >
+    {#if $isMobile}
+        <!-- Mobile: search icon toggle or expanded search -->
+        <div class="titlebar-center mobile-center">
+            {#if mobileSearchOpen}
+                <div class="search-input-wrapper mobile-search">
                     <svg
+                        class="search-icon"
                         viewBox="0 0 24 24"
                         fill="currentColor"
-                        width="16"
-                        height="16"
+                        width="18"
+                        height="18"
                     >
                         <path
-                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                        />
+                    </svg>
+                    <input
+                        type="text"
+                        class="search-input"
+                        placeholder="Search..."
+                        bind:value={searchInput}
+                        bind:this={searchInputEl}
+                        on:input={handleSearchInput}
+                        on:keydown={handleKeydown}
+                        spellcheck="false"
+                        autofocus
+                    />
+                    <button
+                        class="clear-search"
+                        on:click={() => { handleClearSearch(); mobileSearchOpen = false; }}
+                        title="Close search"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="16"
+                            height="16"
+                        >
+                            <path
+                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                            />
+                        </svg>
+                    </button>
+                </div>
+            {:else}
+                <span class="mobile-title">Audion</span>
+                <button
+                    class="nav-btn search-toggle-btn"
+                    on:click={() => mobileSearchOpen = true}
+                    aria-label="Open search"
+                >
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                    >
+                        <path
+                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
                         />
                     </svg>
                 </button>
             {/if}
         </div>
-    </div>
+    {:else}
+        <div class="titlebar-center">
+            <div class="search-input-wrapper">
+                <svg
+                    class="search-icon"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    width="18"
+                    height="18"
+                >
+                    <path
+                        d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                    />
+                </svg>
+                <input
+                    type="text"
+                    class="search-input"
+                    placeholder="Search..."
+                    bind:value={searchInput}
+                    bind:this={searchInputEl}
+                    on:input={handleSearchInput}
+                    on:keydown={handleKeydown}
+                    spellcheck="false"
+                    title="Search (Ctrl+F)"
+                />
+                {#if searchInput}
+                    {#if $searchResults.hasResults}
+                        <span class="search-count">
+                            {$searchResults.tracks.length +
+                                $searchResults.albums.length +
+                                $searchResults.artists.length +
+                                $searchResults.playlists.length} results
+                        </span>
+                    {/if}
+                    <button
+                        class="clear-search"
+                        on:click={handleClearSearch}
+                        title="Clear search (Esc)"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="16"
+                            height="16"
+                        >
+                            <path
+                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                            />
+                        </svg>
+                    </button>
+                {/if}
+            </div>
+        </div>
+    {/if}
 
     <div class="titlebar-right">
-        <!-- Right Drag Region -->
-        <div class="drag-region" data-tauri-drag-region></div>
-        <div class="window-controls">
-            <button class="win-btn" on:click={minimize} aria-label="Minimize">
-                <svg
-                    width="10"
-                    height="1"
-                    viewBox="0 0 10 1"
-                    fill="currentColor"
-                    ><rect width="10" height="1" rx="0.5" /></svg
-                >
-            </button>
-            <button
-                class="win-btn"
-                on:click={toggleMaximize}
-                aria-label="Maximize"
-            >
-                {#if isMaximized}
+        <!-- Right Drag Region (desktop only) -->
+        {#if !$isMobile}
+            <div class="drag-region" data-tauri-drag-region></div>
+            <div class="window-controls">
+                <button class="win-btn" on:click={minimize} aria-label="Minimize">
                     <svg
                         width="10"
-                        height="10"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1"
-                        ><rect
-                            x="1.5"
-                            y="1.5"
-                            width="7"
-                            height="7"
-                            rx="1"
-                            transform="rotate(180 5 5)"
-                        />
-                        <path d="M3 3v-2h6v6h-2" stroke-width="1" />
-                    </svg>
-                {:else}
-                    <svg
-                        width="10"
-                        height="10"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1"
-                        ><rect
-                            x="1.5"
-                            y="1.5"
-                            width="7"
-                            height="7"
-                            rx="1"
-                        /></svg
+                        height="1"
+                        viewBox="0 0 10 1"
+                        fill="currentColor"
+                        ><rect width="10" height="1" rx="0.5" /></svg
                     >
-                {/if}
-            </button>
-            <button
-                class="win-btn close-btn"
-                on:click={close}
-                aria-label="Close"
-            >
-                <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    stroke-linecap="round"><path d="M1 1l8 8M9 1L1 9" /></svg
+                </button>
+                <button
+                    class="win-btn"
+                    on:click={toggleMaximize}
+                    aria-label="Maximize"
                 >
-            </button>
-        </div>
+                    {#if isMaximized}
+                        <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 10 10"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1"
+                            ><rect
+                                x="1.5"
+                                y="1.5"
+                                width="7"
+                                height="7"
+                                rx="1"
+                                transform="rotate(180 5 5)"
+                            />
+                            <path d="M3 3v-2h6v6h-2" stroke-width="1" />
+                        </svg>
+                    {:else}
+                        <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 10 10"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1"
+                            ><rect
+                                x="1.5"
+                                y="1.5"
+                                width="7"
+                                height="7"
+                                rx="1"
+                            /></svg
+                        >
+                    {/if}
+                </button>
+                <button
+                    class="win-btn close-btn"
+                    on:click={close}
+                    aria-label="Close"
+                >
+                    <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 10 10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"><path d="M1 1l8 8M9 1L1 9" /></svg
+                    >
+                </button>
+            </div>
+        {/if}
     </div>
 </div>
 
@@ -487,5 +579,42 @@
     .close-btn:hover {
         background-color: #e81123;
         color: white;
+    }
+
+    /* Mobile styles */
+    .titlebar.mobile {
+        grid-template-columns: auto 1fr auto;
+        height: 48px;
+        padding: 0 var(--spacing-sm);
+    }
+
+    .hamburger-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .mobile-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--spacing-sm);
+        padding: 0 var(--spacing-sm);
+    }
+
+    .mobile-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--accent-primary);
+        flex: 1;
+        text-align: center;
+    }
+
+    .search-toggle-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .mobile-search {
+        width: 100%;
     }
 </style>

@@ -1,0 +1,49 @@
+{
+  "identifier": "mobile-default",
+  "description": "Capability for the main window on mobile",
+  "platforms": ["android", "iOS"],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "dialog:default",
+    "notification:default",
+    "fs:allow-read",
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        {
+          "path": "$AUDIO/**"
+        },
+        {
+          "path": "$APPDATA/audion/**"
+        },
+        {
+          "path": "$MUSIC/**"
+        },
+        {
+          "path": "$HOME/Music/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "$AUDIO/**"
+        },
+        {
+          "path": "$APPDATA/audion/**"
+        },
+        {
+          "path": "$MUSIC/**"
+        },
+        {
+          "path": "$HOME/Music/**"
+        }
+      ]
+    }
+  ]
+}

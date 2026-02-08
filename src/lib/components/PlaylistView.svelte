@@ -628,4 +628,33 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .playlist-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-sm);
+        }
+
+        .playlist-card {
+            padding: var(--spacing-sm);
+        }
+
+        .playlist-cover {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .playlist-name {
+            font-size: 0.8125rem;
+        }
+
+        .playlist-type {
+            font-size: 0.75rem;
+        }
+
+        .play-overlay {
+            display: none;
+        }
+    }
 </style>

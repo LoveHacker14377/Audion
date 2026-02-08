@@ -91,6 +91,7 @@
         align-items: center;
         justify-content: space-between;
         width: 320px;
+        max-width: calc(100vw - 32px);
         background: var(--bg-highlight); /* Fallback */
         background: rgba(30, 30, 30, 0.95);
         border: 1px solid var(--border-primary);

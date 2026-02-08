@@ -297,3 +297,52 @@ a:hover {
 .animate-pulse {
   animation: pulse 1.5s ease-in-out infinite;
 }
+
+/* ============================================
+   MOBILE RESPONSIVE UTILITIES & OVERRIDES
+   ============================================ */
+
+/* Utility classes for responsive visibility */
+.hide-mobile {
+  display: initial;
+}
+.show-mobile {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+    --player-height: 64px;
+    --header-height: 48px;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: initial !important;
+  }
+
+  /* Enforce minimum touch targets (44x44px per Apple/Google guidelines) */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Smaller icon buttons are OK as long as they have padding */
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Narrower scrollbars on mobile */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  /* Cards: no hover transform on touch */
+  .card:hover {
+    transform: none;
+  }
+}

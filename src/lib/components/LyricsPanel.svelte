@@ -16,6 +16,7 @@
         duration,
         seek,
     } from "$lib/stores/player";
+    import { isMobile } from "$lib/stores/mobile";
 
     let lyricsContainer: HTMLDivElement;
     let lineElements: HTMLDivElement[] = [];
@@ -157,7 +158,7 @@
 </script>
 
 {#if $lyricsVisible}
-    <aside class="lyrics-panel">
+    <aside class="lyrics-panel" class:mobile={$isMobile}>
         <header class="lyrics-header">
             <h3>Lyrics</h3>
             <button
@@ -597,5 +598,38 @@
         color: var(--text-subdued);
         text-transform: uppercase;
         letter-spacing: 0.5px;
+    }
+
+    /* Mobile: full-screen overlay */
+    .lyrics-panel.mobile {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        z-index: 150;
+        border-left: none;
+        border-radius: 0;
+    }
+
+    .lyrics-panel.mobile .lyrics-header {
+        padding: var(--spacing-md);
+        padding-top: calc(var(--spacing-md) + env(safe-area-inset-top, 0px));
+    }
+
+    .lyrics-panel.mobile .close-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .lyrics-panel.mobile .lyric-line {
+        font-size: 1.1rem;
+    }
+
+    .lyrics-panel.mobile .lyric-line.active {
+        font-size: 1.2rem;
     }
 </style>

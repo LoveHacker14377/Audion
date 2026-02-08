@@ -4,6 +4,7 @@
   import { theme } from "$lib/stores/theme";
   import { cleanupPlayer } from "$lib/stores/player";
   import { migrateCoversToFiles } from "$lib/api/tauri";
+  import { initMobileDetection } from "$lib/stores/mobile";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
   import ProgressiveScanStatus from "$lib/components/ProgressiveScanStatus.svelte";
@@ -16,6 +17,7 @@
   onMount(async () => {
     appSettings.initialize();
     theme.initialize();
+    initMobileDetection();
 
     const migrationStart = performance.now();
 

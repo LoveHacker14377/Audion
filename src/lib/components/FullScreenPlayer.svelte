@@ -868,4 +868,71 @@ $: if ($currentTrack) {
     font-size: 1.5rem;
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
   }
+
+  /* ── Mobile ── */
+  @media (max-width: 768px) {
+    .player-content {
+      grid-template-columns: 1fr;
+      padding: var(--spacing-md);
+      padding-top: 60px;
+      gap: var(--spacing-md);
+      overflow-y: auto;
+      align-items: start;
+    }
+
+    .left-panel {
+      align-items: center;
+      padding-left: 0;
+      height: auto;
+      max-height: none;
+    }
+
+    .art-container {
+      max-width: min(280px, 60vw);
+    }
+
+    .track-info {
+      text-align: center;
+      align-items: center;
+    }
+
+    .track-title {
+      font-size: 1.4rem;
+    }
+
+    .track-artist {
+      font-size: 0.95rem;
+    }
+
+    .player-controls {
+      max-width: 100%;
+      align-items: center;
+    }
+
+    .buttons {
+      gap: var(--spacing-lg);
+    }
+
+    .right-panel {
+      max-height: 40vh;
+    }
+
+    .lyrics-container {
+      padding: 10vh 0;
+    }
+
+    .lyric-line {
+      font-size: 1.25rem;
+    }
+
+    .close-btn {
+      top: var(--spacing-md);
+      right: var(--spacing-md);
+    }
+
+    .close-btn svg {
+      width: 28px;
+      height: 28px;
+    }
+  }
 </style>

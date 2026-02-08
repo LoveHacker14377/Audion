@@ -1,6 +1,7 @@
 <script lang="ts">
     import { fade, fly } from "svelte/transition";
     import { isQueueVisible, toggleQueue } from "$lib/stores/ui";
+    import { isMobile } from "$lib/stores/mobile";
     import {
         queue,
         queueIndex,
@@ -223,7 +224,7 @@
 </script>
 
 {#if $isQueueVisible}
-    <aside class="queue-panel" transition:fly={{ x: 300, duration: 300 }}>
+    <aside class="queue-panel" class:mobile={$isMobile} transition:fly={{ x: $isMobile ? 0 : 300, y: $isMobile ? 100 : 0, duration: 300 }}>
         <header class="queue-header">
             <h3>Queue</h3>
             <div class="header-actions">
@@ -788,6 +789,35 @@
     }
 
     .history:hover {
+        opacity: 1;
+    }
+
+    /* Mobile: full-screen overlay */
+    .queue-panel.mobile {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        z-index: 150;
+        border-left: none;
+        border-radius: 0;
+    }
+
+    .queue-panel.mobile .queue-header {
+        padding: var(--spacing-md) var(--spacing-md);
+        padding-top: calc(var(--spacing-md) + env(safe-area-inset-top, 0px));
+    }
+
+    .queue-panel.mobile .close-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .queue-panel.mobile .drag-handle {
         opacity: 1;
     }
 </style>

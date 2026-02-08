@@ -19,13 +19,12 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-notification = "2"
 
-# Discord RPC
-discord-rich-presence = "1.0"
+# dirs for cross-platform app data paths
+dirs = "5"
 
 # File scanning
 walkdir = "2"
@@ -40,8 +39,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 base64 = "0.22"
 
 # HTTP client for API requests
-# HTTP client for API requests
-reqwest = { version = "0.12", features = ["json", "cookies", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "stream", "rustls-tls"] }
 futures = "0.3"
 
 # Error handling
@@ -57,9 +55,17 @@ rayon = "1.10"
  # Thread-safe channels
 crossbeam = "0.8"
 
-# Move files to trash instead of permanent deletion (security)
-trash = "5"
+# Move files to trash instead of permanent deletion (security, desktop only)
+# trash is in [target.'cfg(desktop)'.dependencies]
 
 # Logging for audit trail
 log = "0.4"
-env_logger = "0.11"   
+env_logger = "0.11"
+
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+# Discord RPC (desktop only - uses local IPC sockets)
+discord-rich-presence = "1.0"
+# Move files to trash (desktop only)
+trash = "5"
+# Global keyboard shortcuts (desktop only)
+tauri-plugin-global-shortcut = "2"
