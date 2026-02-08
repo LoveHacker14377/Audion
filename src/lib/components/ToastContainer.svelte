@@ -12,24 +12,24 @@
 <style>
     .toast-container {
         position: fixed;
-        bottom: 24px; /* Above the player bar ideally, or just float on top */
-        right: 24px;
+        bottom: calc(var(--player-height, 96px) + var(--spacing-md));
+        left: 50%;
+        transform: translateX(-50%);
         z-index: 9999;
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        pointer-events: none; /* Let clicks pass through container but not toasts */
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: var(--spacing-sm);
+        pointer-events: none;
     }
 
-    /* Adjust position if miniplayer or mobile layouts needed later */
-
+    /* Mobile: above mini-player + bottom nav + safe area */
     @media (max-width: 768px) {
         .toast-container {
-            right: 0;
-            left: 0;
-            bottom: 72px; /* Above mobile player bar (64px) */
-            align-items: center;
-            padding: 0 var(--spacing-sm);
+            /* mini-player ~64px + bottom-nav ~60px + safe area + spacing */
+            bottom: calc(64px + 60px + env(safe-area-inset-bottom, 0px) + var(--spacing-sm));
+            width: 100%;
+            padding: 0 var(--spacing-md);
         }
     }
 </style>

@@ -37,6 +37,7 @@
   import { isOnline } from "$lib/stores/network";
   import { onDestroy, onMount } from "svelte";
   import { multiSelect } from "$lib/stores/multiselect";
+  import { isMobile } from "$lib/stores/mobile";
 
   export let tracks: Track[] = [];
   export let title: string = "Tracks";
@@ -296,6 +297,11 @@
     // Clean up drag listeners if component unmounts during drag
     if (cleanupDragListeners) {
       cleanupDragListeners();
+    }
+
+    // Clean up swipe timer
+    if (swipeResetTimer) {
+      clearTimeout(swipeResetTimer);
     }
   });
 
@@ -622,6 +628,111 @@
     }
   }
 
+  // ── Swipe-to-queue (mobile only) ──
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeDeltaX = 0;
+  let swipingRow: HTMLElement | null = null;
+  let swipeTrackId: number | null = null;
+  let swipeCommitted = false;
+  const SWIPE_THRESHOLD = 80; // px to trigger add-to-queue
+  const SWIPE_MAX = 120;
+  let swipeResetTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function handleSwipeTouchStart(e: TouchEvent) {
+    if (!$isMobile || multiSelectMode) return;
+    // Don't swipe on drag handles
+    if ((e.target as HTMLElement).closest('.drag-handle')) return;
+
+    const touch = e.touches[0];
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+    swipeDeltaX = 0;
+    swipeCommitted = false;
+
+    const row = (e.target as HTMLElement).closest('.track-row') as HTMLElement;
+    if (row) {
+      swipingRow = row;
+      swipeTrackId = parseInt(row.getAttribute('data-track-id') || '0');
+    }
+  }
+
+  function handleSwipeTouchMove(e: TouchEvent) {
+    if (!swipingRow || swipeCommitted) return;
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+
+    // If vertical movement is dominant, cancel swipe (allow scroll)
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 15) {
+      swipingRow.style.transform = '';
+      swipingRow.style.transition = '';
+      swipingRow = null;
+      return;
+    }
+
+    // Only right-swipe
+    if (dx < 0) {
+      swipeDeltaX = 0;
+      swipingRow.style.transform = '';
+      return;
+    }
+
+    // Prevent vertical scroll while swiping
+    e.preventDefault();
+
+    swipeDeltaX = Math.min(dx, SWIPE_MAX);
+    swipingRow.style.transition = 'none';
+    swipingRow.style.transform = `translateX(${swipeDeltaX}px)`;
+
+    // Visual feedback: change bg when past threshold
+    if (swipeDeltaX >= SWIPE_THRESHOLD) {
+      swipingRow.classList.add('swipe-queue-ready');
+    } else {
+      swipingRow.classList.remove('swipe-queue-ready');
+    }
+  }
+
+  function handleSwipeTouchEnd() {
+    if (!swipingRow) return;
+
+    const row = swipingRow;
+    const trackId = swipeTrackId;
+
+    if (swipeDeltaX >= SWIPE_THRESHOLD && trackId) {
+      swipeCommitted = true;
+      row.classList.add('swipe-queue-added');
+      row.classList.remove('swipe-queue-ready');
+
+      // Find track and add to queue
+      const trackIndex = trackIndexMap.get(trackId);
+      if (trackIndex !== undefined) {
+        const track = sortedTracks[trackIndex];
+        if (track) {
+          addToQueue([track]);
+          addToast(`Added "${track.title}" to queue`, 'success');
+        }
+      }
+
+      // Animate back after short delay
+      swipeResetTimer = setTimeout(() => {
+        row.style.transition = 'transform 0.25s ease';
+        row.style.transform = '';
+        row.classList.remove('swipe-queue-added');
+      }, 400);
+    } else {
+      // Snap back
+      row.style.transition = 'transform 0.25s ease';
+      row.style.transform = '';
+      row.classList.remove('swipe-queue-ready');
+    }
+
+    swipingRow = null;
+    swipeTrackId = null;
+    swipeDeltaX = 0;
+  }
+
   // Helper to handle album click from event delegation
   function handleAlbumClick(e: MouseEvent) {
     const albumButton = (e.target as HTMLElement).closest('.col-album');
@@ -725,6 +836,9 @@
       on:click={handleBodyClick}
       on:dblclick={handleBodyDoubleClick}
       on:contextmenu={handleBodyContextMenu}
+      on:touchstart={handleSwipeTouchStart}
+      on:touchmove={handleSwipeTouchMove}
+      on:touchend={handleSwipeTouchEnd}
       bind:this={containerElement}
     >
       <div
@@ -1640,6 +1754,57 @@
     .downloaded-icon svg {
       width: 12px;
       height: 12px;
+    }
+
+    /* ─── Swipe-to-queue visual states ─── */
+    .track-row {
+      position: relative;
+      will-change: transform;
+    }
+
+    /* Green reveal behind the row when swiping right */
+    .track-row::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-md);
+      background-color: transparent;
+      transition: background-color 0.15s ease;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    :global(.track-row.swipe-queue-ready)::before {
+      background-color: rgba(29, 185, 84, 0.2);
+    }
+
+    :global(.track-row.swipe-queue-added)::before {
+      background-color: rgba(29, 185, 84, 0.35);
+    }
+
+    /* Queue icon hint that peeks from the left while swiping */
+    .track-row::after {
+      content: '+';
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent-primary);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    :global(.track-row.swipe-queue-ready)::after {
+      opacity: 1;
+    }
+
+    :global(.track-row.swipe-queue-added)::after {
+      content: '✓';
+      opacity: 1;
     }
   }
 </style>

@@ -792,7 +792,7 @@
         opacity: 1;
     }
 
-    /* Mobile: full-screen overlay */
+    /* Mobile: full-screen overlay (z-index above FullScreenPlayer at 2000) */
     .queue-panel.mobile {
         position: fixed;
         top: 0;
@@ -802,7 +802,7 @@
         width: 100%;
         max-width: 100%;
         min-width: 0;
-        z-index: 150;
+        z-index: 2100;
         border-left: none;
         border-radius: 0;
     }

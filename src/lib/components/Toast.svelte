@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import { fade, fly } from "svelte/transition";
     import type { Toast } from "$lib/stores/toast";
     import { toasts } from "$lib/stores/toast";
@@ -13,74 +12,33 @@
 
 <div
     class="toast {toast.type}"
-    in:fly={{ y: 20, duration: 300, opacity: 0 }}
+    in:fly={{ y: 40, duration: 350, opacity: 0 }}
     out:fade={{ duration: 200 }}
+    role="alert"
 >
-    <div class="content">
+    <div class="icon-badge">
         {#if toast.type === "error"}
-            <span class="icon error">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-            </span>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
         {:else if toast.type === "success"}
-            <span class="icon success">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-            </span>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+            </svg>
         {:else if toast.type === "warning"}
-            <span class="icon warning">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <path
-                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                    ></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-            </span>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
         {:else}
-            <span class="icon info">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-            </span>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
         {/if}
-        <span class="message">{toast.message}</span>
     </div>
-    <button class="close-btn" on:click={close} aria-label="Close notification">
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-        >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
+    <span class="message">{toast.message}</span>
+    <button class="close-btn" on:click={close} aria-label="Dismiss">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
         </svg>
     </button>
 </div>
@@ -89,100 +47,127 @@
     .toast {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        width: 320px;
-        max-width: calc(100vw - 32px);
-        background: var(--bg-highlight); /* Fallback */
-        background: rgba(30, 30, 30, 0.95);
-        border: 1px solid var(--border-primary);
+        gap: var(--spacing-sm);
+        min-width: 280px;
+        max-width: 420px;
+        background-color: var(--bg-surface);
         color: var(--text-primary);
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        margin-bottom: 0.75rem;
-        backdrop-filter: blur(10px);
+        padding: 10px 12px;
+        border-radius: var(--radius-full);
+        box-shadow: var(--shadow-lg);
         pointer-events: auto;
+        border: 1px solid var(--border-color);
+    }
+
+    /* ── Type-specific tinted backgrounds ── */
+    .toast.success {
+        background-color: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: var(--bg-base);
     }
 
     .toast.error {
-        border-left: 4px solid var(--accent-error);
-    }
-
-    .toast.success {
-        border-left: 4px solid var(--accent-success);
+        background-color: var(--accent-error, var(--error-color));
+        border-color: var(--accent-error, var(--error-color));
+        color: #fff;
     }
 
     .toast.warning {
-        border-left: 4px solid var(--accent-warning);
+        background-color: var(--accent-warning, #ffae42);
+        border-color: var(--accent-warning, #ffae42);
+        color: #1a1a1a;
     }
 
     .toast.info {
-        border-left: 4px solid var(--accent-info);
+        background-color: var(--bg-surface);
+        border-color: var(--border-color);
     }
 
-    .content {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        flex: 1;
-        overflow: hidden;
-    }
-
-    .message {
-        font-size: 0.9rem;
-        line-height: 1.4;
-        word-break: break-word;
-    }
-
-    .icon {
+    /* ── Icon badge ── */
+    .icon-badge {
         display: flex;
         align-items: center;
         justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-full);
         flex-shrink: 0;
+        background-color: rgba(0, 0, 0, 0.15);
+        color: inherit;
     }
 
-    .icon svg {
-        width: 20px;
-        height: 20px;
+    .toast.info .icon-badge {
+        background-color: var(--accent-subtle);
+        color: var(--accent-primary);
     }
 
-    .icon.error {
-        color: var(--accent-error);
-    }
-    .icon.success {
-        color: var(--accent-success);
-    }
-    .icon.warning {
-        color: var(--accent-warning);
-    }
-    .icon.info {
-        color: var(--accent-info);
+    .toast.success .icon-badge {
+        background-color: rgba(0, 0, 0, 0.2);
     }
 
+    .toast.error .icon-badge {
+        background-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .toast.warning .icon-badge {
+        background-color: rgba(0, 0, 0, 0.12);
+    }
+
+    /* ── Message ── */
+    .message {
+        flex: 1;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: inherit;
+    }
+
+    /* ── Close button ── */
     .close-btn {
-        background: none;
-        border: none;
-        color: var(--text-secondary);
-        cursor: pointer;
-        padding: 4px;
-        margin-left: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 4px;
-        opacity: 0.7;
-        transition:
-            opacity 0.2s,
-            background-color 0.2s;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+        color: inherit;
+        opacity: 0.6;
+        transition: all var(--transition-fast);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0;
     }
 
     .close-btn:hover {
         opacity: 1;
-        background-color: var(--bg-hover);
+        background-color: rgba(0, 0, 0, 0.15);
     }
 
-    .close-btn svg {
-        width: 16px;
-        height: 16px;
+    .toast.info .close-btn:hover {
+        background-color: var(--bg-highlight);
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .toast {
+            min-width: 0;
+            max-width: calc(100vw - 32px);
+            width: auto;
+            padding: 10px 14px;
+        }
+
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            min-height: 32px;
+        }
     }
 </style>
