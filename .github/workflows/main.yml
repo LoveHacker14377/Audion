@@ -16,6 +16,7 @@ on:
           - windows
           - linux
           - macos
+          - android
           - all
 permissions:
   contents: write
@@ -399,6 +400,107 @@ jobs:
                 \"fields\": [
                   {\"name\": \"📦 DMG Package\", \"value\": \"\`${DMG_NAME}\` (${DMG_SIZE})\", \"inline\": false},
                   {\"name\": \"📦 App Bundle (tar.gz)\", \"value\": \"\`${APP_tar_NAME}\` (${APP_tar_SIZE})\", \"inline\": false}
+                ],
+                \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v${VERSION}\",
+                \"footer\": {\"text\": \"Released by ${{ github.actor }}\"}
+              }]
+            }" \
+            "$DISCORD_WEBHOOK_URL"
+
+  release-android:
+    runs-on: ubuntu-latest
+    needs: [release-windows, release-linux, release-macos]
+    # Allow running if previous jobs succeeded or were skipped, and platform matches
+    if: ${{ always() && (github.event_name == 'push' || inputs.platform == 'android' || inputs.platform == 'all') && (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped') && (needs.release-linux.result == 'success' || needs.release-linux.result == 'skipped') && (needs.release-macos.result == 'success' || needs.release-macos.result == 'skipped') }}
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Read version from tauri.conf.json
+      - name: Read app version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 3. Setup Java
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 4. Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 5. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      # 6. Setup Rust
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      # 7. Rust cache
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # 8. Install frontend dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 9. Build Tauri app for Android
+      - name: Build Tauri app
+        run: npm run tauri android build
+
+      # 10. Upload Android artifacts
+      - name: Upload Android artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 11. Send Discord notification for Android
+      - name: Discord notification (Android)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL secret is not set. Skipping notification."
+            exit 0
+          fi
+
+          APK_FILE=$(ls src-tauri/gen/android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+
+          APK_NAME=$(basename "$APK_FILE" 2>/dev/null || echo "N/A")
+
+          APK_SIZE=$(du -h "$APK_FILE" 2>/dev/null | cut -f1 || echo "N/A")
+
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{
+              \"content\": \"@everyone\",
+              \"embeds\": [{
+                \"title\": \"🤖 Android Release Added: v${VERSION}\",
+                \"description\": \"Android build has been added to the release!\",
+                \"color\": 16776960,
+                \"fields\": [
+                  {\"name\": \"📦 APK Package\", \"value\": \"\`${APK_NAME}\` (${APK_SIZE})\", \"inline\": false}
                 ],
                 \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v${VERSION}\",
                 \"footer\": {\"text\": \"Released by ${{ github.actor }}\"}
