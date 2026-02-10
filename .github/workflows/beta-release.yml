@@ -85,6 +85,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+<<<<<<< HEAD
   release-linux:
     runs-on: ubuntu-24.04
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'linux' || inputs.platform == 'all') }}
@@ -160,6 +161,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+=======
+>>>>>>> 181cb5c (feat(CI): Mobile Build)
   release-android:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'all') }}
