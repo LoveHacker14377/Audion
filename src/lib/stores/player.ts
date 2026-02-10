@@ -342,6 +342,37 @@ export function setAudioElement(element: HTMLAudioElement): void {
         stopTimeSync();
     };
 
+    // Handle audio loading/playback errors
+    const handleError = (e: Event) => {
+        const audio = e.target as HTMLAudioElement;
+        const error = audio.error;
+        
+        let errorMessage = 'Unknown audio error';
+        if (error) {
+            switch (error.code) {
+                case MediaError.MEDIA_ERR_ABORTED:
+                    errorMessage = 'Playback aborted';
+                    break;
+                case MediaError.MEDIA_ERR_NETWORK:
+                    errorMessage = 'Network error while loading audio';
+                    break;
+                case MediaError.MEDIA_ERR_DECODE:
+                    errorMessage = 'Audio file could not be decoded';
+                    break;
+                case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                    errorMessage = 'Audio source not accessible or format not supported';
+                    break;
+            }
+        }
+        
+        console.error('[Player] Audio error:', error?.code, error?.message, errorMessage);
+        
+        const track = get(currentTrack);
+        if (track) {
+            addToast(`Cannot play "${track.title}": ${errorMessage}`, 'error');
+        }
+    };
+
     // Set up event listeners
     audioElement.addEventListener('ended', handleEnded);
     audioElement.addEventListener('timeupdate', handleTimeUpdate);
@@ -349,6 +380,7 @@ export function setAudioElement(element: HTMLAudioElement): void {
     audioElement.addEventListener('seeked', handleSeeked);
     audioElement.addEventListener('play', handlePlay);
     audioElement.addEventListener('pause', handlePause);
+    audioElement.addEventListener('error', handleError);
 
     // Store cleanup function for listeners
     cleanupListeners = () => {
@@ -358,6 +390,7 @@ export function setAudioElement(element: HTMLAudioElement): void {
         element.removeEventListener('seeked', handleSeeked);
         element.removeEventListener('play', handlePlay);
         element.removeEventListener('pause', handlePause);
+        element.removeEventListener('error', handleError);
     };
 }
 

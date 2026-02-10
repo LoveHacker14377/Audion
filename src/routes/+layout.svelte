@@ -3,7 +3,7 @@
   import { appSettings } from "$lib/stores/settings";
   import { theme } from "$lib/stores/theme";
   import { cleanupPlayer } from "$lib/stores/player";
-  import { migrateCoversToFiles } from "$lib/api/tauri";
+  import { migrateCoversToFiles, isAndroid, isTauri, ensureAudioPermission, openAppSettings } from "$lib/api/tauri";
   import { initMobileDetection, isMobile } from '$lib/stores/mobile';
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
@@ -13,11 +13,18 @@
   let handleVisibilityChange: (() => void) | null = null;
   let migrationStatus = "";
   let showMigrationBanner = false;
+  let showPermissionBanner = false;
+  let permissionDenied = false;
 
   onMount(async () => {
     appSettings.initialize();
     theme.initialize();
     initMobileDetection();
+
+    // Check Android audio permission first
+    if (isAndroid() && isTauri()) {
+      await checkAndroidPermissions();
+    }
 
     const migrationStart = performance.now();
 
@@ -38,6 +45,29 @@
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
   });
+
+  async function checkAndroidPermissions() {
+    console.log("[PERMISSIONS] Checking Android audio permissions...");
+    const granted = await ensureAudioPermission();
+    
+    if (!granted) {
+      console.warn("[PERMISSIONS] Audio permission not granted");
+      showPermissionBanner = true;
+      permissionDenied = true;
+    } else {
+      console.log("[PERMISSIONS] Audio permission granted");
+      showPermissionBanner = false;
+      permissionDenied = false;
+    }
+  }
+
+  async function handleOpenSettings() {
+    await openAppSettings();
+    // Re-check after returning from settings
+    setTimeout(async () => {
+      await checkAndroidPermissions();
+    }, 1000);
+  }
 
   async function runCoverMigration() {
     const migrated = localStorage.getItem("covers_migrated");
@@ -144,6 +174,26 @@
   </div>
 {/if}
 
+{#if showPermissionBanner}
+  <div class="permission-banner">
+    <div class="permission-content">
+      <span class="permission-icon">🎵</span>
+      <span class="permission-text">
+        {#if permissionDenied}
+          Audio permission required to play local music files.
+        {:else}
+          Requesting audio permission...
+        {/if}
+      </span>
+      {#if permissionDenied}
+        <button class="permission-button" on:click={handleOpenSettings}>
+          Open Settings
+        </button>
+      {/if}
+    </div>
+  </div>
+{/if}
+
 <div class="app-content" class:mobile={$isMobile}>
   <slot />
 </div>
@@ -221,5 +271,57 @@
 
   .app-content.mobile {
     padding-top: 0;
+  }
+
+  /* Permission Banner Styles */
+  .permission-banner {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .permission-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .permission-icon {
+    font-size: 1.2rem;
+  }
+
+  .permission-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .permission-button {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .permission-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .permission-button:active {
+    background: rgba(255, 255, 255, 0.4);
   }
 </style>

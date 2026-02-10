@@ -8,4 +8,9 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
   }
+
+  override fun onPluginsLoaded() {
+    // Register custom permissions plugin for audio file access
+    registerPlugin(PermissionsPlugin::class.java)
+  }
 }

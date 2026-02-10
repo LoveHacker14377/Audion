@@ -5,6 +5,11 @@ export function isTauri(): boolean {
     return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+// Check if running on Android
+export function isAndroid(): boolean {
+    return typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+}
+
 // Dynamic imports to avoid SSR issues
 let invokeFunc: typeof import('@tauri-apps/api/core').invoke | null = null;
 let openFunc: typeof import('@tauri-apps/plugin-dialog').open | null = null;
@@ -404,4 +409,84 @@ export function formatDuration(seconds: number | null): string {
 
 export async function syncCoverPathsFromFiles(): Promise<MigrationProgress> {
     return await invoke('sync_cover_paths_from_files');
+}
+
+// Android Permission Helpers
+export interface PermissionStatus {
+    status: 'granted' | 'prompt' | 'prompt-with-rationale' | 'requesting';
+    permission?: string;
+}
+
+// Check if audio permission is granted on Android
+export async function checkAudioPermission(): Promise<PermissionStatus> {
+    if (!isAndroid() || !isTauri()) {
+        return { status: 'granted' }; // Not on Android, permission not needed
+    }
+    
+    try {
+        await ensureTauriLoaded();
+        return await invokeFunc!('plugin:permissions|check_audio_permission');
+    } catch (error) {
+        console.error('[Permissions] Failed to check audio permission:', error);
+        // Assume granted if plugin not available (older builds)
+        return { status: 'granted' };
+    }
+}
+
+// Request audio permission on Android
+export async function requestAudioPermission(): Promise<PermissionStatus> {
+    if (!isAndroid() || !isTauri()) {
+        return { status: 'granted' }; // Not on Android, permission not needed
+    }
+    
+    try {
+        await ensureTauriLoaded();
+        return await invokeFunc!('plugin:permissions|request_audio_permission');
+    } catch (error) {
+        console.error('[Permissions] Failed to request audio permission:', error);
+        return { status: 'prompt' };
+    }
+}
+
+// Open app settings (for when permission is permanently denied)
+export async function openAppSettings(): Promise<boolean> {
+    if (!isAndroid() || !isTauri()) {
+        return false;
+    }
+    
+    try {
+        await ensureTauriLoaded();
+        const result = await invokeFunc!<{ success: boolean }>('plugin:permissions|open_app_settings');
+        return result.success;
+    } catch (error) {
+        console.error('[Permissions] Failed to open app settings:', error);
+        return false;
+    }
+}
+
+// Check and request audio permission with retry logic
+export async function ensureAudioPermission(): Promise<boolean> {
+    if (!isAndroid() || !isTauri()) {
+        return true; // Not on Android, permission not needed
+    }
+    
+    // First check current status
+    let status = await checkAudioPermission();
+    console.log('[Permissions] Current audio permission status:', status.status);
+    
+    if (status.status === 'granted') {
+        return true;
+    }
+    
+    // Request permission
+    await requestAudioPermission();
+    
+    // Wait a bit for the system dialog and re-check
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Re-check status after request
+    status = await checkAudioPermission();
+    console.log('[Permissions] Audio permission status after request:', status.status);
+    
+    return status.status === 'granted';
 }

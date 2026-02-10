@@ -59,6 +59,12 @@
         },
         {
           "path": "$HOME/Music/**"
+        },
+        {
+          "path": "/storage/emulated/0/**"
+        },
+        {
+          "path": "/sdcard/**"
         }
       ]
     }

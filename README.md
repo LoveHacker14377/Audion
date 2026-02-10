@@ -104,6 +104,58 @@ npm run tauri build  # Production build
 
 ---
 
+## 🐧 Linux Troubleshooting
+
+### "Could not create surfaceless EGL display" Error
+
+If you encounter this error when running the AppImage:
+```
+could not create surfaceless egl display bad alloc aborting
+```
+
+**Solution 1: Use software rendering**
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 ./Audion.AppImage
+```
+
+**Solution 2: Force software rendering with Mesa**
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 ./Audion.AppImage
+```
+
+**Solution 3: Disable GPU acceleration**
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Audion.AppImage
+```
+
+**Solution 4: Combined flags (most compatible)**
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Audion.AppImage
+```
+
+**Permanent fix:** Add the environment variable to your `.bashrc` or create a desktop entry with the flag.
+
+### Missing Dependencies
+
+Ensure you have the required WebKitGTK libraries installed:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1
+```
+
+**Fedora:**
+```bash
+sudo dnf install webkit2gtk4.1 gtk3 libappindicator-gtk3
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S webkit2gtk-4.1 gtk3 libappindicator-gtk3
+```
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Check out:

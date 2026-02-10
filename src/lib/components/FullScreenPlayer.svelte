@@ -482,6 +482,19 @@ $: if ($currentTrack) {
     will-change: transform, opacity;
   }
 
+  /* Mobile: GPU layer promotion and containment for backgrounds */
+  @media (max-width: 768px) {
+    .bg-canvas {
+      contain: strict;
+      isolation: isolate;
+    }
+
+    .bg-layer {
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+  }
+
   .bg-layer-1 {
     filter: blur(80px) saturate(2.5) brightness(0.45);
     transform-origin: 30% 30%;
@@ -774,6 +787,14 @@ $: if ($currentTrack) {
     display: none;
   }
 
+  /* Mobile: containment for lyrics container */
+  @media (max-width: 768px) {
+    .lyrics-container {
+      contain: content;
+      will-change: scroll-position;
+    }
+  }
+
   .lyric-line {
     --line-distance: 6;
     font-size: 2rem;
@@ -795,6 +816,28 @@ $: if ($currentTrack) {
     line-height: 1.35;
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
     letter-spacing: -0.01em;
+  }
+
+  /* Mobile: performance optimizations for lyric lines */
+  @media (max-width: 768px) {
+    .lyric-line {
+      /* Containment isolates repaint regions */
+      contain: layout style paint;
+      /* Skip rendering off-screen lines */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 40px;
+      /* Remove filter from transition - use instant blur class changes */
+      transition:
+        transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+        opacity 0.35s ease;
+    }
+
+    /* Force visible for active and nearby lines */
+    .lyric-line.active,
+    .lyric-line.near,
+    .lyric-line.mid {
+      content-visibility: visible;
+    }
   }
 
   .lyric-line:hover {
@@ -837,6 +880,32 @@ $: if ($currentTrack) {
       0 2px 10px rgba(0, 0, 0, 0.4);
   }
 
+  /* Mobile: fixed blur values instead of calc() for better caching */
+  @media (max-width: 768px) {
+    .lyric-line.near {
+      filter: blur(0.5px);
+    }
+
+    .lyric-line.mid {
+      filter: blur(1.5px);
+    }
+
+    .lyric-line.far {
+      filter: blur(3px);
+      opacity: 0.35;
+    }
+
+    .lyric-line.active {
+      /* Simplified text-shadow: single layer instead of 3 */
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .lyric-line.passed.far {
+      filter: blur(3px);
+      opacity: 0.25;
+    }
+  }
+
   /* Passed lines mirror future but slightly more faded */
   .lyric-line.passed.near {
     color: rgba(255, 255, 255, 0.35);
@@ -871,6 +940,20 @@ $: if ($currentTrack) {
     background-size: 200% 100%;
     will-change: background-position;
     transition: text-shadow 0.2s ease;
+  }
+
+  /* Mobile: containment and GPU optimization for words */
+  @media (max-width: 768px) {
+    .lyric-word {
+      contain: layout style;
+      /* Remove text-shadow transition on mobile */
+      transition: none;
+    }
+
+    .lyric-line.word-sync .lyric-word.highlighted {
+      /* Simplified: no text-shadow glow on mobile */
+      text-shadow: none;
+    }
   }
 
   /* Active word being filled — soft gradient edge (8% feather) */
