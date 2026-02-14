@@ -107,6 +107,16 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
                 })
             });
 
+            // Extract disc number
+            let disc_number = tag.disk().map(|n| n as i32).or_else(|| {
+                tag.get_string(&ItemKey::DiscNumber).and_then(|s| {
+                    // Handle "1/2" format
+                    s.split('/')
+                        .next()
+                        .and_then(|num| num.trim().parse::<i32>().ok())
+                })
+            });
+
             // Extract album art as raw bytes (NOT base64)
             let album_art = tag.pictures().first().map(|pic| pic.data().to_vec());
 
@@ -127,6 +137,7 @@ pub fn extract_metadata(path: &str) -> Option<TrackInsert> {
                 artist,
                 album,
                 track_number,
+                disc_number,
                 duration: Some(duration),
                 album_art,
                 track_cover,
@@ -164,6 +175,7 @@ fn create_fallback_metadata(path: &Path) -> TrackInsert {
         artist: None,
         album: None,
         track_number: None,
+        disc_number: None,
         duration: None,
         album_art: None,
         track_cover: None,
@@ -199,6 +211,8 @@ fn extract_flac_metadata_fallback(path: &Path, _duration_hint: Option<i32>) -> O
             let artist = vorbis.and_then(|v| v.artist().map(|s| s[0].clone()));
             let album = vorbis.and_then(|v| v.album().map(|s| s[0].clone()));
             let track_number = vorbis.and_then(|v| v.track().map(|n| n as i32));
+            let disc_number =
+                vorbis.and_then(|v| v.get("DISCNUMBER").and_then(|d| d[0].parse::<i32>().ok()));
 
             // Extract picture
             let album_art = tag.pictures().next().map(|p| p.data.clone());
@@ -229,6 +243,7 @@ fn extract_flac_metadata_fallback(path: &Path, _duration_hint: Option<i32>) -> O
                 artist,
                 album,
                 track_number,
+                disc_number,
                 duration,
                 album_art: album_art.clone(),
                 track_cover: album_art, // Use same art for track cover

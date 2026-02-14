@@ -23,7 +23,9 @@ pub struct DownloadAudioInput {
     pub title: Option<String>,
     pub artist: Option<String>,
     pub album: Option<String>,
-    pub track_number: Option<u32>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub duration: Option<i32>,
     pub cover_url: Option<String>,
 }
 
@@ -388,7 +390,7 @@ async fn write_metadata_to_file(
     }
     if let Some(track_num) = input.track_number {
         if track_num > 0 && track_num <= 255 {
-            tag.set_track(track_num);
+            tag.set_track(track_num as u32);
         }
     }
 
@@ -656,7 +658,7 @@ async fn write_m4a_metadata(
         }
     }
     if let Some(track_num) = input.track_number {
-        if track_num > 0 && track_num <= u16::MAX as u32 {
+        if track_num > 0 && (track_num as u32) <= u16::MAX as u32 {
             tag.set_track_number(track_num as u16);
         }
     }

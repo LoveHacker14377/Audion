@@ -27,9 +27,26 @@
 
     let album: Album | null = null;
     let tracks: Track[] = [];
+    let groupedTracks: { disc: number; tracks: Track[] }[] = [];
     let loading = true;
 
     $: totalDuration = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+
+    function groupTracksByDisc(tracks: Track[]) {
+        const groups = new Map<number, Track[]>();
+
+        tracks.forEach((track) => {
+            const disc = track.disc_number || 1;
+            if (!groups.has(disc)) {
+                groups.set(disc, []);
+            }
+            groups.get(disc)?.push(track);
+        });
+
+        return Array.from(groups.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([disc, tracks]) => ({ disc, tracks }));
+    }
 
     async function loadAlbumData() {
         loading = true;
@@ -40,6 +57,7 @@
             ]);
             album = albumData;
             tracks = trackData;
+            groupedTracks = groupTracksByDisc(tracks);
         } catch (error) {
             console.error("Failed to load album:", error);
         } finally {
@@ -131,9 +149,9 @@
     function handlePlayAll() {
         if (tracks.length > 0 && album) {
             playTracks(tracks, 0, {
-                type: 'album',
+                type: "album",
                 albumId: album.id,
-                displayName: album.name
+                displayName: album.name,
             });
         }
     }
@@ -297,12 +315,48 @@
         </header>
 
         <section class="track-list-section">
-            <TrackList 
-                {tracks} 
-                {isTidalAvailable} 
-                showAlbum={false}
-                playbackContext={{ type: 'album', albumId, displayName: album?.name }}
-            />
+            {#if groupedTracks.length > 1}
+                {#each groupedTracks as group}
+                    <div class="disc-group">
+                        <div class="disc-header">
+                            <span class="disc-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                    width="16"
+                                    height="16"
+                                >
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"
+                                    />
+                                </svg>
+                            </span>
+                            <h3>Disc {group.disc}</h3>
+                        </div>
+                        <TrackList
+                            tracks={group.tracks}
+                            {isTidalAvailable}
+                            showAlbum={false}
+                            playbackContext={{
+                                type: "album",
+                                albumId,
+                                displayName: album?.name,
+                            }}
+                        />
+                    </div>
+                {/each}
+            {:else}
+                <TrackList
+                    {tracks}
+                    {isTidalAvailable}
+                    showAlbum={false}
+                    playbackContext={{
+                        type: "album",
+                        albumId,
+                        displayName: album?.name,
+                    }}
+                />
+            {/if}
         </section>
     {:else}
         <div class="not-found">
@@ -505,6 +559,46 @@
         border-top-color: var(--text-primary);
         border-radius: 50%;
         animation: spin 1s linear infinite;
+    }
+
+    .disc-group {
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .disc-header {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-md);
+        padding: var(--spacing-md) var(--spacing-xl);
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 1rem;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: normal;
+        border: none;
+        margin-top: var(--spacing-lg);
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .disc-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        width: 24px; /* Align with track number width roughly */
+    }
+
+    .disc-icon {
+        display: flex;
+        align-items: center;
+        opacity: 0.7;
+    }
+
+    .disc-header h3 {
+        margin: 0;
+        font-size: inherit;
+        font-weight: inherit;
     }
 
     /* ── Mobile ── */

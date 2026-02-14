@@ -24,6 +24,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             artist TEXT,
             album TEXT,
             track_number INTEGER,
+            disc_number INTEGER,
             duration INTEGER,
             album_id INTEGER,
             format TEXT,
@@ -87,6 +88,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN content_hash TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN local_src TEXT", []);
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover TEXT", []);
+    let _ = conn.execute("ALTER TABLE tracks ADD COLUMN disc_number INTEGER", []);
 
     // Add path columns for file-based cover storage
     let _ = conn.execute("ALTER TABLE tracks ADD COLUMN track_cover_path TEXT", []);

@@ -73,6 +73,7 @@ export interface Track {
     source_type?: string | null;  // 'local', 'tidal', 'url'
     external_id?: string | null;  // Source-specific ID
     local_src?: string | null; // Local file path for offline playback
+    disc_number?: number | null;
 }
 
 export interface Album {
@@ -115,7 +116,7 @@ export interface ScanProgress {
     current_batch: number;
     batch_size: number;
     estimated_time_remaining_ms: number;
-    tracks_added: number;      
+    tracks_added: number;
     tracks_updated: number;
 }
 
@@ -442,7 +443,7 @@ export async function checkAudioPermission(): Promise<PermissionStatus> {
     if (!isAndroid() || !isTauri()) {
         return { status: 'granted' }; // Not on Android, permission not needed
     }
-    
+
     try {
         await ensureTauriLoaded();
         return await invokeFunc!('plugin:permissions|check_audio_permission');
@@ -458,7 +459,7 @@ export async function requestAudioPermission(): Promise<PermissionStatus> {
     if (!isAndroid() || !isTauri()) {
         return { status: 'granted' }; // Not on Android, permission not needed
     }
-    
+
     try {
         await ensureTauriLoaded();
         return await invokeFunc!('plugin:permissions|request_audio_permission');
@@ -473,7 +474,7 @@ export async function openAppSettings(): Promise<boolean> {
     if (!isAndroid() || !isTauri()) {
         return false;
     }
-    
+
     try {
         await ensureTauriLoaded();
         const result = await invokeFunc!<{ success: boolean }>('plugin:permissions|open_app_settings');
@@ -489,25 +490,25 @@ export async function ensureAudioPermission(): Promise<boolean> {
     if (!isAndroid() || !isTauri()) {
         return true; // Not on Android, permission not needed
     }
-    
+
     // First check current status
     let status = await checkAudioPermission();
     console.log('[Permissions] Current audio permission status:', status.status);
-    
+
     if (status.status === 'granted') {
         return true;
     }
-    
+
     // Request permission
     await requestAudioPermission();
-    
+
     // Wait a bit for the system dialog and re-check
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     // Re-check status after request
     status = await checkAudioPermission();
     console.log('[Permissions] Audio permission status after request:', status.status);
-    
+
     return status.status === 'granted';
 }
 
@@ -516,7 +517,7 @@ export async function checkStoragePermission(): Promise<{ status: 'granted' | 'p
     if (!isAndroid() || !isTauri()) {
         return { status: 'granted' }; // Not on Android, permission not needed
     }
-    
+
     try {
         await ensureTauriLoaded();
         return await invokeFunc!('plugin:permissions|check_storage_permission');
@@ -532,7 +533,7 @@ export async function requestStoragePermission(): Promise<{ status: 'granted' | 
     if (!isAndroid() || !isTauri()) {
         return { status: 'granted' }; // Not on Android, permission not needed
     }
-    
+
     try {
         await ensureTauriLoaded();
         return await invokeFunc!('plugin:permissions|request_storage_permission');
@@ -547,31 +548,31 @@ export async function ensureStoragePermission(): Promise<boolean> {
     if (!isAndroid() || !isTauri()) {
         return true; // Not on Android, permission not needed
     }
-    
+
     // First check current status
     const status = await checkStoragePermission();
     console.log('[Permissions] Current storage permission status:', status);
-    
+
     if (status.status === 'granted') {
         return true;
     }
-    
+
     // Request permission
     const req = await requestStoragePermission();
     console.log('[Permissions] Storage permission request result:', req);
-    
+
     // For Android 11+, the check is immediate
     if (req.status === 'checked' || req.granted === true) {
         return req.granted === true;
     }
-    
+
     // For older Android, wait a bit for the system dialog and re-check
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     // Re-check status after request
     const recheck = await checkStoragePermission();
     console.log('[Permissions] Storage permission status after request:', recheck);
-    
+
     return recheck.status === 'granted';
 }
 
