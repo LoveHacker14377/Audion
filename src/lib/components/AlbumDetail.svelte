@@ -342,6 +342,7 @@
                                 albumId,
                                 displayName: album?.name,
                             }}
+                            queueTracks={tracks}
                         />
                     </div>
                 {/each}
@@ -355,6 +356,7 @@
                         albumId,
                         displayName: album?.name,
                     }}
+                    queueTracks={tracks}
                 />
             {/if}
         </section>
