@@ -14,7 +14,7 @@ export const pluginEvents = new EventEmitter<PluginEvents>();
 // Playback Context Tracking
 // source from which tracks are being played.
 export interface PlaybackContext {
-    
+
     type: 'playlist' | 'album' | 'artist';
 
     /** For playlists: playlist ID */
@@ -346,7 +346,7 @@ export function setAudioElement(element: HTMLAudioElement): void {
     const handleError = (e: Event) => {
         const audio = e.target as HTMLAudioElement;
         const error = audio.error;
-        
+
         let errorMessage = 'Unknown audio error';
         if (error) {
             switch (error.code) {
@@ -364,9 +364,9 @@ export function setAudioElement(element: HTMLAudioElement): void {
                     break;
             }
         }
-        
+
         console.error('[Player] Audio error:', error?.code, error?.message, errorMessage);
-        
+
         const track = get(currentTrack);
         if (track) {
             // If decode error on a downloaded file, try streaming instead
@@ -375,7 +375,7 @@ export function setAudioElement(element: HTMLAudioElement): void {
                 playTrack(track, true); // Skip local_src
                 return;
             }
-            
+
             addToast(`Cannot play "${track.title}": ${errorMessage}`, 'error');
         }
     };
@@ -614,7 +614,7 @@ function updateMediaSessionPosition(): void {
 }
 
 // Play a specific track
-export async function playTrack(track: Track, skipLocalSrc = false): Promise<void> {
+export async function playTrack(track: Track, skipLocalSrc = false, startTime = 0): Promise<void> {
     const previousTrack = get(currentTrack);
     const sessionId = ++currentSessionId;
 
@@ -692,6 +692,12 @@ export async function playTrack(track: Track, skipLocalSrc = false): Promise<voi
             }
 
             audioElement.src = src;
+
+            // Set start time if provided (restoring progress)
+            if (startTime > 0) {
+                audioElement.currentTime = startTime;
+            }
+
             try {
                 await audioElement.play();
                 // Update Media Session (notification shade / lock screen)
@@ -805,6 +811,15 @@ export function playTracks(
 // Play/Pause toggle
 export function togglePlay(): void {
     if (!audioElement) return;
+
+    // Check for resume from cold start (track selected but no source)
+    const track = get(currentTrack);
+    if ((!audioElement.src || audioElement.src === '' || audioElement.src === window.location.href) && track) {
+        const savedTime = get(currentTime);
+        console.log('[Player] Resuming session at', savedTime);
+        playTrack(track, false, savedTime);
+        return;
+    }
 
     if (audioElement.paused) {
         audioElement.play().catch(error => {
