@@ -552,8 +552,9 @@
               value={$appSettings.audioBackend}
               on:change={(e) => appSettings.setAudioBackend(e.currentTarget.value as 'auto' | 'native' | 'html5')}
             >
-              <option value="html5">WebView</option>
+              <option value="auto">Auto</option>
               <option value="native">Native (rodio)</option>
+              <option value="html5">WebView</option>
             </select>
           </div>
         </div>

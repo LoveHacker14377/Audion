@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
@@ -79,6 +79,10 @@ pub struct AudioPlayer {
     state: PlaybackState,
     /// Duration of the current track (stored separately for seeking calculations)
     track_duration: Option<Duration>,
+    /// Timestamp when playback started/resumed (for position tracking)
+    playback_started_at: Option<Instant>,
+    /// Position when playback was paused (to resume tracking correctly)
+    position_at_pause: f64,
 }
 
 impl AudioPlayer {
@@ -100,6 +104,8 @@ impl AudioPlayer {
             sink,
             state: PlaybackState::default(),
             track_duration: None,
+            playback_started_at: None,
+            position_at_pause: 0.0,
         })
     }
 
@@ -138,22 +144,34 @@ impl AudioPlayer {
             .unwrap_or(0.0);
         self.state.current_path = path.to_string();
 
+        // Start position tracking
+        self.playback_started_at = Some(Instant::now());
+        self.position_at_pause = 0.0;
+
         log::info!("[AUDIO] Playing: {} (duration: {:.1}s)", path, self.state.duration);
         Ok(())
     }
 
     /// Pause playback
     pub fn pause(&mut self) {
+        // Store current position before pausing
+        if let Some(started_at) = self.playback_started_at {
+            self.position_at_pause = self.position_at_pause + started_at.elapsed().as_secs_f64();
+        }
+        self.playback_started_at = None;
+
         self.sink.pause();
         self.state.is_playing = false;
-        log::debug!("[AUDIO] Paused");
+        log::debug!("[AUDIO] Paused at {:.1}s", self.position_at_pause);
     }
 
     /// Resume playback
     pub fn resume(&mut self) {
         self.sink.play();
         self.state.is_playing = true;
-        log::debug!("[AUDIO] Resumed");
+        // Resume position tracking from where we paused
+        self.playback_started_at = Some(Instant::now());
+        log::debug!("[AUDIO] Resumed from {:.1}s", self.position_at_pause);
     }
 
     /// Toggle between play and pause
@@ -171,6 +189,9 @@ impl AudioPlayer {
         self.state.is_playing = false;
         self.state.position = 0.0;
         self.state.current_path = String::new();
+        // Reset position tracking
+        self.playback_started_at = None;
+        self.position_at_pause = 0.0;
         log::debug!("[AUDIO] Stopped");
     }
 
@@ -220,12 +241,17 @@ impl AudioPlayer {
         self.sink.set_volume(self.state.volume);
         self.sink.append(source);
 
+        // Update position tracking
+        self.position_at_pause = seek_to.as_secs_f64();
+
         if was_playing {
             self.sink.play();
             self.state.is_playing = true;
+            self.playback_started_at = Some(Instant::now());
         } else {
             self.sink.pause();
             self.state.is_playing = false;
+            self.playback_started_at = None;
         }
 
         self.state.position = seek_to.as_secs_f64();
@@ -233,10 +259,21 @@ impl AudioPlayer {
         Ok(())
     }
 
-    /// Get current playback state
-    /// NOTE: Position tracking is approximate - rodio doesn't expose precise position
+    /// Get current playback state with calculated position
     pub fn get_state(&self) -> PlaybackState {
         let mut state = self.state.clone();
+
+        // Calculate current position from elapsed time
+        if let Some(started_at) = self.playback_started_at {
+            state.position = self.position_at_pause + started_at.elapsed().as_secs_f64();
+            // Clamp to duration if known
+            if state.duration > 0.0 && state.position > state.duration {
+                state.position = state.duration;
+            }
+        } else {
+            state.position = self.position_at_pause;
+        }
+
         // Check if playback finished
         if self.sink.empty() && state.is_playing {
             state.is_playing = false;

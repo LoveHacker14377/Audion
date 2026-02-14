@@ -295,17 +295,26 @@ function startLinuxStatePoller(): void {
         if (!useNativeAudio) return;
 
         try {
-            // Check if track finished
-            const finished = await linuxAudioIsFinished();
-            if (finished && get(isPlaying)) {
-                handleTrackEnd();
+            // Get current state from native backend
+            const state = await linuxAudioGetState();
+
+            // Update position and duration for seekbar
+            currentTime.set(state.position);
+            if (state.duration > 0) {
+                duration.set(state.duration);
             }
 
-            // We could poll position here too, but for now we trust the backend
+            // Check if track finished
+            if (state.is_playing === false && get(isPlaying)) {
+                const finished = await linuxAudioIsFinished();
+                if (finished) {
+                    handleTrackEnd();
+                }
+            }
         } catch (e) {
             // Ignore polling errors
         }
-    }, 500);
+    }, 250); // Poll more frequently for smoother seekbar
 }
 
 // setAudioElement with proper cleanup
