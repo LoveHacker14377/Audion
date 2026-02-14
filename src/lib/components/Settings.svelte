@@ -552,13 +552,10 @@
               value={$appSettings.audioBackend}
               on:change={(e) => appSettings.setAudioBackend(e.currentTarget.value as 'auto' | 'native' | 'html5')}
             >
-              <option value="native">Native (rodio)</option>
               <option value="html5">WebView</option>
+              <option value="native">Native (rodio)</option>
             </select>
           </div>
-          <p class="setting-hint">
-            Native uses rodio for direct system audio. WebView uses the browser engine.
-          </p>
         </div>
       </section>
       {/if}
@@ -1541,6 +1538,12 @@
     font-size: 0.875rem;
     cursor: pointer;
     max-width: 200px;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23b3b3b3' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-sm) center;
+    padding-right: calc(var(--spacing-md) + 16px);
   }
 
   .preset-select:focus {

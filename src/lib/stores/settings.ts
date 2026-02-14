@@ -24,7 +24,7 @@ const defaultSettings: AppSettings = {
     showDiscord: true,
     startMode: 'normal',
     autoplay: false,
-    audioBackend: 'auto',
+    audioBackend: 'html5',
 };
 
 // Load settings from localStorage
