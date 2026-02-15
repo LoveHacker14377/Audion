@@ -673,6 +673,7 @@
     overflow-y: auto;
     padding-bottom: calc(var(--player-height) + var(--spacing-lg));
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   @media (max-width: 768px) {
@@ -890,6 +891,7 @@
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
     border: 1px solid var(--border-color);
   }
 
