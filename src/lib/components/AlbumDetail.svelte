@@ -22,6 +22,7 @@
     } from "$lib/services/downloadService";
     import { addToast } from "$lib/stores/toast";
     import { goto } from "$app/navigation";
+    import { confirm } from "$lib/stores/dialogs";
 
     export let albumId: number;
 
@@ -178,6 +179,17 @@
                     label: "Delete Album",
                     danger: true,
                     action: async () => {
+                        const confirmed = await confirm(
+                            `Are you sure you want to delete the album "${album!.name}"? This will delete all songs in this album from your computer.`,
+                            {
+                                title: "Delete Album",
+                                confirmLabel: "Delete",
+                                danger: true,
+                            },
+                        );
+
+                        if (!confirmed) return;
+
                         try {
                             await deleteAlbum(album!.id);
                             await loadLibrary(); // Refresh library

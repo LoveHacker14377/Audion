@@ -38,6 +38,7 @@
   import { onDestroy, onMount } from "svelte";
   import { multiSelect } from "$lib/stores/multiselect";
   import { isMobile } from "$lib/stores/mobile";
+  import { confirm } from "$lib/stores/dialogs";
 
   export let tracks: Track[] = [];
   export let title: string = "Tracks";
@@ -528,7 +529,19 @@
       { type: "separator" },
       {
         label: "Delete from Library",
+        danger: true,
         action: async () => {
+          const confirmed = await confirm(
+            `Are you sure you want to delete "${track.title}" from your library? This will also remove the file from your computer.`,
+            {
+              title: "Delete Track",
+              confirmLabel: "Delete",
+              danger: true,
+            },
+          );
+
+          if (!confirmed) return;
+
           try {
             await deleteTrack(track.id);
             // Clear from cache

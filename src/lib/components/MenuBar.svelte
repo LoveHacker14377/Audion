@@ -9,6 +9,7 @@
   import { progressiveScan } from "$lib/stores/progressiveScan";
   import { lyricsStore } from "$lib/stores/lyrics";
   import { addToast } from "$lib/stores/toast";
+  import { confirm } from "$lib/stores/dialogs";
 
   let openMenu: string | null = null;
   let isScanning = false;
@@ -60,7 +61,9 @@
           console.warn("Scan errors:", result.errors);
         }
 
-        console.log(`Scan complete: ${result.tracks_added} added, ${result.tracks_updated} updated, ${result.tracks_deleted} deleted`);
+        console.log(
+          `Scan complete: ${result.tracks_added} added, ${result.tracks_updated} updated, ${result.tracks_deleted} deleted`,
+        );
 
         // Load albums/artists after progressive track loading completes
         // this was a huge pain point. i tried to load them simultaneously
@@ -84,15 +87,17 @@
         // Add success toast
         const parts = [];
         if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
-        if (result.tracks_updated > 0) parts.push(`${result.tracks_updated} updated`);
-        if (result.tracks_deleted > 0) parts.push(`${result.tracks_deleted} deleted`);
-        
-        const message = parts.length > 0 
-            ? `Library scan complete: ${parts.join(', ')}`
-            : 'Library scan complete';
-        
-        addToast(message, 'success', 4000);
+        if (result.tracks_updated > 0)
+          parts.push(`${result.tracks_updated} updated`);
+        if (result.tracks_deleted > 0)
+          parts.push(`${result.tracks_deleted} deleted`);
 
+        const message =
+          parts.length > 0
+            ? `Library scan complete: ${parts.join(", ")}`
+            : "Library scan complete";
+
+        addToast(message, "success", 4000);
       } else {
         console.log("[TIMING] No path selected");
       }
@@ -152,17 +157,19 @@
       );
 
       // success toast
-        const parts = [];
-        if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
-        if (result.tracks_updated > 0) parts.push(`${result.tracks_updated} updated`);
-        if (result.tracks_deleted > 0) parts.push(`${result.tracks_deleted} deleted`);
-        
-        const message = parts.length > 0 
-            ? `Rescan complete: ${parts.join(', ')}`
-            : 'Rescan complete - no changes';
-        
-        addToast(message, 'success', 4000);
+      const parts = [];
+      if (result.tracks_added > 0) parts.push(`${result.tracks_added} added`);
+      if (result.tracks_updated > 0)
+        parts.push(`${result.tracks_updated} updated`);
+      if (result.tracks_deleted > 0)
+        parts.push(`${result.tracks_deleted} deleted`);
 
+      const message =
+        parts.length > 0
+          ? `Rescan complete: ${parts.join(", ")}`
+          : "Rescan complete - no changes";
+
+      addToast(message, "success", 4000);
     } catch (error) {
       console.error("Failed to rescan:", error);
       addToast("Failed to rescan library", "error");
@@ -174,6 +181,18 @@
 
   async function handleClearCache() {
     closeMenus();
+
+    const confirmed = await confirm(
+      "Are you sure you want to clear the application cache? This will clear all track data, search indices, and lyrics. Your music files will not be affected.",
+      {
+        title: "Clear Cache",
+        confirmLabel: "Clear",
+        danger: true,
+      },
+    );
+
+    if (!confirmed) return;
+
     try {
       // Clear lyrics cache from localStorage
       localStorage.removeItem("musixmatch_token");
@@ -225,12 +244,7 @@
           on:click={handleLoadFolder}
           disabled={isScanning}
         >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
-                    >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path
               d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
             />
@@ -238,17 +252,8 @@
           <span>Load Folder</span>
           <span class="shortcut">Ctrl+O</span>
         </button>
-                <button
-                    class="menu-item"
-                    on:click={handleRescan}
-                    disabled={isScanning}
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
-                    >
+        <button class="menu-item" on:click={handleRescan} disabled={isScanning}>
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path
               d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
             />
@@ -269,12 +274,7 @@
             window.location.reload();
           }}
         >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
-                    >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path
               d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
             />
@@ -289,12 +289,7 @@
       <div class="menu-section">
         <div class="menu-header">Settings</div>
         <button class="menu-item" on:click={handleClearCache}>
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
-                    >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path
               d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
             />

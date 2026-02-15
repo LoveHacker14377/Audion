@@ -11,3 +11,4 @@
 - Remember last window position.
 - Add Import Lyrics
 - Drag & Drop music files to import.
+- Add warning when deleting files in drive.

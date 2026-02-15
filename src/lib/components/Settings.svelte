@@ -7,13 +7,14 @@
     resetDatabase,
     selectMusicFolder,
     syncCoverPathsFromFiles,
-    mergeDuplicateCovers, 
-    type MergeCoverResult
+    mergeDuplicateCovers,
+    type MergeCoverResult,
   } from "$lib/api/tauri";
   import { loadLibrary } from "$lib/stores/library";
   import UpdatePopup from "./UpdatePopup.svelte";
-  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { onMount, onDestroy } from 'svelte';
+  import { confirm } from "$lib/stores/dialogs";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { onMount, onDestroy } from "svelte";
 
   interface MigrationProgressUpdate {
     current: number;
@@ -62,20 +63,24 @@
 
   onMount(async () => {
     // Listen for migration events (used by sync)
-    unlistenSync = await listen('migration-batch-ready', (event) => {
+    unlistenSync = await listen("migration-batch-ready", (event) => {
       const data = event.payload as { progress: MigrationProgressUpdate };
       syncProgress = data.progress;
       if (syncProgress && syncProgress.total > 0) {
-        syncPercentage = Math.round((syncProgress.current / syncProgress.total) * 100);
+        syncPercentage = Math.round(
+          (syncProgress.current / syncProgress.total) * 100,
+        );
       }
     });
 
     // Listen for merge events
-    unlistenMerge = await listen('merge-batch-ready', (event) => {
+    unlistenMerge = await listen("merge-batch-ready", (event) => {
       const data = event.payload as { progress: MergeProgressUpdate };
       mergeProgress = data.progress;
       if (mergeProgress && mergeProgress.total_albums > 0) {
-        mergePercentage = Math.round((mergeProgress.current_album / mergeProgress.total_albums) * 100);
+        mergePercentage = Math.round(
+          (mergeProgress.current_album / mergeProgress.total_albums) * 100,
+        );
       }
     });
   });
@@ -100,7 +105,18 @@
     }
   }
 
-  function openResetModal() {
+  async function openResetModal() {
+    const confirmed = await confirm(
+      "Are you sure you want to reset the database? This will clear all tracks and metadata, but your music files will remain on your computer.",
+      {
+        title: "Reset Database",
+        confirmLabel: "Proceed",
+        danger: true,
+      },
+    );
+
+    if (!confirmed) return;
+
     showResetModal = true;
     resetConfirmText = "";
     resetError = "";
@@ -163,7 +179,11 @@
       syncProgress = null;
       syncPercentage = 0;
 
-      if (result.tracks_migrated === 0 && result.albums_migrated === 0 && result.errors.length === 0) {
+      if (
+        result.tracks_migrated === 0 &&
+        result.albums_migrated === 0 &&
+        result.errors.length === 0
+      ) {
         syncSuccess = true;
         syncMessage = `✓ No cover files found to sync.`;
       } else if (result.errors.length === 0) {
@@ -217,7 +237,9 @@
         mergeMessage = `✓ No duplicate covers found. All album covers are unique.`;
       } else if (result.errors.length === 0) {
         mergeSuccess = true;
-        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(2);
+        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(
+          2,
+        );
         mergeMessage = `✓ Successfully merged ${result.covers_merged} duplicate covers across ${result.albums_processed} albums. Saved ${spaceSavedMB} MB of disk space.`;
 
         // Reload library to refresh cover references
@@ -226,7 +248,9 @@
         console.log("[Settings] Library reloaded");
       } else {
         mergeSuccess = false;
-        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(2);
+        const spaceSavedMB = (result.space_saved_bytes / (1024 * 1024)).toFixed(
+          2,
+        );
         mergeMessage = `⚠ Merged ${result.covers_merged} covers (saved ${spaceSavedMB} MB) with ${result.errors.length} errors. Check console.`;
         console.error("[Settings] Merge errors:", result.errors);
       }
@@ -247,22 +271,22 @@
   }
 
   function formatTime(ms: number): string {
-    if (!ms || ms === 0) return '';
-    
+    if (!ms || ms === 0) return "";
+
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60) return `${seconds}s`;
-    
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}m ${remainingSeconds}s`;
   }
 
   function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 </script>
 
@@ -535,7 +559,7 @@
       <!-- Cover Management -->
       <section class="settings-section">
         <h3 class="section-title">Cover Management</h3>
-      
+
         <!-- Sync Cover Files -->
         <div class="setting-item">
           <div class="danger-item">
@@ -559,14 +583,15 @@
               {/if}
             </button>
           </div>
-          
+
           <!-- Sync Progress Bar -->
           {#if isSyncingCovers && syncProgress}
             <div class="progress-container">
               <div class="progress-header">
                 <div class="progress-info">
                   <span class="progress-text">
-                    {syncProgress.current.toLocaleString()} of {syncProgress.total.toLocaleString()} items
+                    {syncProgress.current.toLocaleString()} of {syncProgress.total.toLocaleString()}
+                    items
                   </span>
                   {#if syncProgress.estimated_time_remaining_ms}
                     <span class="progress-separator">·</span>
@@ -578,7 +603,10 @@
                 <div class="progress-percentage">{syncPercentage}%</div>
               </div>
               <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width: {syncPercentage}%"></div>
+                <div
+                  class="progress-bar-fill"
+                  style="width: {syncPercentage}%"
+                ></div>
               </div>
               <div class="progress-stats">
                 <span class="stat-item">
@@ -603,14 +631,15 @@
             </p>
           {/if}
         </div>
-      
+
         <!-- Merge Duplicate Covers -->
         <div class="setting-item">
           <div class="danger-item">
             <div class="danger-info">
               <span class="setting-label">Merge Duplicate Covers</span>
               <p class="setting-hint">
-                Find and merge identical album covers to save disk space and improve performance
+                Find and merge identical album covers to save disk space and
+                improve performance
               </p>
             </div>
             <button
@@ -625,14 +654,15 @@
               {/if}
             </button>
           </div>
-          
+
           <!-- Merge Progress Bar -->
           {#if isMergingCovers && mergeProgress}
             <div class="progress-container">
               <div class="progress-header">
                 <div class="progress-info">
                   <span class="progress-text">
-                    {mergeProgress.current_album.toLocaleString()} of {mergeProgress.total_albums.toLocaleString()} albums
+                    {mergeProgress.current_album.toLocaleString()} of {mergeProgress.total_albums.toLocaleString()}
+                    albums
                   </span>
                   {#if mergeProgress.estimated_time_remaining_ms}
                     <span class="progress-separator">·</span>
@@ -644,7 +674,10 @@
                 <div class="progress-percentage">{mergePercentage}%</div>
               </div>
               <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width: {mergePercentage}%"></div>
+                <div
+                  class="progress-bar-fill"
+                  style="width: {mergePercentage}%"
+                ></div>
               </div>
               <div class="progress-stats">
                 <span class="stat-item">
@@ -653,7 +686,9 @@
                 </span>
                 <span class="stat-item">
                   <span class="stat-label">Space Saved:</span>
-                  <span class="stat-value">{formatBytes(mergeProgress.space_saved_bytes)}</span>
+                  <span class="stat-value"
+                    >{formatBytes(mergeProgress.space_saved_bytes)}</span
+                  >
                 </span>
               </div>
             </div>
@@ -951,7 +986,9 @@
 
   @media (max-width: 768px) {
     .settings-content {
-      padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-xl));
+      padding-bottom: calc(
+        var(--mobile-bottom-inset, 130px) + var(--spacing-xl)
+      );
     }
 
     .view-header h1 {

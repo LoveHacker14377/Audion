@@ -29,6 +29,7 @@
     import { contextMenu } from "$lib/stores/ui";
     import { pluginStore } from "$lib/stores/plugin-store";
     import { playlistCovers } from "$lib/stores/playlistCovers";
+    import { confirm } from "$lib/stores/dialogs";
 
     // Helper functions for playlist covers
     function initialsFromName(name: string) {
@@ -206,7 +207,19 @@
                 { type: "separator" },
                 {
                     label: "Delete from Library",
+                    danger: true,
                     action: async () => {
+                        const confirmed = await confirm(
+                            `Are you sure you want to delete "${track.title}" from your library? This will also remove the file from your computer.`,
+                            {
+                                title: "Delete Track",
+                                confirmLabel: "Delete",
+                                danger: true,
+                            },
+                        );
+
+                        if (!confirmed) return;
+
                         try {
                             if (track.id) {
                                 await deleteTrack(track.id);
@@ -254,6 +267,17 @@
                     label: "Delete Album",
                     danger: true,
                     action: async () => {
+                        const confirmed = await confirm(
+                            `Are you sure you want to delete the album "${album.name}"? This will delete all songs in this album from your computer.`,
+                            {
+                                title: "Delete Album",
+                                confirmLabel: "Delete",
+                                danger: true,
+                            },
+                        );
+
+                        if (!confirmed) return;
+
                         try {
                             await deleteAlbum(album.id);
                             await loadLibrary();

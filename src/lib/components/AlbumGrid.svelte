@@ -1,11 +1,16 @@
 <script lang="ts">
     import type { Album } from "$lib/api/tauri";
     import { goToAlbumDetail } from "$lib/stores/view";
-    import { loadLibrary, getAlbumCoverFromTracks, loadMoreAlbums } from "$lib/stores/library";
+    import {
+        loadLibrary,
+        getAlbumCoverFromTracks,
+        loadMoreAlbums,
+    } from "$lib/stores/library";
     import { contextMenu } from "$lib/stores/ui";
     import { deleteAlbum, getTracksByAlbum } from "$lib/api/tauri";
     import { playTracks, currentAlbumId, isPlaying } from "$lib/stores/player";
-    import { onDestroy, onMount } from 'svelte';
+    import { onDestroy, onMount } from "svelte";
+    import { confirm } from "$lib/stores/dialogs";
 
     export let albums: Album[] = [];
 
@@ -20,9 +25,13 @@
 
     // Responsive values based on viewport
     $: isMobileView = containerWidth > 0 && containerWidth < 600;
-    $: ALBUM_CARD_WIDTH = isMobileView ? ALBUM_CARD_WIDTH_MOBILE : ALBUM_CARD_WIDTH_DESKTOP;
+    $: ALBUM_CARD_WIDTH = isMobileView
+        ? ALBUM_CARD_WIDTH_MOBILE
+        : ALBUM_CARD_WIDTH_DESKTOP;
     $: GRID_GAP = isMobileView ? GRID_GAP_MOBILE : GRID_GAP_DESKTOP;
-    $: ALBUM_CARD_HEIGHT = isMobileView ? ALBUM_CARD_HEIGHT_MOBILE : ALBUM_CARD_HEIGHT_DESKTOP;
+    $: ALBUM_CARD_HEIGHT = isMobileView
+        ? ALBUM_CARD_HEIGHT_MOBILE
+        : ALBUM_CARD_HEIGHT_DESKTOP;
 
     let containerHeight = 600;
     let containerWidth = 800;
@@ -43,12 +52,16 @@
     let albumIndexMap = new Map<number, number>();
     $: {
         albumIndexMap = new Map(
-            albums.map((album, index) => [album.id, index])
+            albums.map((album, index) => [album.id, index]),
         );
     }
 
-    // Helper function that accepts parameters 
-    function isAlbumPlaying(albumId: number, currentId: number | null, playing: boolean): boolean {
+    // Helper function that accepts parameters
+    function isAlbumPlaying(
+        albumId: number,
+        currentId: number | null,
+        playing: boolean,
+    ): boolean {
         return currentId === albumId && playing;
     }
 
@@ -69,17 +82,26 @@
     };
 
     $: {
-        const availableWidth = containerWidth - (GRID_GAP * 2);
+        const availableWidth = containerWidth - GRID_GAP * 2;
         const cardWithGap = ALBUM_CARD_WIDTH + GRID_GAP;
-        const columns = Math.max(1, Math.floor((availableWidth + GRID_GAP) / cardWithGap));
-        
+        const columns = Math.max(
+            1,
+            Math.floor((availableWidth + GRID_GAP) / cardWithGap),
+        );
+
         const totalRows = Math.ceil(albums.length / columns);
         const rowHeight = ALBUM_CARD_HEIGHT + GRID_GAP;
         const totalHeight = totalRows * rowHeight;
-        
-        const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN);
-        const endRow = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / rowHeight) + OVERSCAN);
-        
+
+        const startRow = Math.max(
+            0,
+            Math.floor(scrollTop / rowHeight) - OVERSCAN,
+        );
+        const endRow = Math.min(
+            totalRows,
+            Math.ceil((scrollTop + containerHeight) / rowHeight) + OVERSCAN,
+        );
+
         const startIndex = startRow * columns;
         const endIndex = Math.min(albums.length, endRow * columns);
         const visibleAlbums = albums.slice(startIndex, endIndex);
@@ -119,15 +141,15 @@
     // Event delegation - container
     async function handleBodyClick(e: MouseEvent) {
         const target = e.target as HTMLElement;
-        
+
         // Check if play button was clicked
-        const playButton = target.closest('.play-button');
+        const playButton = target.closest(".play-button");
         if (playButton) {
             e.stopPropagation();
-            const card = playButton.closest('.album-card');
+            const card = playButton.closest(".album-card");
             if (!card) return;
 
-            const albumId = parseInt(card.getAttribute('data-album-id') || '0');
+            const albumId = parseInt(card.getAttribute("data-album-id") || "0");
             if (!albumId) return;
 
             // Don't restart if already playing
@@ -139,24 +161,24 @@
             try {
                 const tracks = await getTracksByAlbum(albumId);
                 if (tracks.length > 0) {
-                    const album = albums.find(a => a.id === albumId);
+                    const album = albums.find((a) => a.id === albumId);
                     playTracks(tracks, 0, {
-                        type: 'album',
+                        type: "album",
                         albumId: albumId,
-                        displayName: album?.name ?? 'Album'
+                        displayName: album?.name ?? "Album",
                     });
                 }
             } catch (error) {
-                console.error('Failed to load tracks for album:', error);
+                console.error("Failed to load tracks for album:", error);
             }
             return;
         }
 
         // Otherwise, navigate to album detail
-        const card = target.closest('.album-card');
+        const card = target.closest(".album-card");
         if (!card) return;
 
-        const albumId = parseInt(card.getAttribute('data-album-id') || '0');
+        const albumId = parseInt(card.getAttribute("data-album-id") || "0");
         if (!albumId) return;
 
         goToAlbumDetail(albumId);
@@ -164,16 +186,16 @@
 
     // Event delegation - context menu handler on container
     async function handleBodyContextMenu(e: MouseEvent) {
-        const card = (e.target as HTMLElement).closest('.album-card');
+        const card = (e.target as HTMLElement).closest(".album-card");
         if (!card) return;
 
         e.preventDefault();
 
-        const albumId = parseInt(card.getAttribute('data-album-id') || '0');
+        const albumId = parseInt(card.getAttribute("data-album-id") || "0");
         const albumIndex = albumIndexMap.get(albumId);
-        
+
         if (albumIndex === undefined) return;
-        
+
         const album = albums[albumIndex];
         if (!album) return;
 
@@ -189,13 +211,16 @@
                             const tracks = await getTracksByAlbum(album.id);
                             if (tracks.length > 0) {
                                 playTracks(tracks, 0, {
-                                    type: 'album',
+                                    type: "album",
                                     albumId: album.id,
-                                    displayName: album.name
+                                    displayName: album.name,
                                 });
                             }
                         } catch (error) {
-                            console.error('Failed to load tracks for album:', error);
+                            console.error(
+                                "Failed to load tracks for album:",
+                                error,
+                            );
                         }
                     },
                 },
@@ -204,6 +229,17 @@
                     label: "Delete Album",
                     danger: true,
                     action: async () => {
+                        const confirmed = await confirm(
+                            `Are you sure you want to delete the album "${album.name}"? This will delete all songs in this album from your computer.`,
+                            {
+                                title: "Delete Album",
+                                confirmLabel: "Delete",
+                                danger: true,
+                            },
+                        );
+
+                        if (!confirmed) return;
+
                         try {
                             await deleteAlbum(album.id);
                             await loadLibrary();
@@ -220,16 +256,18 @@
     function handleImageError(e: Event) {
         const img = e.target as HTMLImageElement;
         const coverSrc = img.src;
-        
+
         if (failedImages.size >= MAX_FAILED_IMAGES) {
-            const toKeep = Array.from(failedImages).slice(-MAX_FAILED_IMAGES / 2);
+            const toKeep = Array.from(failedImages).slice(
+                -MAX_FAILED_IMAGES / 2,
+            );
             failedImages.clear();
-            toKeep.forEach(src => failedImages.add(src));
+            toKeep.forEach((src) => failedImages.add(src));
         }
-        
+
         failedImages.add(coverSrc);
         failedImages = failedImages; // Trigger reactivity
-        
+
         // Start cleanup interval if needed
         startCleanupInterval();
     }
@@ -243,7 +281,9 @@
 
         cleanupInterval = window.setInterval(() => {
             if (failedImages.size > MAX_FAILED_IMAGES) {
-                const toKeep = Array.from(failedImages).slice(-MAX_FAILED_IMAGES / 2);
+                const toKeep = Array.from(failedImages).slice(
+                    -MAX_FAILED_IMAGES / 2,
+                );
                 failedImages.clear();
                 toKeep.forEach((src) => failedImages.add(src));
                 failedImages = failedImages;
@@ -266,7 +306,7 @@
             updateDimensions();
 
             // Use ResizeObserver for better performance
-            if (typeof ResizeObserver !== 'undefined') {
+            if (typeof ResizeObserver !== "undefined") {
                 resizeObserver = new ResizeObserver(updateDimensions);
                 resizeObserver.observe(containerElement);
             } else {
@@ -283,9 +323,9 @@
     onDestroy(() => {
         // Clear lazy-loaded images
         if (containerElement) {
-            const images = containerElement.querySelectorAll('img');
-            images.forEach(img => {
-                img.src = '';
+            const images = containerElement.querySelectorAll("img");
+            images.forEach((img) => {
+                img.src = "";
             });
         }
 
@@ -309,35 +349,35 @@
         containerElement = undefined as any;
     });
 
-// Infinite Scroll
+    // Infinite Scroll
 
-let isLoadingMore = false;
-let hasMoreAlbums = true;
+    let isLoadingMore = false;
+    let hasMoreAlbums = true;
 
-async function loadMoreAlbumsIfNeeded() {
-    if (isLoadingMore || !hasMoreAlbums) return;
+    async function loadMoreAlbumsIfNeeded() {
+        if (isLoadingMore || !hasMoreAlbums) return;
 
-    // Check if we're near the bottom
-    const threshold = virtualScrollState.totalHeight * 0.8;
-    if (scrollTop + containerHeight < threshold) return;
+        // Check if we're near the bottom
+        const threshold = virtualScrollState.totalHeight * 0.8;
+        if (scrollTop + containerHeight < threshold) return;
 
-    isLoadingMore = true;
-    try {
-        const loaded = await loadMoreAlbums();
-        hasMoreAlbums = loaded;
-    } catch (error) {
-        console.error('[AlbumGrid] Failed to load more albums:', error);
-    } finally {
-        isLoadingMore = false;
+        isLoadingMore = true;
+        try {
+            const loaded = await loadMoreAlbums();
+            hasMoreAlbums = loaded;
+        } catch (error) {
+            console.error("[AlbumGrid] Failed to load more albums:", error);
+        } finally {
+            isLoadingMore = false;
+        }
     }
-}
 
-// Add to existing reactive statement for scroll
-$: {
-    if (scrollTop > 0) {
-        loadMoreAlbumsIfNeeded();
+    // Add to existing reactive statement for scroll
+    $: {
+        if (scrollTop > 0) {
+            loadMoreAlbumsIfNeeded();
+        }
     }
-}
 </script>
 
 {#if albums.length > 0}
@@ -359,78 +399,87 @@ $: {
                     grid-template-columns: repeat({virtualScrollState.columns}, minmax({ALBUM_CARD_WIDTH}px, 1fr));
                 "
             >
-            {#each visibleAlbumsWithMetadata as { album, coverSrc } (album.id)}
-                <div
-                    class="album-card"
-                    class:now-playing={isAlbumPlaying(album.id, currentAlbumIdValue, isPlayingValue)}
-                    data-album-id={album.id}
-                    role="button"
-                    tabindex="0"
-                >
-                    <div class="album-art">
-                        {#if coverSrc && !failedImages.has(coverSrc)}
-                            <img
-                                src={coverSrc}
-                                alt={album.name}
-                                decoding="async"
-                                on:error={handleImageError}
-                            />
-                        {:else}
-                            <div class="album-art-placeholder">
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    width="48"
-                                    height="48"
-                                    aria-hidden="true"
-                                >
-                                    <path
-                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
-                                    />
-                                </svg>
-                            </div>
-                        {/if}
-                        {#if isAlbumPlaying(album.id, currentAlbumIdValue, isPlayingValue)}
-                            <div class="now-playing-badge">
-                                Now Playing
-                            </div>
-                        {/if}
-                        <div class="play-overlay">
-                            {#if isAlbumPlaying(album.id, currentAlbumIdValue, isPlayingValue)}
-                                <div class="playing-indicator">
-                                    <span class="bar"></span>
-                                    <span class="bar"></span>
-                                    <span class="bar"></span>
-                                </div>
+                {#each visibleAlbumsWithMetadata as { album, coverSrc } (album.id)}
+                    <div
+                        class="album-card"
+                        class:now-playing={isAlbumPlaying(
+                            album.id,
+                            currentAlbumIdValue,
+                            isPlayingValue,
+                        )}
+                        data-album-id={album.id}
+                        role="button"
+                        tabindex="0"
+                    >
+                        <div class="album-art">
+                            {#if coverSrc && !failedImages.has(coverSrc)}
+                                <img
+                                    src={coverSrc}
+                                    alt={album.name}
+                                    decoding="async"
+                                    on:error={handleImageError}
+                                />
                             {:else}
-                                <div class="play-button">
+                                <div class="album-art-placeholder">
                                     <svg
                                         viewBox="0 0 24 24"
                                         fill="currentColor"
-                                        width="24"
-                                        height="24"
+                                        width="48"
+                                        height="48"
                                         aria-hidden="true"
                                     >
-                                        <path d="M8 5v14l11-7z" />
+                                        <path
+                                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
+                                        />
                                     </svg>
                                 </div>
                             {/if}
+                            {#if isAlbumPlaying(album.id, currentAlbumIdValue, isPlayingValue)}
+                                <div class="now-playing-badge">Now Playing</div>
+                            {/if}
+                            <div class="play-overlay">
+                                {#if isAlbumPlaying(album.id, currentAlbumIdValue, isPlayingValue)}
+                                    <div class="playing-indicator">
+                                        <span class="bar"></span>
+                                        <span class="bar"></span>
+                                        <span class="bar"></span>
+                                    </div>
+                                {:else}
+                                    <div class="play-button">
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                            width="24"
+                                            height="24"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                        <div class="album-info">
+                            <span class="album-name truncate">{album.name}</span
+                            >
+                            <span class="album-artist truncate"
+                                >{album.artist || "Unknown Artist"}</span
+                            >
                         </div>
                     </div>
-                    <div class="album-info">
-                        <span class="album-name truncate">{album.name}</span>
-                        <span class="album-artist truncate"
-                            >{album.artist || "Unknown Artist"}</span
-                        >
-                    </div>
-                </div>
-            {/each}
+                {/each}
             </div>
         </div>
     </div>
 {:else}
     <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48" aria-hidden="true">
+        <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="48"
+            height="48"
+            aria-hidden="true"
+        >
             <path
                 d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
             />
@@ -572,7 +621,9 @@ $: {
         align-items: center;
         justify-content: center;
         transform: translateY(8px);
-        transition: transform var(--transition-fast), scale var(--transition-fast);
+        transition:
+            transform var(--transition-fast),
+            scale var(--transition-fast);
         box-shadow: var(--shadow-lg);
         will-change: transform, scale;
         cursor: pointer;
@@ -580,7 +631,7 @@ $: {
     }
 
     .play-button::after {
-        content: 'Play album';
+        content: "Play album";
         position: absolute;
         bottom: calc(100% + 8px);
         left: 50%;
@@ -646,7 +697,6 @@ $: {
         50% {
             height: 20px;
         }
-
     }
 
     .album-info {

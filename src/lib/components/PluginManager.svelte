@@ -12,6 +12,7 @@
     getPermissionDescription,
   } from "$lib/plugins/schema";
   import { addToast } from "$lib/stores/toast";
+  import { confirm } from "$lib/stores/dialogs";
 
   // Local state
   let newCommunityUrl = "";
@@ -32,38 +33,47 @@
 
   function normalizeGitHubUrl(url: string): string {
     // Remove trailing slashes
-    let normalized = url.trim().replace(/\/+$/, '');
-    
+    let normalized = url.trim().replace(/\/+$/, "");
+
     // Remove .git suffix
-    normalized = normalized.replace(/\.git$/, '');
-    
+    normalized = normalized.replace(/\.git$/, "");
+
     // Convert blob/main/plugin.json URLs to repo URLs
-    normalized = normalized.replace(/\/blob\/[^/]+\/.*$/, '');
-    
+    normalized = normalized.replace(/\/blob\/[^/]+\/.*$/, "");
+
     // Convert to standard github.com format (in case of www or other variations)
-    normalized = normalized.replace(/^https?:\/\/(www\.)?github\.com\//, 'https://github.com/');
-    
+    normalized = normalized.replace(
+      /^https?:\/\/(www\.)?github\.com\//,
+      "https://github.com/",
+    );
+
     return normalized;
   }
 
   function handleAddCommunityUrl() {
     const trimmedUrl = newCommunityUrl.trim();
-    
+
     if (!trimmedUrl) return;
 
     // Normalize both the new URL and existing URLs for comparison
     const normalizedNew = normalizeGitHubUrl(trimmedUrl);
-    const existingNormalized = $pluginStore.communityUrls.map(url => normalizeGitHubUrl(url));
+    const existingNormalized = $pluginStore.communityUrls.map((url) =>
+      normalizeGitHubUrl(url),
+    );
 
     // Check for duplicate
     if (existingNormalized.includes(normalizedNew)) {
-      addToast("This plugin repository has already been added", 'error');
+      addToast("This plugin repository has already been added", "error");
       return;
     }
 
     // Check if already installed
-    if ($pluginStore.installed.some(p => normalizeGitHubUrl(p.manifest.repo || '') === normalizedNew)) {
-      addToast("This plugin is already installed", 'warning');
+    if (
+      $pluginStore.installed.some(
+        (p) => normalizeGitHubUrl(p.manifest.repo || "") === normalizedNew,
+      )
+    ) {
+      addToast("This plugin is already installed", "warning");
       return;
     }
 
@@ -85,7 +95,9 @@
   async function handleInstallClick(plugin: MarketplacePlugin) {
     // Combine regular permissions and cross-plugin access
     const hasPermissions = plugin.manifest.permissions.length > 0;
-    const hasCrossPluginAccess = plugin.manifest.cross_plugin_access && plugin.manifest.cross_plugin_access.length > 0;
+    const hasCrossPluginAccess =
+      plugin.manifest.cross_plugin_access &&
+      plugin.manifest.cross_plugin_access.length > 0;
 
     if (hasPermissions || hasCrossPluginAccess) {
       selectedPlugin = plugin;
@@ -116,7 +128,13 @@
   }
 
   async function handleUninstall(name: string) {
-    if (confirm(`Are you sure you want to uninstall "${name}"?`)) {
+    if (
+      await confirm(`Are you sure you want to uninstall "${name}"?`, {
+        title: "Uninstall Plugin",
+        confirmLabel: "Uninstall",
+        danger: true,
+      })
+    ) {
       await pluginStore.uninstallPlugin(name);
     }
   }
@@ -314,14 +332,24 @@
       <div class="plugin-grid">
         {#each $communityPlugins as plugin}
           <div class="plugin-card">
-            <button 
-              class="remove-btn" 
+            <button
+              class="remove-btn"
               on:click={() => handleRemoveCommunityUrl(plugin.repo)}
               title="Remove from list"
               aria-label="Remove plugin"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
-                <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                width="16"
+                height="16"
+              >
+                <path
+                  d="M18 6L6 18M6 6l12 12"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
               </svg>
             </button>
             <div class="plugin-icon">
@@ -425,8 +453,12 @@
                   class="btn-secondary"
                   on:click={async () => {
                     if (
-                      confirm(
+                      await confirm(
                         `Are you sure you want to reinstall "${plugin.name}"?`,
+                        {
+                          title: "Reinstall Plugin",
+                          confirmLabel: "Reinstall",
+                        },
                       )
                     ) {
                       await pluginStore.reinstallPlugin(plugin.name);
@@ -467,13 +499,15 @@
       <p class="modal-desc">
         <strong>{selectedPlugin.manifest.name}</strong> requests the following permissions:
       </p>
-      
+
       <!-- Regular Permissions -->
       {#if pendingPermissions.length > 0}
         <div class="permission-section">
           <h3 class="section-title">
             <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+              <path
+                d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"
+              />
             </svg>
             System Permissions
           </h3>
@@ -495,7 +529,7 @@
         <div class="permission-section">
           <h3 class="section-title">
             <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
             </svg>
             Plugin Integration
           </h3>
@@ -503,8 +537,18 @@
             {#each selectedPlugin.manifest.cross_plugin_access as access}
               <div class="cross-plugin-item">
                 <div class="cross-plugin-header">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-width="2" stroke-linejoin="round"/>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    width="14"
+                    height="14"
+                  >
+                    <path
+                      d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                    />
                   </svg>
                   <span class="target-plugin">{access.plugin}</span>
                 </div>
@@ -633,7 +677,9 @@
 
   @media (max-width: 768px) {
     .plugin-content {
-      padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-xl));
+      padding-bottom: calc(
+        var(--mobile-bottom-inset, 130px) + var(--spacing-xl)
+      );
     }
   }
 
