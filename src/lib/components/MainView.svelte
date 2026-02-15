@@ -1,8 +1,23 @@
 <script lang="ts">
-    import { currentView, goToTracks, goToAlbums, goToArtists, goToPlaylists } from "$lib/stores/view";
-    import { tracks, albums, artists } from "$lib/stores/library";
-    import { isScanning } from "$lib/stores/progressiveScan";  // we Only need isScanning flag
-    import { searchQuery, searchResults, clearSearch } from "$lib/stores/search";
+    import {
+        currentView,
+        goToTracks,
+        goToAlbums,
+        goToArtists,
+        goToPlaylists,
+    } from "$lib/stores/view";
+    import {
+        tracks,
+        albums,
+        artists,
+        addTrackToLibrary,
+    } from "$lib/stores/library";
+    import { isScanning } from "$lib/stores/progressiveScan"; // we Only need isScanning flag
+    import {
+        searchQuery,
+        searchResults,
+        clearSearch,
+    } from "$lib/stores/search";
     import { isMobile } from "$lib/stores/mobile";
     import MobileHome from "./MobileHome.svelte";
 
@@ -19,14 +34,24 @@
     import PluginManager from "./PluginManager.svelte";
     import Settings from "./Settings.svelte";
 
-    import { tick } from 'svelte';
+    import { tick, onMount } from "svelte";
+    import { fade, fly } from "svelte/transition";
+    import { onDestroy } from "svelte";
+    import { getCurrentWebview } from "@tauri-apps/api/webview";
+
+    import { confirm } from "$lib/stores/dialogs";
+    import { get } from "svelte/store";
+    import { importAudioFile, importAudioBytes } from "$lib/api/tauri";
+    // Note: we prefer using the OS file path when available from the drag event.
 
     $: isSearching = $searchQuery.length > 0;
-    $: isLibraryView = ['tracks', 'albums', 'artists', 'playlists'].includes($currentView.type);
+    $: isLibraryView = ["tracks", "albums", "artists", "playlists"].includes(
+        $currentView.type,
+    );
     import GlobalShortcuts from "./GlobalShortcuts.svelte";
 
     // Mobile search bar state
-    let mobileSearchInput = '';
+    let mobileSearchInput = "";
     let mobileSearchInputEl: HTMLInputElement;
     let mobileSearchTimer: ReturnType<typeof setTimeout>;
     let mobileSearchVisible = false;
@@ -45,20 +70,438 @@
 
     function closeMobileSearch() {
         mobileSearchVisible = false;
-        mobileSearchInput = '';
+        mobileSearchInput = "";
         clearSearch();
+    }
+
+    // Drag & Drop logic
+    let isDragging = false;
+    let dragCounter = 0;
+    let dropError = "";
+
+    function isAudioFile(file: File) {
+        return (
+            file.type.startsWith("audio/") ||
+            /\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(file.name)
+        );
+    }
+
+    async function handleDrop(event: any) {
+        try {
+            if (event && typeof event.preventDefault === "function")
+                event.preventDefault();
+        } catch (e) {}
+
+        isDragging = false;
+        dragCounter = 0;
+        dropError = "";
+
+        // Normalize files: support DataTransferFile (File objects) and synthetic { name, path } objects
+        let incomingFiles: any[] = [];
+        try {
+            if (event?.dataTransfer?.files) {
+                // FileList or Array-like
+                incomingFiles = Array.from(event.dataTransfer.files as any);
+            } else if (Array.isArray(event?.dataTransfer?.files)) {
+                incomingFiles = event.dataTransfer.files;
+            } else if (Array.isArray(event?.dataTransfer)) {
+                incomingFiles = event.dataTransfer;
+            } else if (event?.dataTransfer && event.dataTransfer.paths) {
+                incomingFiles = event.dataTransfer.paths.map((p: string) => ({
+                    name: p.split(/[\\/]/).pop(),
+                    path: p,
+                }));
+            } else if (event?.dataTransfer && event.dataTransfer.filesPaths) {
+                incomingFiles = event.dataTransfer.filesPaths.map(
+                    (p: string) => ({ name: p.split(/[\\/]/).pop(), path: p }),
+                );
+            } else if (Array.isArray(event)) {
+                incomingFiles = event;
+            } else if (event && event.payload && event.payload.paths) {
+                incomingFiles = event.payload.paths.map((p: string) => ({
+                    name: p.split(/[\\/]/).pop(),
+                    path: p,
+                }));
+            }
+        } catch (e) {
+            console.warn("Failed to normalize drop payload", e);
+        }
+
+        if (!incomingFiles.length) {
+            dropError = "No audio files detected.";
+            return;
+        }
+
+        for (const file of incomingFiles) {
+            // If file is a plain path object
+            const maybePath: string | undefined =
+                (file as any).path ||
+                (file as any).filesystemPath ||
+                ((file as any).name && /[:\\/]/.test((file as any).name))
+                    ? (file as any).name
+                    : undefined;
+
+            // If item is a real File-like object, it may have .name and .arrayBuffer()
+            if (maybePath) {
+                // Use backend import by path
+                try {
+                    console.log("[DND] importing by path:", maybePath);
+                    const result = await importAudioFile(maybePath, false);
+                    if (result === "duplicate") {
+                        const overwrite = await confirm(
+                            `File '${(file as any).name}' already exists. Overwrite?`,
+                            { confirmLabel: "Overwrite", cancelLabel: "Skip" },
+                        );
+                        if (overwrite) {
+                            const r2 = await importAudioFile(maybePath, true);
+                            if (typeof r2 === "object") {
+                                console.log("Imported (overwritten)", r2.title);
+                                addTrackToLibrary(r2);
+                            } else {
+                                dropError = `Failed to import ${(file as any).name || maybePath}: ${r2}`;
+                            }
+                        }
+                    } else if (typeof result === "object") {
+                        console.log("Imported", result.title);
+                        addTrackToLibrary(result);
+                    } else {
+                        dropError = `Failed to import ${(file as any).name || maybePath}: ${result}`;
+                    }
+                } catch (e) {
+                    dropError = `Failed to import ${(file as any).name || maybePath}: ${e}`;
+                }
+            } else if ((file as any).arrayBuffer) {
+                // Browser File: read bytes and call importAudioBytes
+                try {
+                    const arrayBuffer = await (file as File).arrayBuffer();
+                    const bytes = new Uint8Array(arrayBuffer);
+                    let binary = "";
+                    for (let i = 0; i < bytes.length; i++)
+                        binary += String.fromCharCode(bytes[i]);
+                    const base64Data = btoa(binary);
+                    const result = await importAudioBytes(
+                        (file as any).name || "unknown",
+                        base64Data,
+                        false,
+                    );
+                    if (result === "duplicate") {
+                        const overwrite = await confirm(
+                            `File '${(file as any).name}' already exists. Overwrite?`,
+                            { confirmLabel: "Overwrite", cancelLabel: "Skip" },
+                        );
+                        if (overwrite) {
+                            const r2 = await importAudioBytes(
+                                (file as any).name || "unknown",
+                                base64Data,
+                                true,
+                            );
+                            if (typeof r2 === "object") {
+                                console.log(
+                                    "Imported bytes (overwritten)",
+                                    r2.title,
+                                );
+                                addTrackToLibrary(r2);
+                            } else {
+                                dropError = `Failed to import ${(file as any).name}: ${r2}`;
+                            }
+                        }
+                    } else if (typeof result === "object") {
+                        console.log("Imported bytes", result.title);
+                        addTrackToLibrary(result);
+                    } else {
+                        dropError = `Failed to import ${(file as any).name}: ${result}`;
+                    }
+                } catch (e) {
+                    dropError = `Failed to read ${(file as any).name}: ${e}`;
+                }
+            } else {
+                console.warn("Unsupported drop item", file);
+            }
+        }
+    }
+
+    function hasFiles(dt: DataTransfer | null | undefined) {
+        try {
+            if (!dt) return false;
+            // Some browsers expose types as DOMStringList
+            const types = dt.types as any;
+            if (!types) return false;
+            // Common check: 'Files' type present
+            for (let i = 0; i < types.length; i++) {
+                const t = String(types[i] || "").toLowerCase();
+                if (
+                    t === "files" ||
+                    t === "application/x-moz-file" ||
+                    t === "file"
+                )
+                    return true;
+            }
+        } catch (e) {
+            // ignore
+        }
+        return false;
+    }
+
+    // Add native capture-phase listeners to help when webview swallows events
+    onMount(() => {
+        const nativeEnter = (e: DragEvent) => {
+            console.log(
+                "[DND] native dragenter",
+                e.type,
+                e.dataTransfer?.types,
+            );
+            try {
+                if (hasFiles(e.dataTransfer)) {
+                    e.preventDefault();
+                    handleDragEnter(e);
+                }
+            } catch (err) {}
+        };
+        const nativeOver = (e: DragEvent) => {
+            // show logs to verify dragover
+            console.log("[DND] native dragover", e.type, e.dataTransfer?.types);
+            try {
+                if (hasFiles(e.dataTransfer)) {
+                    e.preventDefault();
+                    handleDragOver(e);
+                    e.dataTransfer!.dropEffect = "copy";
+                }
+            } catch (err) {}
+        };
+        const nativeLeave = (e: DragEvent) => {
+            console.log(
+                "[DND] native dragleave",
+                e.type,
+                e.dataTransfer?.types,
+            );
+            try {
+                if (hasFiles(e.dataTransfer)) {
+                    e.preventDefault();
+                    handleDragLeave(e);
+                }
+            } catch (err) {}
+        };
+        const nativeDrop = (e: DragEvent) => {
+            console.log("[DND] native drop", e.type, e.dataTransfer?.types);
+            try {
+                if (hasFiles(e.dataTransfer)) {
+                    e.preventDefault();
+                    handleDrop(e);
+                }
+            } catch (err) {}
+        };
+
+        window.addEventListener("dragenter", nativeEnter, true);
+        window.addEventListener("dragover", nativeOver, true);
+        window.addEventListener("dragleave", nativeLeave, true);
+        window.addEventListener("drop", nativeDrop, true);
+
+        // Register Tauri webview drag-drop event listener (desktop webview)
+        let unlistenWebview: (() => void) | null = null;
+
+        (async () => {
+            try {
+                const webview = await getCurrentWebview();
+                unlistenWebview = await webview.onDragDropEvent(
+                    async (event) => {
+                        // payload types: 'over' | 'drop' | 'cancel'
+                        console.log(
+                            "[DND] webview onDragDropEvent",
+                            event.payload.type,
+                            event.payload,
+                        );
+                        const p: any = event.payload;
+                        if (p.type === "over") {
+                            // The user is hovering files over the webview
+                            isDragging = true;
+                        } else if (p.type === "drop") {
+                            isDragging = false;
+                            // event.payload.paths is an array of absolute file paths
+                            const paths: string[] = p.paths || [];
+                            for (const fp of paths) {
+                                try {
+                                    console.log("[DND] webview drop path:", fp);
+                                    const result = await importAudioFile(
+                                        fp,
+                                        false,
+                                    );
+                                    if (result === "duplicate") {
+                                        const name =
+                                            fp.split(/[\\/]/).pop() || fp;
+                                        const overwrite = await confirm(
+                                            `File '${name}' already exists. Overwrite?`,
+                                            {
+                                                confirmLabel: "Overwrite",
+                                                cancelLabel: "Skip",
+                                            },
+                                        );
+                                        if (overwrite) {
+                                            const r2 = await importAudioFile(
+                                                fp,
+                                                true,
+                                            );
+                                            if (typeof r2 === "object")
+                                                addTrackToLibrary(r2);
+                                        }
+                                    } else if (typeof result === "object") {
+                                        console.log(
+                                            "Imported (webview)",
+                                            result.title,
+                                        );
+                                        addTrackToLibrary(result);
+                                    } else {
+                                        console.warn(
+                                            "Import result",
+                                            result,
+                                            fp,
+                                        );
+                                    }
+                                } catch (e) {
+                                    console.error(
+                                        "[DND] importAudioFile failed for",
+                                        fp,
+                                        e,
+                                    );
+                                }
+                            }
+                        } else {
+                            // cancel
+                            isDragging = false;
+                        }
+                    },
+                );
+            } catch (e) {
+                // Ignore if not running in Tauri or API unavailable
+                console.warn(
+                    "[DND] getCurrentWebview.onDragDropEvent not available",
+                    e,
+                );
+            }
+        })();
+
+        return () => {
+            window.removeEventListener("dragenter", nativeEnter, true);
+            window.removeEventListener("dragover", nativeOver, true);
+            window.removeEventListener("dragleave", nativeLeave, true);
+            window.removeEventListener("drop", nativeDrop, true);
+            if (unlistenWebview) {
+                try {
+                    unlistenWebview();
+                } catch (e) {}
+            }
+        };
+    });
+
+    function handleDragOver(event: DragEvent) {
+        if (!hasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        if (!isDragging) isDragging = true;
+    }
+
+    function handleDragEnter(event: DragEvent) {
+        if (!hasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        dragCounter++;
+        isDragging = true;
+    }
+
+    function handleDragLeave(event: DragEvent) {
+        if (!hasFiles(event.dataTransfer)) return;
+        event.preventDefault();
+        dragCounter--;
+        if (dragCounter <= 0) {
+            isDragging = false;
+        }
     }
 </script>
 
-<main class="main-view">
+<svelte:window
+    on:dragenter={handleDragEnter}
+    on:dragover={handleDragOver}
+    on:dragleave={handleDragLeave}
+    on:drop={handleDrop}
+/>
+
+<main
+    class="main-view"
+    on:dragover={handleDragOver}
+    on:dragenter={handleDragEnter}
+    on:dragleave={handleDragLeave}
+    on:drop={handleDrop}
+>
+    {#if isDragging}
+        <div class="drop-overlay" transition:fade={{ duration: 200 }}>
+            <div
+                class="drop-content"
+                in:fly={{ y: 20, duration: 400, delay: 100 }}
+            >
+                <div class="drop-icon">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </div>
+                <div class="drop-text">Drop your music here</div>
+                <div class="drop-subtext">MP3, FLAC, M4A, WAV, OGG</div>
+            </div>
+        </div>
+    {/if}
+
+    {#if dropError}
+        <div class="drop-error" transition:fly={{ y: -20, duration: 300 }}>
+            <div class="error-icon">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+            </div>
+            <div class="error-message">{dropError}</div>
+            <button
+                class="error-close"
+                on:click={() => (dropError = "")}
+                aria-label="Close error"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    {/if}
     <GlobalShortcuts />
 
     <!-- Mobile: Search bar + library sub-tabs (Spotify pill style) -->
     {#if $isMobile && isLibraryView}
         <div class="mobile-library-header">
             <div class="mobile-search-bar">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                <svg
+                    class="search-icon"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    width="18"
+                    height="18"
+                >
+                    <path
+                        d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                    />
                 </svg>
                 <input
                     type="text"
@@ -67,13 +510,25 @@
                     bind:value={mobileSearchInput}
                     bind:this={mobileSearchInputEl}
                     on:input={handleMobileSearchInput}
-                    on:keydown={(e) => e.key === 'Escape' && closeMobileSearch()}
+                    on:keydown={(e) =>
+                        e.key === "Escape" && closeMobileSearch()}
                     spellcheck="false"
                 />
                 {#if mobileSearchInput}
-                    <button class="search-clear" on:click={closeMobileSearch} aria-label="Clear search">
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    <button
+                        class="search-clear"
+                        on:click={closeMobileSearch}
+                        aria-label="Clear search"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="18"
+                            height="18"
+                        >
+                            <path
+                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                            />
                         </svg>
                     </button>
                 {/if}
@@ -81,22 +536,38 @@
         </div>
 
         {#if !isSearching}
-        <div class="mobile-library-tabs-wrapper">
-            <div class="mobile-library-tabs">
-                <button class="lib-tab" class:active={$currentView.type === 'tracks'} on:click={goToTracks}>
-                    Songs
-                </button>
-                <button class="lib-tab" class:active={$currentView.type === 'albums'} on:click={goToAlbums}>
-                    Albums
-                </button>
-                <button class="lib-tab" class:active={$currentView.type === 'artists'} on:click={goToArtists}>
-                    Artists
-                </button>
-                <button class="lib-tab" class:active={$currentView.type === 'playlists'} on:click={goToPlaylists}>
-                    Playlists
-                </button>
+            <div class="mobile-library-tabs-wrapper">
+                <div class="mobile-library-tabs">
+                    <button
+                        class="lib-tab"
+                        class:active={$currentView.type === "tracks"}
+                        on:click={goToTracks}
+                    >
+                        Songs
+                    </button>
+                    <button
+                        class="lib-tab"
+                        class:active={$currentView.type === "albums"}
+                        on:click={goToAlbums}
+                    >
+                        Albums
+                    </button>
+                    <button
+                        class="lib-tab"
+                        class:active={$currentView.type === "artists"}
+                        on:click={goToArtists}
+                    >
+                        Artists
+                    </button>
+                    <button
+                        class="lib-tab"
+                        class:active={$currentView.type === "playlists"}
+                        on:click={goToPlaylists}
+                    >
+                        Playlists
+                    </button>
+                </div>
             </div>
-        </div>
         {/if}
     {/if}
 
@@ -120,10 +591,10 @@
                 {/if}
             </header>
 
-        <div class="view-content">
-            <TrackList tracks={$tracks} showAlbum={true} />
+            <div class="view-content">
+                <TrackList tracks={$tracks} showAlbum={true} />
+            </div>
         </div>
-    </div>
     {:else if $currentView.type === "tracks-multiselect" && $currentView.id}
         <div class="view-container no-padding">
             <MultiSelectTrackView playlistId={$currentView.id} />
@@ -190,6 +661,140 @@
         flex-direction: column;
         overflow: hidden;
         background-color: var(--bg-base);
+        position: relative;
+    }
+
+    .drop-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        padding: var(--spacing-xl);
+    }
+
+    .drop-overlay::after {
+        content: "";
+        position: absolute;
+        inset: var(--spacing-md);
+        border: 2px dashed var(--accent-primary);
+        border-radius: var(--radius-lg);
+        opacity: 0.5;
+        animation: border-dance 4s linear infinite;
+    }
+
+    @keyframes border-dance {
+        0% {
+            stroke-dashoffset: 0;
+        }
+        100% {
+            stroke-dashoffset: 100;
+        }
+    }
+
+    .drop-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-md);
+        color: var(--text-primary);
+        text-align: center;
+        z-index: 1001;
+    }
+
+    .drop-icon {
+        width: 80px;
+        height: 80px;
+        color: var(--accent-primary);
+        background: var(--accent-subtle);
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .drop-icon svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    .drop-text {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+    }
+
+    .drop-subtext {
+        color: var(--text-secondary);
+        font-size: 1rem;
+        font-weight: 500;
+    }
+
+    .drop-error {
+        position: fixed;
+        top: var(--spacing-lg);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        padding: var(--spacing-md) var(--spacing-lg);
+        border-radius: var(--radius-md);
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-md);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--error-color);
+        min-width: 320px;
+        max-width: 90vw;
+    }
+
+    .error-icon {
+        color: var(--error-color);
+        flex-shrink: 0;
+    }
+
+    .error-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .error-message {
+        flex: 1;
+        font-weight: 500;
+        font-size: 0.9375rem;
+    }
+
+    .error-close {
+        color: var(--text-subdued);
+        padding: 4px;
+        border-radius: 4px;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        min-height: 32px;
+    }
+
+    .error-close:hover {
+        color: var(--text-primary);
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .error-close svg {
+        width: 18px;
+        height: 18px;
     }
 
     .view-container {
@@ -200,7 +805,7 @@
         overflow: hidden;
     }
 
-    .view-container.no-padding .view-content {
+    :global(.view-container.no-padding .view-content) {
         padding: 0;
     }
 
@@ -222,7 +827,9 @@
 
     @media (max-width: 768px) {
         .view-content {
-            padding-bottom: calc(var(--mobile-bottom-inset, 130px) + var(--spacing-md));
+            padding-bottom: calc(
+                var(--mobile-bottom-inset, 130px) + var(--spacing-md)
+            );
         }
     }
 
@@ -235,9 +842,9 @@
     }
 
     .scan-status {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-top: var(--spacing-xs);
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: var(--spacing-xs);
     }
 
     /* ===== Mobile Library Header (search + tabs) ===== */

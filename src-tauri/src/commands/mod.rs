@@ -15,3 +15,5 @@ pub use playlist::*;
 pub use plugin::*;
 pub mod window;
 pub use covers::*;
+pub use library::import_audio_file;
+pub use library::import_audio_bytes;

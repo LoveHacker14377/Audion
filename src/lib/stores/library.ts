@@ -309,6 +309,29 @@ function ingestTracks(incoming: Track[]): Track[] {
     return lightweight;
 }
 
+/**
+ * Add a single track to the library (handles metadata caching and store update)
+ */
+export function addTrackToLibrary(track: Track): void {
+    const [lightweight] = ingestTracks([track]);
+
+    // Update store
+    tracks.update(current => {
+        // Find if track already exists (by ID)
+        const index = current.findIndex(t => t.id === track.id);
+        if (index >= 0) {
+            const updated = [...current];
+            updated[index] = lightweight;
+            return updated;
+        }
+        // Prepend new tracks to the top so they are visible immediately
+        return [lightweight, ...current];
+    });
+
+    // Update count if it was new
+    trackCount.update(n => n + 1);
+}
+
 
 // ingestAlbums — caches album metadata and album art separately
 // Returns lightweight Album[] for the store

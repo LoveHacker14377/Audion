@@ -131,6 +131,8 @@ pub fn run() {
                     commands::download_and_save_audio,
                     commands::update_track_after_download,
                     commands::update_track_cover_url,
+                    commands::import_audio_file,
+                    commands::import_audio_bytes,
                     // Plugin commands
                     commands::list_plugins,
                     commands::install_plugin,

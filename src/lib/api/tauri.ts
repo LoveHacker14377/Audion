@@ -238,6 +238,15 @@ export async function getBatchCoverPaths(trackIds: number[]): Promise<Record<num
     return await invoke('get_batch_cover_paths', { trackIds });
 }
 
+export async function importAudioBytes(filename: string, base64Data: string, overwrite: boolean): Promise<Track | 'duplicate' | string> {
+    try {
+        return await invoke<Track>('import_audio_bytes', { filename, base64_data: base64Data, overwrite });
+    } catch (e: any) {
+        if (typeof e === 'string' && e === 'duplicate') return 'duplicate';
+        return e?.toString?.() || 'error';
+    }
+}
+
 // Get the file path for an album's art
 // Returns null if no art exists
 export async function getAlbumArtPath(albumId: number): Promise<string | null> {
@@ -620,5 +629,15 @@ export async function downloadTrack(trackId: number): Promise<void> {
         } else {
             alert('Failed to download track.');
         }
+    }
+}
+
+// Import a single audio file with duplicate detection and overwrite/skip logic
+export async function importAudioFile(filePath: string, overwrite: boolean): Promise<Track | 'duplicate' | string> {
+    try {
+        return await invoke<Track>('import_audio_file', { filePath, overwrite });
+    } catch (e: any) {
+        if (typeof e === 'string' && e === 'duplicate') return 'duplicate';
+        return e?.toString?.() || 'error';
     }
 }

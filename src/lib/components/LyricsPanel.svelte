@@ -9,6 +9,7 @@
         activeLine,
         initLyricsSync,
         destroyLyricsSync,
+        fetchLyricsForTrack,
     } from "$lib/stores/lyrics";
     import {
         currentTrack,
@@ -17,6 +18,7 @@
         seek,
     } from "$lib/stores/player";
     import { isMobile } from "$lib/stores/mobile";
+    import { addToast } from "$lib/stores/toast";
 
     let lyricsContainer: HTMLDivElement;
     let lineElements: HTMLDivElement[] = [];
@@ -151,6 +153,46 @@
         }
     }
 
+    // Import LRC file handler
+    async function handleImportLrc() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.lrc';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        input.click();
+        await new Promise(resolve => {
+            input.onchange = resolve;
+        });
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const lrcContent = e.target?.result as string;
+                await importLrcContent(lrcContent);
+            };
+            reader.readAsText(file);
+        }
+        document.body.removeChild(input);
+    }
+
+    async function importLrcContent(lrcContent: string) {
+        // Save to cache for current track
+        if (!$currentTrack) {
+            addToast("No track selected for lyrics import.", "error");
+            return;
+        }
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('save_lrc_file', { musicPath: $currentTrack.path, lrcContent });
+            // Reload lyrics
+            await fetchLyricsForTrack();
+            addToast("Lyrics imported successfully!", "success");
+        } catch (e) {
+            addToast("Failed to import lyrics.", "error");
+        }
+    }
+
     onMount(() => {
         initLyricsSync();
         return () => destroyLyricsSync();
@@ -161,23 +203,36 @@
     <aside class="lyrics-panel" class:mobile={$isMobile}>
         <header class="lyrics-header">
             <h3>Lyrics</h3>
-            <button
-                class="close-btn"
-                on:click={() => lyricsVisible.set(false)}
-                title="Close lyrics panel"
-                aria-label="Close lyrics panel"
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button
+                    class="icon-btn"
+                    title="Import LRC file"
+                    aria-label="Import LRC file"
+                    on:click={handleImportLrc}
                 >
-                    <path
-                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                    />
-                </svg>
-            </button>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7z"/>
+                        <path d="M5 18h14v2H5z"/>
+                    </svg>
+                </button>
+                <button
+                    class="close-btn"
+                    on:click={() => lyricsVisible.set(false)}
+                    title="Close lyrics panel"
+                    aria-label="Close lyrics panel"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="currentColor"
+                    >
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                        />
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <div class="lyrics-content" bind:this={lyricsContainer}>

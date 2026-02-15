@@ -2,9 +2,11 @@
 use crate::db::{queries, Database};
 use crate::scanner::{cover_storage, extract_metadata, scan_directory};
 use crate::security;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use crossbeam::channel::{bounded, Receiver, Sender};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -36,6 +38,162 @@ pub struct ScanResult {
     pub tracks_updated: usize,
     pub tracks_deleted: usize,
     pub errors: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn import_audio_file(
+    file_path: String,
+    overwrite: bool,
+    db: State<'_, Database>,
+) -> Result<queries::Track, String> {
+    // Log received path for debugging
+    eprintln!("[import_audio_file] received path: {}", file_path);
+
+    let path_buf = PathBuf::from(&file_path);
+    let canonical = path_buf.canonicalize().unwrap_or(path_buf.clone());
+    let file_str = canonical.to_string_lossy().to_string();
+
+    // Early existence check to provide clearer errors
+    if !std::path::Path::new(&file_str).exists() {
+        eprintln!("[import_audio_file] file does not exist: {}", file_str);
+        return Err(format!("file_not_found: {}", file_str));
+    }
+
+    let track_data = crate::scanner::extract_metadata(&file_str)
+        .ok_or_else(|| format!("Failed to extract metadata for {}", file_str))?;
+
+    handle_track_import(db, track_data, overwrite).await
+}
+
+#[tauri::command]
+pub async fn import_audio_bytes(
+    filename: String,
+    base64_data: String,
+    overwrite: bool,
+    db: State<'_, Database>,
+) -> Result<queries::Track, String> {
+    // Decode base64 payload
+    let bytes = STANDARD
+        .decode(base64_data.as_bytes())
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    // Determine app base dir via cover storage helper
+    let covers_dir = crate::scanner::cover_storage::get_covers_directory()
+        .map_err(|e| format!("Failed to get covers dir: {}", e))?;
+    let base_dir = covers_dir
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| covers_dir.clone());
+
+    // Ensure imports directory
+    let imports_dir = base_dir.join("imports");
+    std::fs::create_dir_all(&imports_dir)
+        .map_err(|e| format!("Failed to create imports dir: {}", e))?;
+
+    let file_path = imports_dir.join(&filename);
+    std::fs::write(&file_path, &bytes)
+        .map_err(|e| format!("Failed to write imported file: {}", e))?;
+
+    let file_path_str = file_path.to_string_lossy().to_string();
+    let track_data = crate::scanner::extract_metadata(&file_path_str)
+        .ok_or_else(|| "Failed to extract metadata".to_string())?;
+
+    handle_track_import(db, track_data, overwrite).await
+}
+
+async fn handle_track_import(
+    db: State<'_, Database>,
+    track_data: queries::TrackInsert,
+    overwrite: bool,
+) -> Result<queries::Track, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    // Check duplicate by content_hash
+    if let Some(ref hash) = track_data.content_hash {
+        let exists: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM tracks WHERE content_hash = ?1",
+                rusqlite::params![hash],
+                |row| row.get(0),
+            )
+            .ok();
+        if exists.is_some() && !overwrite {
+            return Err("duplicate".to_string());
+        }
+    }
+
+    let (track_id, _was_new) = crate::db::queries::insert_or_update_track(&conn, &track_data)
+        .map_err(|e| format!("DB error: {e}"))?;
+
+    if track_id == 0 {
+        return Err("failed_to_insert".to_string());
+    }
+
+    // Save track cover if present
+    let cover_path = if let Some(ref cover_bytes) = track_data.track_cover {
+        match cover_storage::save_track_cover(track_id, cover_bytes) {
+            Ok(p) => {
+                let _ = queries::update_track_cover_path(&conn, track_id, Some(&p));
+                Some(p)
+            }
+            Err(e) => {
+                eprintln!("[Import] Failed to save track cover: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Save album art if present and album doesn't have one
+    let album_id = conn
+        .query_row(
+            "SELECT album_id FROM tracks WHERE id = ?1",
+            [track_id],
+            |row| row.get::<_, Option<i64>>(0),
+        )
+        .unwrap_or(None);
+
+    if let Some(id) = album_id {
+        if let Some(ref art_bytes) = track_data.album_art {
+            let has_art: bool = conn
+                .query_row(
+                    "SELECT art_path IS NOT NULL FROM albums WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if !has_art {
+                if let Ok(p) = cover_storage::save_album_art(id, art_bytes) {
+                    let _ = queries::update_album_art_path(&conn, id, Some(&p));
+                }
+            }
+        }
+    }
+
+    // Return the full track object for the frontend
+    let track = queries::Track {
+        id: track_id,
+        path: track_data.path.clone(),
+        title: track_data.title.clone(),
+        artist: track_data.artist.clone(),
+        album: track_data.album.clone(),
+        track_number: track_data.track_number,
+        duration: track_data.duration,
+        album_id,
+        format: track_data.format.clone(),
+        bitrate: track_data.bitrate,
+        source_type: track_data.source_type.clone(),
+        cover_url: track_data.cover_url.clone(),
+        external_id: track_data.external_id.clone(),
+        local_src: track_data.local_src.clone(),
+        track_cover: None, // Frontend uses track_cover_path via convertFileSrc
+        track_cover_path: cover_path,
+        disc_number: track_data.disc_number,
+    };
+
+    Ok(track)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
