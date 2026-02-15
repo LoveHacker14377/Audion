@@ -12,3 +12,9 @@
 - Add Import Lyrics
 - Drag & Drop music files to import.
 - Add warning when deleting files in drive.
+- Add VirtualizedGrid to improve performance.
+
+### Contributors
+- @iiDriisTN
+- @SmileofHaven
+- @Manga-Knights
