@@ -1,5 +1,4 @@
 <script lang="ts">
-<script lang="ts">
   import type { Track } from "$lib/api/tauri";
   import {
     formatDuration,
@@ -1868,7 +1867,6 @@
     }
   }
 </style>
-// ...existing code...
 <script lang="ts">
   import type { Track } from "$lib/api/tauri";
   import {
