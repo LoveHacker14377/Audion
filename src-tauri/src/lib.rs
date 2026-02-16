@@ -152,6 +152,7 @@ pub fn run() {
                     commands::get_current_lyric,
                     // Metadata commands
                     commands::download_and_save_audio,
+                    commands::update_track_after_download,
                     commands::update_local_src,
                     commands::update_track_cover_url,
                     // Plugin commands
@@ -252,6 +253,7 @@ pub fn run() {
                     commands::get_current_lyric,
                     // Metadata commands
                     commands::download_and_save_audio,
+                    commands::update_track_after_download,
                     commands::update_local_src,
                     commands::update_track_cover_url,
                     // Plugin commands

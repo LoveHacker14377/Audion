@@ -116,13 +116,13 @@
   }
 
   // 5: Pre-compute album art and availability for visible tracks
-  type TrackWithMetadata = {
+  type TrackMeta = {
     track: Track;
     albumArt: string | null;
     unavailable: boolean;
   };
 
-  let visibleTracksWithMetadata: TrackWithMetadata[] = [];
+  let visibleTracksWithMetadata: TrackMeta[] = [];
   $: {
     // Watch relevant dependencies for availability and art
     const _ = $pluginStore;
@@ -138,7 +138,7 @@
         albumArt: getTrackAlbumArt(track),
         unavailable: isTrackUnavailable(track),
       }),
-    ) as TrackWithMetadata[];
+    ) as TrackMeta[];
   }
 
   $: filteredTracks = tracks;
