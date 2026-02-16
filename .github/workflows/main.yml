@@ -207,7 +207,7 @@ jobs:
           Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
 
   release-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: release-windows
     # Allow running even if Windows was skipped (for linux-only builds), or if Windows passed
     if: ${{ always() && (github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'all') && (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped') }}
@@ -227,7 +227,24 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev xvfb
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-0=2.44.0-2 \
+            libwebkit2gtk-4.1-dev=2.44.0-2 \
+            libjavascriptcoregtk-4.1-0=2.44.0-2 \
+            libjavascriptcoregtk-4.1-dev=2.44.0-2 \
+            gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
+            gir1.2-webkit2-4.1=2.44.0-2 \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            xvfb
 
       # 4. Setup Node.js
       - name: Setup Node.js
