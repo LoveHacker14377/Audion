@@ -45,6 +45,9 @@
           "path": "$APPDATA/audion/**"
         },
         {
+          "path": "$APPDATA/com.audion.app/**"
+        },
+        {
           "path": "$MUSIC/**"
         },
         {
@@ -60,6 +63,9 @@
         },
         {
           "path": "$APPDATA/audion/**"
+        },
+        {
+          "path": "$APPDATA/com.audion.app/**"
         },
         {
           "path": "$MUSIC/**"

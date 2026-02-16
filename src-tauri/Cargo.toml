@@ -11,6 +11,19 @@ edition = "2021"
 name = "audion_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# =============================================================================
+# FEATURE FLAGS
+# =============================================================================
+# native-audio: Force native audio backend (rodio) on all platforms.
+#               Linux enables this automatically. Use this flag to enable
+#               on Windows/macOS for testing or if you prefer native playback.
+#
+# Example: cargo build --features native-audio
+# =============================================================================
+[features]
+default = []
+native-audio = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -76,3 +89,18 @@ discord-rich-presence = "1.0"
 trash = "5"
 # Global keyboard shortcuts (desktop only)
 tauri-plugin-global-shortcut = "2"
+
+# =============================================================================
+# NATIVE AUDIO BACKEND
+# =============================================================================
+# We use rodio to provide native audio playback that bypasses the WebView
+# for better performance and reliability across all platforms.
+# =============================================================================
+rodio = { version = "0.19", default-features = false, features = [
+    "vorbis",
+    "symphonia-flac",
+    "symphonia-mp3",
+    "symphonia-wav",
+    "symphonia-aac",
+    "symphonia-isomp4"
+] }

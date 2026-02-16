@@ -9,6 +9,14 @@ mod scanner;
 mod security;
 mod utils;
 
+// =============================================================================
+// NATIVE AUDIO BACKEND
+// =============================================================================
+// We provide a native audio backend using rodio that bypasses the WebView.
+// This is now the default backend for all platforms.
+// =============================================================================
+mod audio;
+
 use db::Database;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -56,6 +64,17 @@ pub fn run() {
             #[cfg(desktop)]
             app.manage(discord::DiscordState(std::sync::Mutex::new(None)));
 
+            // =============================================================================
+            // NATIVE AUDIO BACKEND INITIALIZATION
+            // =============================================================================
+            // Initialize the native audio backend.
+            // This is now the default backend for all platforms.
+            // =============================================================================
+            {
+                log::info!("[AUDIO] Initializing native audio backend (rodio)...");
+                app.manage(audio::PlaybackStateSync::new());
+            }
+
             // Handle window start mode (desktop only)
             #[cfg(desktop)]
             {
@@ -78,7 +97,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler({
-            // Shared commands available on all platforms
+            // =============================================================================
+            // DESKTOP WITH NATIVE AUDIO: All commands + native audio backend
+            // =============================================================================
+            // This block is used on Linux (always) or when native-audio feature is enabled.
+            // =============================================================================
             #[cfg(desktop)]
             {
                 tauri::generate_handler![
@@ -130,9 +153,8 @@ pub fn run() {
                     // Metadata commands
                     commands::download_and_save_audio,
                     commands::update_track_after_download,
+                    commands::update_local_src,
                     commands::update_track_cover_url,
-                    commands::import_audio_file,
-                    commands::import_audio_bytes,
                     // Plugin commands
                     commands::list_plugins,
                     commands::install_plugin,
@@ -163,6 +185,22 @@ pub fn run() {
                     discord::discord_clear_presence,
                     discord::discord_disconnect,
                     discord::discord_reconnect,
+                    // =========================================================================
+                    // NATIVE AUDIO COMMANDS
+                    // =========================================================================
+                    // These commands control the native audio backend (rodio).
+                    // Now available on all platforms.
+                    // =========================================================================
+                    audio::audio_play,
+                    audio::audio_pause,
+                    audio::audio_resume,
+                    audio::audio_stop,
+                    audio::audio_set_volume,
+                    audio::audio_seek,
+                    audio::audio_get_state,
+                    audio::audio_is_finished,
+                    audio::audio_set_eq,
+                    audio::native_audio_available,
                 ]
             }
             #[cfg(mobile)]
@@ -215,6 +253,7 @@ pub fn run() {
                     commands::get_current_lyric,
                     // Metadata commands
                     commands::download_and_save_audio,
+                    commands::update_track_after_download,
                     commands::update_local_src,
                     commands::update_track_cover_url,
                     // Plugin commands

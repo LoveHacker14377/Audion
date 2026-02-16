@@ -97,6 +97,7 @@ function createSettingsStore() {
             });
         },
 
+
         async setStartMode(mode: 'normal' | 'maximized' | 'minimized') {
             try {
                 await invoke('set_window_start_mode', { mode });

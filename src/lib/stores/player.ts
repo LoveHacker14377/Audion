@@ -7,6 +7,115 @@ import { EventEmitter, type PluginEvents } from '$lib/plugins/event-emitter';
 import { tracks as libraryTracks, getFullTrack, getAlbumCoverFromTracks } from '$lib/stores/library';
 import { appSettings } from '$lib/stores/settings';
 import { equalizer, EQ_FREQUENCIES } from '$lib/stores/equalizer';
+import { pluginStore } from '$lib/stores/plugin-store';
+
+// =============================================================================
+// NATIVE AUDIO BACKEND
+// =============================================================================
+// We use a native Rust backend (rodio) for all audio playback.
+// This provides consistent performance and high-quality audio processing
+// (including EQ) across all supported platforms.
+// =============================================================================
+import {
+    nativeAudioPlay,
+    nativeAudioPause,
+    nativeAudioResume,
+    nativeAudioStop,
+    nativeAudioSetVolume,
+    nativeAudioSeek,
+    nativeAudioGetState,
+    nativeAudioIsFinished,
+    nativeAudioSetEq,
+    type NativePlaybackState
+} from '$lib/services/native-audio';
+
+// Interval for polling native playback state
+let nativeStatePoller: ReturnType<typeof setInterval> | null = null;
+
+// HTML5 Audio element for streaming (initialized lazily)
+let html5Audio: HTMLAudioElement | null = null;
+
+function getHtml5Audio(): HTMLAudioElement {
+    if (!html5Audio && typeof window !== 'undefined') {
+        html5Audio = new Audio();
+        setupHtml5AudioListeners(html5Audio);
+    }
+    return html5Audio!;
+}
+
+function setupHtml5AudioListeners(audio: HTMLAudioElement): void {
+    audio.addEventListener('timeupdate', () => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            currentTime.set(audio.currentTime);
+        }
+    });
+
+    audio.addEventListener('durationchange', () => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            if (audio.duration && !isNaN(audio.duration)) {
+                duration.set(audio.duration);
+            }
+        }
+    });
+
+    audio.addEventListener('play', () => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            isPlaying.set(true);
+            updateMediaSessionPlaybackState('playing');
+        }
+    });
+
+    audio.addEventListener('pause', () => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            isPlaying.set(false);
+            updateMediaSessionPlaybackState('paused');
+        }
+    });
+
+    audio.addEventListener('ended', () => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            handleTrackEnd();
+        }
+    });
+
+    audio.addEventListener('error', (e) => {
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            console.error('[Player] HTML5 audio error:', audio.error);
+            addToast(`Streaming playback failed: ${audio.error?.message || 'Unknown error'}`, 'error');
+        }
+    });
+}
+
+/**
+ * Detect if a track needs HTML5 streaming or native local playback
+ */
+export function isStreaming(track: Track): boolean {
+    // 1. Explicitly local sources (by type or path)
+    if (track.source_type === 'local' || track.local_src) return false;
+
+    if (track.path) {
+        // Tauri local protocols are always local
+        if (track.path.startsWith('file://') || track.path.startsWith('asset://') || track.path.startsWith('tauri://')) {
+            return false;
+        }
+        // Explicitly streaming protocols
+        if (track.path.startsWith('http://') || track.path.startsWith('https://')) {
+            return true;
+        }
+    }
+
+    // 3. Known external source types (Tidal, etc.)
+    if (track.source_type && track.source_type !== 'local') return true;
+
+    // 4. Default to local for anything else (safer for absolute paths)
+    return false;
+}
 
 // Plugin event emitter (global singleton for plugin system)
 export const pluginEvents = new EventEmitter<PluginEvents>();
@@ -90,6 +199,9 @@ export function audioVolumeToSlider(audioVolume: number): number {
     return Math.sqrt(audioVolume);
 }
 
+// Playback session tracking
+let currentSessionId = 0;
+
 // Current time and duration
 export const currentTime = writable(0);
 export const duration = writable(0);
@@ -98,419 +210,101 @@ export const duration = writable(0);
 export const shuffle = writable(false);
 export const repeat = writable<'none' | 'one' | 'all'>('none');
 
-// Audio element reference (set from PlayerBar component)
-let audioElement: HTMLAudioElement | null = null;
-let animationFrameId: number | null = null;
+// Subscribe to EQ changes to update native backend
+equalizer.subscribe((state) => {
+    const track = get(currentTrack);
+    // EQ only works on native backend for now
+    if (track && !isStreaming(track)) {
+        nativeAudioSetEq(state).catch(err => {
+            console.error('[EQ] Failed to apply settings:', err);
+        });
+    }
+});
 
-// Web Audio API for equalizer
-let audioContext: AudioContext | null = null;
-let sourceNode: MediaElementAudioSourceNode | null = null;
-let eqFilters: BiquadFilterNode[] = [];
-let eqConnected = false;
-
-// Cleanup tracking for memory leak prevention
-let cleanupListeners: (() => void) | null = null;
-let unsubscribeGainChange: (() => void) | null = null;
-let unsubscribeEnabledChange: (() => void) | null = null;
-let unsubscribeEqEnabledInSetAudio: (() => void) | null = null;
-let rafActive = false;
-let currentSessionId = 0;
-
-// Get the AudioContext (for potential visualizer use)
-export function getAudioContext(): AudioContext | null {
-    return audioContext;
+// =============================================================================
+// BACKEND INITIALIZATION
+// =============================================================================
+export async function initAudioBackend(): Promise<void> {
+    console.log('[Player] Initializing native audio backend');
+    startStatePoller();
 }
 
-// Initialize the equalizer filters
-function initializeEqualizer(audio: HTMLAudioElement): void {
-    if (eqConnected) return; // Already initialized
+// Poll the native backend for state changes
+function startStatePoller(): void {
+    if (nativeStatePoller) return;
 
-    try {
-        // Create AudioContext on user interaction (browser requirement)
-        if (!audioContext) {
-            audioContext = new AudioContext();
-        }
+    nativeStatePoller = setInterval(async () => {
+        try {
+            // If playing via HTML5, skip native polling
+            const track = get(currentTrack);
+            if (track && isStreaming(track)) return;
 
-        // Create source node from audio element (can only be done once per element)
-        if (!sourceNode) {
-            sourceNode = audioContext.createMediaElementSource(audio);
-        }
+            const state = await nativeAudioGetState();
 
-        // CRITICAL: First connect directly to destination to ensure audio plays
-        // We'll disconnect and reconnect through filters after
-        sourceNode.connect(audioContext.destination);
+            currentTime.set(state.position);
+            if (state.duration > 0) {
+                duration.set(state.duration);
+            }
 
-        // Create EQ filters (peaking filters for each band)
-        eqFilters = EQ_FREQUENCIES.map((freq, index) => {
-            const filter = audioContext!.createBiquadFilter();
-            filter.type = 'peaking';
-            filter.frequency.value = freq;
-            filter.Q.value = 1.4; // Standard Q for 10-band EQ
-            filter.gain.value = 0;
-            return filter;
-        });
-
-        // Now disconnect direct connection and route through filters
-        sourceNode.disconnect();
-
-        // Connect the chain: source → filters → destination
-        let currentNode: AudioNode = sourceNode;
-        for (const filter of eqFilters) {
-            currentNode.connect(filter);
-            currentNode = filter;
-        }
-        currentNode.connect(audioContext.destination);
-
-        // Set initial gains from equalizer state
-        const state = equalizer.getState();
-        if (state.enabled) {
-            state.bands.forEach((band, i) => {
-                if (eqFilters[i]) {
-                    eqFilters[i].gain.value = band.gain;
+            // Check if track finished
+            if (state.is_playing === false && get(isPlaying)) {
+                const finished = await nativeAudioIsFinished();
+                if (finished) {
+                    handleTrackEnd();
                 }
-            });
-        }
-
-        // Clean up old listeners before registering new ones
-        if (unsubscribeGainChange) unsubscribeGainChange();
-        if (unsubscribeEnabledChange) unsubscribeEnabledChange();
-
-        // Register callbacks for equalizer changes and store unsubscribe functions
-        unsubscribeGainChange = equalizer.onGainChange((bandIndex, gain) => {
-            if (eqFilters[bandIndex] && equalizer.getState().enabled) {
-                eqFilters[bandIndex].gain.value = gain;
             }
-        });
 
-        unsubscribeEnabledChange = equalizer.onEnabledChange((enabled) => {
-            const state = equalizer.getState();
-            eqFilters.forEach((filter, i) => {
-                filter.gain.value = enabled ? state.bands[i].gain : 0;
-            });
-        });
-
-        eqConnected = true;
-        console.log('[Player] Equalizer initialized successfully');
-    } catch (error) {
-        console.error('[Player] Failed to initialize equalizer:', error);
-        // Fallback: ensure audio still plays by connecting source directly to destination
-        if (sourceNode && audioContext) {
-            try {
-                sourceNode.connect(audioContext.destination);
-                console.log('[Player] Fallback: audio connected directly to output');
-            } catch (e) {
-                console.error('[Player] Fallback connection failed:', e);
+            // Sync isPlaying state
+            if (state.is_playing !== get(isPlaying)) {
+                isPlaying.set(state.is_playing);
             }
-        }
-    }
-}
 
-// High-frequency time update with safeguard against orphaned RAF
-function startTimeSync(): void {
-    if (animationFrameId !== null) return;
-
-    rafActive = true;
-    let lastEventTime = 0;
-
-    const updateTime = () => {
-        // Check rafActive flag to prevent orphaned RAF loops
-        if (!rafActive || !audioElement || audioElement.paused) {
-            animationFrameId = null;
-            rafActive = false;
-            return;
-        }
-
-        const time = audioElement.currentTime;
-        currentTime.set(time);
-
-        // Emit timeUpdate event for plugins (throttled to 250ms)
-        const now = Date.now();
-        if (now - lastEventTime >= 250) {
+            // Emit time update for plugins
             pluginEvents.emit('timeUpdate', {
-                currentTime: time,
-                duration: audioElement.duration
+                currentTime: state.position,
+                duration: state.duration
             });
-            lastEventTime = now;
-        }
 
-        animationFrameId = requestAnimationFrame(updateTime);
-    };
-    animationFrameId = requestAnimationFrame(updateTime);
+        } catch (e) {
+            // Ignore polling errors
+        }
+    }, 100);
 }
 
-function stopTimeSync(): void {
-    rafActive = false;
-    if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
+function stopStatePoller(): void {
+    if (nativeStatePoller) {
+        clearInterval(nativeStatePoller);
+        nativeStatePoller = null;
     }
-}
-
-// setAudioElement with proper cleanup
-export function setAudioElement(element: HTMLAudioElement): void {
-    // Clean up old element listeners if replacing
-    if (audioElement && audioElement !== element && cleanupListeners) {
-        console.log('[Player] Cleaning up old audio element listeners');
-        cleanupListeners();
-        cleanupListeners = null;
-    }
-
-    // Clean up old EQ enabled listener from previous setAudioElement call
-    if (unsubscribeEqEnabledInSetAudio) {
-        unsubscribeEqEnabledInSetAudio();
-        unsubscribeEqEnabledInSetAudio = null;
-    }
-
-    audioElement = element;
-
-    // Sync volume (convert linear slider to logarithmic audio volume)
-    const sliderVol = get(volume);
-    audioElement.volume = sliderToAudioVolume(sliderVol);
-
-    // Store unsubscribe function for EQ enabled listener
-    unsubscribeEqEnabledInSetAudio = equalizer.onEnabledChange((enabled) => {
-        if (enabled && !eqConnected && audioElement) {
-            initializeEqualizer(audioElement);
-            // Resume audio context if suspended (browser autoplay policy)
-            if (audioContext?.state === 'suspended') {
-                audioContext.resume();
-            }
-        }
-    });
-
-    // Store initEQ listener reference for cleanup
-    let initEqListener: (() => void) | null = null;
-
-    // If EQ is already enabled on load, init it on first play
-    if (equalizer.getState().enabled) {
-        initEqListener = () => {
-            initializeEqualizer(element);
-            if (audioContext?.state === 'suspended') {
-                audioContext.resume();
-            }
-            element.removeEventListener('play', initEqListener!);
-            initEqListener = null;
-        };
-        element.addEventListener('play', initEqListener);
-    }
-
-    // cleanup function to remove initEQ listener
-    const originalCleanup = cleanupListeners;
-    cleanupListeners = () => {
-        if (originalCleanup) originalCleanup();
-        if (initEqListener) {
-            element.removeEventListener('play', initEqListener);
-            initEqListener = null;
-        }
-    };
-
-    // Define event handlers as named functions for proper cleanup
-    const handleEnded = () => handleTrackEnd();
-
-    const handleTimeUpdate = () => {
-        // Fallback update (less frequent, for when RAF isn't running)
-        if (animationFrameId === null) {
-            currentTime.set(audioElement?.currentTime ?? 0);
-        }
-    };
-
-    const handleDurationChange = () => {
-        duration.set(audioElement?.duration ?? 0);
-        updateMediaSessionPosition();
-    };
-
-    const handleSeeked = (e: Event) => {
-        const target = e.target as HTMLAudioElement;
-        pluginEvents.emit('seeked', {
-            currentTime: target.currentTime,
-            duration: target.duration
-        });
-    };
-
-    const handlePlay = () => {
-        isPlaying.set(true);
-        pluginEvents.emit('playStateChange', { isPlaying: true });
-        updateMediaSessionPlaybackState('playing');
-        updateMediaSessionPosition();
-        startTimeSync();
-    };
-
-    const handlePause = () => {
-        isPlaying.set(false);
-        pluginEvents.emit('playStateChange', { isPlaying: false });
-        updateMediaSessionPlaybackState('paused');
-        stopTimeSync();
-    };
-
-    // Handle audio loading/playback errors
-    const handleError = (e: Event) => {
-        const audio = e.target as HTMLAudioElement;
-        const error = audio.error;
-
-        let errorMessage = 'Unknown audio error';
-        if (error) {
-            switch (error.code) {
-                case MediaError.MEDIA_ERR_ABORTED:
-                    errorMessage = 'Playback aborted';
-                    break;
-                case MediaError.MEDIA_ERR_NETWORK:
-                    errorMessage = 'Network error while loading audio';
-                    break;
-                case MediaError.MEDIA_ERR_DECODE:
-                    errorMessage = 'Audio file could not be decoded';
-                    break;
-                case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                    errorMessage = 'Audio source not accessible or format not supported';
-                    break;
-            }
-        }
-
-        console.error('[Player] Audio error:', error?.code, error?.message, errorMessage);
-
-        const track = get(currentTrack);
-        if (track) {
-            // If decode error on a downloaded file, try streaming instead
-            if (error?.code === MediaError.MEDIA_ERR_DECODE && track.local_src && track.source_type && track.source_type !== 'local') {
-                console.log('[Player] Local file decode failed, retrying with streaming');
-                playTrack(track, true); // Skip local_src
-                return;
-            }
-
-            addToast(`Cannot play "${track.title}": ${errorMessage}`, 'error');
-        }
-    };
-
-    // Set up event listeners
-    audioElement.addEventListener('ended', handleEnded);
-    audioElement.addEventListener('timeupdate', handleTimeUpdate);
-    audioElement.addEventListener('durationchange', handleDurationChange);
-    audioElement.addEventListener('seeked', handleSeeked);
-    audioElement.addEventListener('play', handlePlay);
-    audioElement.addEventListener('pause', handlePause);
-    audioElement.addEventListener('error', handleError);
-
-    // Store cleanup function for listeners
-    cleanupListeners = () => {
-        element.removeEventListener('ended', handleEnded);
-        element.removeEventListener('timeupdate', handleTimeUpdate);
-        element.removeEventListener('durationchange', handleDurationChange);
-        element.removeEventListener('seeked', handleSeeked);
-        element.removeEventListener('play', handlePlay);
-        element.removeEventListener('pause', handlePause);
-        element.removeEventListener('error', handleError);
-    };
 }
 
 // cleanup function for app unmount or hot reload
 export function cleanupPlayer(): void {
     console.log('[Player] Cleaning up player resources');
+    stopStatePoller();
+    nativeAudioStop().catch(console.error);
 
-    // 1. Stop RAF with fail-safe
-    rafActive = false;
-    if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
+    // Cleanup HTML5
+    if (html5Audio) {
+        html5Audio.pause();
+        html5Audio.src = '';
     }
 
-    // 2. Clean audio element
-    if (audioElement) {
-        // Stop playback
-        audioElement.pause();
-
-        // Clear source to free memory
-        audioElement.src = '';
-        audioElement.load(); // Important: triggers resource cleanup
-
-        // Remove event listeners
-        if (cleanupListeners) {
-            cleanupListeners();
-            cleanupListeners = null;
-        }
-
-        audioElement = null;
-    }
-
-    // 3. Clean equalizer listeners
-    if (unsubscribeGainChange) {
-        unsubscribeGainChange();
-        unsubscribeGainChange = null;
-    }
-    if (unsubscribeEnabledChange) {
-        unsubscribeEnabledChange();
-        unsubscribeEnabledChange = null;
-    }
-    if (unsubscribeEqEnabledInSetAudio) {
-        unsubscribeEqEnabledInSetAudio();
-        unsubscribeEqEnabledInSetAudio = null;
-    }
-
-    // 4. Disconnect Web Audio nodes (but keep context for reuse)
-    if (sourceNode) {
-        try {
-            sourceNode.disconnect();
-        } catch (e) {
-            // Already disconnected, ignore
-        }
-    }
-
-    eqFilters.forEach(filter => {
-        try {
-            filter.disconnect();
-        } catch (e) {
-            // Already disconnected, ignore
-        }
-    });
-
-    // 5. Suspend AudioContext (don't close - can be resumed)
-    if (audioContext && audioContext.state !== 'closed') {
-        if (audioContext.state === 'running') {
-            audioContext.suspend().then(() => {
-                console.log('[Player] AudioContext suspended');
-            }).catch(err => {
-                console.warn('[Player] AudioContext suspend error:', err);
-            });
-        }
-    }
-
-    // Reset connection state (but keep context for reuse)
-    sourceNode = null;
-    eqFilters = [];
-    eqConnected = false;
-
-    // 6. Clear plugin events (uses EventEmitter)
-    pluginEvents.removeAllListeners();
-
-    // 7. Reset stores to initial state
+    // Reset stores
     isPlaying.set(false);
     currentTrack.set(null);
     currentTime.set(0);
     duration.set(0);
 
-    // 8. Clear Media Session
+    // Clear Media Session
     updateMediaSessionPlaybackState('none');
     if ('mediaSession' in navigator) {
         try { navigator.mediaSession.metadata = null; } catch (_) { /* ignore */ }
     }
-
-    console.log('[Player] Cleanup complete');
 }
 
-// Full shutdown (for app close, not just pause)
 export function shutdownPlayer(): void {
-    console.log('[Player] Shutting down player (full cleanup)');
-
-    // First do regular cleanup
     cleanupPlayer();
-
-    // Then close AudioContext permanently
-    if (audioContext && audioContext.state !== 'closed') {
-        audioContext.close().then(() => {
-            console.log('[Player] AudioContext closed');
-        }).catch(err => {
-            console.warn('[Player] AudioContext close error:', err);
-        });
-        audioContext = null;
-    }
 }
 
 // ── Media Session API (Now Playing notification / lock screen controls) ──
@@ -530,22 +324,27 @@ function initMediaSessionHandlers(): void {
     ms.setActionHandler('previoustrack', () => previousTrack());
     ms.setActionHandler('nexttrack', () => nextTrack());
     ms.setActionHandler('seekto', (details) => {
-        if (details.seekTime != null && audioElement) {
-            const dur = audioElement.duration;
-            if (dur && isFinite(dur)) {
-                audioElement.currentTime = details.seekTime;
+        if (details.seekTime != null) {
+            const dur = get(duration);
+            if (dur > 0) {
+                nativeAudioSeek(details.seekTime / dur).catch(console.error);
             }
         }
     });
     ms.setActionHandler('seekbackward', (details) => {
-        if (audioElement) {
-            audioElement.currentTime = Math.max(0, audioElement.currentTime - (details.seekOffset || 10));
+        const offset = details.seekOffset || 10;
+        const cur = get(currentTime);
+        const dur = get(duration);
+        if (dur > 0) {
+            nativeAudioSeek(Math.max(0, cur - offset) / dur).catch(console.error);
         }
     });
     ms.setActionHandler('seekforward', (details) => {
-        if (audioElement) {
-            const dur = audioElement.duration || Infinity;
-            audioElement.currentTime = Math.min(dur, audioElement.currentTime + (details.seekOffset || 10));
+        const offset = details.seekOffset || 10;
+        const cur = get(currentTime);
+        const dur = get(duration);
+        if (dur > 0) {
+            nativeAudioSeek(Math.min(dur, cur + offset) / dur).catch(console.error);
         }
     });
 
@@ -598,15 +397,23 @@ function updateMediaSessionPlaybackState(state: 'playing' | 'paused' | 'none'): 
 }
 
 function updateMediaSessionPosition(): void {
-    if (!('mediaSession' in navigator) || !audioElement) return;
-    const dur = audioElement.duration;
+    if (!('mediaSession' in navigator)) return;
+
+    let dur = 0;
+    let pos = 0;
+    let rate = 1;
+
+    dur = get(duration);
+    pos = get(currentTime);
+    rate = 1;
+
     if (!dur || !isFinite(dur)) return;
 
     try {
         navigator.mediaSession.setPositionState({
             duration: dur,
-            playbackRate: audioElement.playbackRate || 1,
-            position: Math.min(audioElement.currentTime, dur),
+            playbackRate: rate,
+            position: Math.min(pos, dur),
         });
     } catch (err) {
         // Ignore — setPositionState not supported everywhere
@@ -629,89 +436,68 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
     const trackForPlugins = fullTrack || track;
     pluginEvents.emit('trackChange', { track: trackForPlugins, previousTrack });
 
-    if (audioElement) {
-        try {
-            let src: string | undefined;
+    try {
+        let audioPath = track.local_src || track.path;
+        const streaming = isStreaming(track);
 
-            // Check for local cached version first (unless skipping)
-            if (track.local_src && !skipLocalSrc) {
-                try {
-                    src = await getAudioSrc(track.local_src);
-                } catch (err) {
-                    console.warn('Failed to play local cached file, falling back to stream', err);
-                }
-            }
+        // Prep the backends
+        if (streaming) {
+            // Stop native audio
+            await nativeAudioStop().catch(() => { });
 
-            if (sessionId !== currentSessionId) return;
-
-            // If no local source or it failed, try standard resolution
-            if (!src!) {
-                if (track.source_type && track.source_type !== 'local') {
-                    const { pluginStore } = await import('./plugin-store');
-                    const runtime = pluginStore.getRuntime();
-
-                    if (sessionId !== currentSessionId) return;
-
-                    if (runtime && track.external_id) {
-                        try {
-                            const streamUrl = await runtime.resolveStreamUrl(track.source_type, track.external_id);
-
-                            if (sessionId !== currentSessionId) return;
-
-                            if (streamUrl) {
-                                src = streamUrl;
-                            } else {
-                                console.error('Failed to resolve stream URL');
-                                addToast(`Unable to play "${track.title}": Stream URL not found`, 'error');
-                                return;
-                            }
-                        } catch (err) {
-                            console.error('Plugin resolution error:', err);
-                            addToast(`Error playing "${track.title}": ${err instanceof Error ? err.message : 'Unknown plugin error'}`, 'error');
-                            return;
+            // Resolve custom schemes (like tidal://) to HTTP URLs
+            if (audioPath.includes('://') && !audioPath.startsWith('http')) {
+                const runtime = pluginStore.getRuntime();
+                if (runtime) {
+                    const sourceType = track.source_type;
+                    const externalId = track.external_id;
+                    if (sourceType && externalId) {
+                        console.log(`[Player] Resolving custom scheme: ${audioPath}`);
+                        const resolved = await runtime.resolveStreamUrl(sourceType, externalId);
+                        if (resolved) {
+                            audioPath = resolved;
+                        } else {
+                            throw new Error(`Failed to resolve stream URL for ${sourceType}`);
                         }
-                    } else if (track.path.startsWith('http://') || track.path.startsWith('https://')) {
-                        src = track.path;
-                    }
-                } else {
-                    try {
-                        src = await getAudioSrc(track.path);
-                    } catch (err) {
-                        console.error('File access error:', err);
-                        addToast(`Cannot play "${track.title}": File not found or inaccessible`, 'error');
-                        return;
                     }
                 }
             }
 
-            if (sessionId !== currentSessionId) return;
+            // Start HTML5
+            const audio = getHtml5Audio();
+            audio.src = audioPath;
+            audio.volume = sliderToAudioVolume(get(volume));
+            await audio.play();
 
-            if (!src) {
-                console.error('Final src resolution failed');
-                return;
+            console.log('[Player] HTML5 streaming started:', track.title);
+        } else {
+            // Stop HTML5 audio
+            if (html5Audio) {
+                html5Audio.pause();
+                html5Audio.src = '';
             }
 
-            audioElement.src = src;
+            // Play via native backend
+            await nativeAudioPlay(audioPath);
 
-            // Set start time if provided (restoring progress)
-            if (startTime > 0) {
-                audioElement.currentTime = startTime;
-            }
+            // Sync volume
+            const vol = sliderToAudioVolume(get(volume));
+            await nativeAudioSetVolume(vol);
 
-            try {
-                await audioElement.play();
-                // Update Media Session (notification shade / lock screen)
-                updateMediaSessionMetadata(track);
-            } catch (err) {
-                if (err instanceof Error && err.name === 'AbortError') return;
-                console.error('Playback failed:', err);
-                addToast(`Playback failed for "${track.title}": ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
-            }
-        } catch (error) {
-            if (error instanceof Error && error.name === 'AbortError') return;
-            console.error('Failed to init track:', error);
-            addToast(`Failed to play "${track.title}": Unexpected error`, 'error');
+            console.log('[Player] Native playback started:', track.title);
         }
+
+        currentTime.set(0);
+        duration.set(track.duration || 0);
+        isPlaying.set(true);
+
+        // Update Media Session
+        updateMediaSessionMetadata(track);
+        updateMediaSessionPlaybackState('playing');
+
+    } catch (err) {
+        console.error('[Player] Playback failed:', err);
+        addToast(`Playback failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
     }
 }
 
@@ -808,26 +594,35 @@ export function playTracks(
     }
 }
 
-// Play/Pause toggle
-export function togglePlay(): void {
-    if (!audioElement) return;
+export async function togglePlay(): Promise<void> {
+    try {
+        const track = get(currentTrack);
+        const streaming = track ? isStreaming(track) : false;
 
-    // Check for resume from cold start (track selected but no source)
-    const track = get(currentTrack);
-    if ((!audioElement.src || audioElement.src === '' || audioElement.src === window.location.href) && track) {
-        const savedTime = get(currentTime);
-        console.log('[Player] Resuming session at', savedTime);
-        playTrack(track, false, savedTime);
-        return;
-    }
-
-    if (audioElement.paused) {
-        audioElement.play().catch(error => {
-            if (error instanceof Error && error.name === 'AbortError') return;
-            console.error(error);
-        });
-    } else {
-        audioElement.pause();
+        if (get(isPlaying)) {
+            if (streaming) {
+                getHtml5Audio().pause();
+            } else {
+                await nativeAudioPause();
+            }
+            isPlaying.set(false);
+            updateMediaSessionPlaybackState('paused');
+        } else {
+            if (track && (get(currentTime) === 0 || get(currentTime) >= get(duration))) {
+                // Restart if at end
+                await playTrack(track);
+            } else if (streaming) {
+                await getHtml5Audio().play();
+                isPlaying.set(true);
+                updateMediaSessionPlaybackState('playing');
+            } else {
+                await nativeAudioResume();
+                isPlaying.set(true);
+                updateMediaSessionPlaybackState('playing');
+            }
+        }
+    } catch (err) {
+        console.error('[Player] Toggle failed:', err);
     }
 }
 
@@ -852,9 +647,12 @@ export function nextTrack(): void {
 
     if (rep === 'one') {
         // Repeat current track
-        if (audioElement) {
-            audioElement.currentTime = 0;
-            audioElement.play().catch(console.error);
+        const track = get(currentTrack);
+        if (track && isStreaming(track)) {
+            getHtml5Audio().currentTime = 0;
+            getHtml5Audio().play();
+        } else {
+            nativeAudioSeek(0).catch(console.error);
         }
         return;
     }
@@ -947,7 +745,7 @@ function playRandomFromLibrary(): void {
 }
 
 // Previous track
-export function previousTrack(): void {
+export async function previousTrack(): Promise<void> {
     const q = get(queue);
     const shuf = get(shuffle);
     let idx = get(queueIndex);
@@ -955,9 +753,28 @@ export function previousTrack(): void {
     if (q.length === 0) return;
 
     // If more than 3 seconds in, restart current track
-    if (audioElement && audioElement.currentTime > 3) {
-        audioElement.currentTime = 0;
-        return;
+    try {
+        const track = get(currentTrack);
+        const streaming = track ? isStreaming(track) : false;
+        let pos = 0;
+
+        if (streaming) {
+            pos = getHtml5Audio().currentTime;
+        } else {
+            const state = await nativeAudioGetState();
+            pos = state.position;
+        }
+
+        if (pos > 3) {
+            if (streaming) {
+                getHtml5Audio().currentTime = 0;
+            } else {
+                await nativeAudioSeek(0);
+            }
+            return;
+        }
+    } catch (err) {
+        console.error('[Player] Restart track failed:', err);
     }
 
     if (shuf) {
@@ -984,20 +801,38 @@ export function previousTrack(): void {
 }
 
 // Seek to position (0-1)
-export function seek(position: number): void {
-    if (!audioElement) return;
-    const dur = audioElement.duration;
-    if (dur && isFinite(dur)) {
-        audioElement.currentTime = position * dur;
+export async function seek(position: number): Promise<void> {
+    const track = get(currentTrack);
+    const streaming = track ? isStreaming(track) : false;
+
+    try {
+        if (streaming) {
+            const audio = getHtml5Audio();
+            if (audio.duration) {
+                audio.currentTime = position * audio.duration;
+            }
+        } else {
+            await nativeAudioSeek(position);
+        }
+    } catch (err) {
+        console.error('[Player] Seek failed:', err);
     }
 }
 
 // Set volume (slider value 0-1, will be converted to logarithmic for audio)
-export function setVolume(sliderValue: number): void {
+export async function setVolume(sliderValue: number): Promise<void> {
     volume.set(sliderValue);
-    if (audioElement) {
-        // Apply logarithmic curve for natural-feeling volume
-        audioElement.volume = sliderToAudioVolume(sliderValue);
+    const vol = sliderToAudioVolume(sliderValue);
+
+    try {
+        // Update HTML5 volume
+        if (html5Audio) {
+            html5Audio.volume = vol;
+        }
+        // Update native volume
+        await nativeAudioSetVolume(vol);
+    } catch (err) {
+        console.error('[Player] Volume set failed:', err);
     }
 }
 
