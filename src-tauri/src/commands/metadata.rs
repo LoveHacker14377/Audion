@@ -5,7 +5,6 @@ use lofty::picture::{MimeType, Picture, PictureType};
 use lofty::prelude::*;
 use lofty::probe::Probe;
 use lofty::tag::Tag;
-use metaflac::block::Picture as FlacPicture;
 use metaflac::Tag as FlacTag;
 use mp4ameta::{Img, Tag as Mp4Tag};
 // use ratio_metadata::{...}; // Import ratio-metadata functions
