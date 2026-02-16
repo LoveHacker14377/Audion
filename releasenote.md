@@ -1,4 +1,4 @@
-## Release Note - 1.1.12
+## Release Note - 1.2.0
 
 ### Bug Fixes
 - Fix Discord Rich Presence functionality.
@@ -8,6 +8,7 @@
 - Track song stats
 - Added homepage
 - Added Liked page
+- Added Mobile Notification
 
 ### Contributors
 - @SmileofHaven
