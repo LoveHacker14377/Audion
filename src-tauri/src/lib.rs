@@ -32,8 +32,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build());
+        .plugin(tauri_plugin_os::init());
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    }
 
     // Global shortcuts are desktop-only (not available on Android/iOS)
     #[cfg(desktop)]
@@ -297,6 +301,19 @@ pub fn run() {
                     commands::plugin_clear_data,
                     // Network commands
                     commands::proxy_fetch,
+                    // =========================================================================
+                    // NATIVE AUDIO COMMANDS
+                    // =========================================================================
+                    audio::audio_play,
+                    audio::audio_pause,
+                    audio::audio_resume,
+                    audio::audio_stop,
+                    audio::audio_set_volume,
+                    audio::audio_seek,
+                    audio::audio_get_state,
+                    audio::audio_is_finished,
+                    audio::audio_set_eq,
+                    audio::native_audio_available,
                 ]
             }
         })

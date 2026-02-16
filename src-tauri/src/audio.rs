@@ -8,7 +8,7 @@
 use std::f32::consts::PI;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};

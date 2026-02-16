@@ -199,8 +199,17 @@ export async function shouldUseNativeAudio(): Promise<boolean> {
         // Ignore parse errors, use auto behavior
     }
 
-    // Auto mode: use native on Linux, HTML5 elsewhere
-    const onLinux = await isLinux();
-    console.log(`[AUDIO] Auto mode: ${onLinux ? 'native (Linux)' : 'html5'}`);
-    return onLinux;
+    // Auto mode: use native on Linux and mobile platforms, HTML5 elsewhere
+    try {
+        const { platform } = await import('@tauri-apps/plugin-os');
+        const os = await platform();
+        const useNative = os === 'linux' || os === 'android' || os === 'ios';
+        console.log(`[AUDIO] Auto mode: ${useNative ? `native (${os})` : 'html5'}`);
+        return useNative;
+    } catch {
+        // Fallback to original Linux check
+        const onLinux = await isLinux();
+        console.log(`[AUDIO] Auto mode (fallback): ${onLinux ? 'native (Linux)' : 'html5'}`);
+        return onLinux;
+    }
 }

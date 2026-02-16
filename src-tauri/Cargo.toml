@@ -82,14 +82,6 @@ env_logger = "0.11"
 metaflac = "0.2.8"
 tauri-plugin-window-state = "2.4.1"
 
-[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-# Discord RPC (desktop only - uses local IPC sockets)
-discord-rich-presence = "1.0"
-# Move files to trash (desktop only)
-trash = "5"
-# Global keyboard shortcuts (desktop only)
-tauri-plugin-global-shortcut = "2"
-
 # =============================================================================
 # NATIVE AUDIO BACKEND
 # =============================================================================
@@ -104,3 +96,11 @@ rodio = { version = "0.19", default-features = false, features = [
     "symphonia-aac",
     "symphonia-isomp4"
 ] }
+
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+# Discord RPC (desktop only - uses local IPC sockets)
+discord-rich-presence = "1.0"
+# Move files to trash (desktop only)
+trash = "5"
+# Global keyboard shortcuts (desktop only)
+tauri-plugin-global-shortcut = "2"
