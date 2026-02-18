@@ -1,16 +1,5 @@
-## Release Note - 1.2.0
+## Release Note - 1.2.1
 
-### Bug Fixes
-- Fix Discord Rich Presence functionality.
 
 ### Features
-- Add support for multiple audio backends.
-- Track song stats
-- Added homepage
-- Added Liked page
-- Added Mobile Notification
-
-### Contributors
-- @SmileofHaven
-- @Manga-Knights
-- @vicrodh
+- Several improvement to support external audio source and external image source
