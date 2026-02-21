@@ -19,7 +19,7 @@
 
   --border-color: #404040;
   --error-color: #f15e6c;
-  
+
   /* Toast/notification colors - can be customized per theme */
   --accent-error: #f15e6c;
   --accent-success: #1DB954;
@@ -120,6 +120,7 @@ button {
   background: none;
   cursor: pointer;
   color: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -146,6 +147,7 @@ input::placeholder {
 a {
   color: var(--text-primary);
   text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a:hover {
@@ -306,6 +308,7 @@ a:hover {
 .hide-mobile {
   display: initial;
 }
+
 .show-mobile {
   display: none !important;
 }
@@ -315,13 +318,18 @@ a:hover {
     --sidebar-width: 0px;
     --player-height: 64px;
     --header-height: 48px;
-    --mobile-bottom-inset: 130px; /* 60px nav + 64px player + 6px margin */
+    --mobile-bottom-inset: 130px;
+    /* 60px nav + 64px player + 6px margin */
+  }
+
   .show-mobile {
     display: initial !important;
   }
 
   /* Enforce minimum touch targets (44x44px per Apple/Google guidelines) */
-  button, a, [role="button"] {
+  button,
+  a,
+  [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
@@ -352,7 +360,6 @@ a:hover {
   .quick-play-grid,
   .mobile-library-tabs,
   .bottom-nav {
-    -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
 

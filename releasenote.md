@@ -1,5 +1,10 @@
-## Release Note - 1.2.1
+## Release Note - 1.2.2
 
 
 ### Features
-- Several improvement to support external audio source and external image source
+- Add preference setting for audio backend
+
+
+### Changes
+- Increase update frequency of `currentTime` to 20Hz for smoother progress bar and lyrics highlighting
+- 
