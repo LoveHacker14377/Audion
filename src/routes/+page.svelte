@@ -30,6 +30,7 @@
   import { currentView, goToHome } from "$lib/stores/view";
   import PluginUpdateDialog from "$lib/components/PluginUpdateDialog.svelte";
   import { isStatsWrappedOpen } from "$lib/stores/ui";
+  import PluginDrawer from "$lib/components/PluginDrawer.svelte";
 
   let isLoading = true;
   let notInTauri = false;
@@ -175,6 +176,7 @@
       <KeyboardShortcutsHelp />
     {/if}
 
+    <PluginDrawer />
     <ToastContainer />
     {#if $pluginStore.pendingUpdates.length > 0}
       <PluginUpdateDialog on:close={() => pluginStore.clearPendingUpdates()} />
