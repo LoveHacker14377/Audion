@@ -116,8 +116,16 @@ jobs:
           echo "content<<$delimiter" >> $env:GITHUB_OUTPUT
           echo $content >> $env:GITHUB_OUTPUT
           echo $delimiter >> $env:GITHUB_OUTPUT
-      
+
       # 11. Create GitHub Release
+      - name: Rename Windows artifacts
+        id: rename
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          Get-ChildItem src-tauri/target/release/bundle/msi/*.msi | Rename-Item -NewName "audion_${version}_windows.msi"
+          Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | Rename-Item -NewName "audion_${version}_windows.exe"
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -126,8 +134,8 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           body: ${{ steps.changelog.outputs.content }}
           files: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/audion_*_windows.msi
+            src-tauri/target/release/bundle/nsis/audion_*_windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
@@ -274,17 +282,21 @@ jobs:
       - name: Verify build artifacts
         run: |
           ls -la src-tauri/target/release/bundle/deb/ || echo "No .deb found"
-          ls -la src-tauri/target/release/bundle/appimage/ || echo "No .AppImage found"
-
       # 10. Upload Linux artifacts (creates or updates release)
+      - name: Rename Linux artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mv src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/deb/audion_${VERSION}_linux.deb
+          mv src-tauri/target/release/bundle/appimage/*.AppImage src-tauri/target/release/bundle/appimage/audion_${VERSION}_linux.AppImage
+
       - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           files: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/audion_*_linux.deb
+            src-tauri/target/release/bundle/appimage/audion_*_linux.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -371,15 +383,20 @@ jobs:
         run: npm run tauri build -- --target universal-apple-darwin
 
       # 8. Upload macOS artifacts
+      - name: Rename macOS artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mv src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg src-tauri/target/universal-apple-darwin/release/bundle/dmg/audion_${VERSION}_macos.dmg
+          mv src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz src-tauri/target/universal-apple-darwin/release/bundle/macos/audion_${VERSION}_macos.app.tar.gz
+
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           files: |
-            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
-            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/audion_*_macos.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/audion_*_macos.app.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -468,7 +485,7 @@ jobs:
       - name: Install tauri-cli
         run: |
           wget -qO- https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz | tar -xvzf - -C ~/.cargo/bin
-          cargo binstall tauri-cli --version 2.1.1 -y
+          cargo binstall tauri-cli --version 2.10.0 -y
 
       # 8. Rust cache
       - name: Rust cache
@@ -488,18 +505,27 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # 10.5 Clean Android generated files
+      - name: Clean Android generated files
+        run: rm -rf src-tauri/gen/android
+
       # 11. Build Tauri app for Android (Signed)
       - name: Build Tauri app
         run: npm run tauri android build
 
-      # 12. Upload Android artifacts
+      # 12. Rename Android artifacts
+      - name: Rename Android artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mv src-tauri/gen/android/app/build/outputs/apk/release/*.apk src-tauri/gen/android/app/build/outputs/apk/release/audion_${VERSION}_android.apk
+
       - name: Upload Android artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           files: |
-            src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/release/audion_*_android.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
