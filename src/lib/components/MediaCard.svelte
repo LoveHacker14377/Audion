@@ -13,6 +13,8 @@
   export let coverBackground = "";
   export let primaryText = "";
   export let secondaryText = "";
+  // If provided, secondary text renders as a clickable button
+  export let secondaryAction: (() => void) | null = null;
 
   $: isRound = variant === "round";
   $: isCentered = variant === "round";
@@ -55,6 +57,8 @@
     }
     primaryOverflows = false;
     secondaryOverflows = false;
+    primaryDuration = "0s";
+    secondaryDuration = "0s";
   }
 
   // Hover
@@ -86,7 +90,7 @@
       touchTimeout = setTimeout(() => {
         isActive = false;
         resetOverflow();
-      }, Math.max(6000, longest * 2 * 1000));
+      }, Math.min(Math.max(6000, longest * 2 * 1000), 10000));
     });
   }
 
@@ -133,7 +137,6 @@
   <div
     class="cover"
     class:round={isRound}
-    class:ring={isNowPlaying || isPaused}
     style={coverBackground ? `--card-cover-bg: ${coverBackground};` : ""}
   >
     <slot name="cover" />
@@ -160,7 +163,7 @@
 
     <div class="cover-overlay" class:is-playing={isNowPlaying}>
       {#if !isNowPlaying}
-        <div
+        <button
           class="play-button"
           data-mediacard-play
           data-play-tooltip={isPaused ? resumeTooltip : playTooltip}
@@ -170,7 +173,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24" aria-hidden="true">
             <path d="M8 5v14l11-7z" />
           </svg>
-        </div>
+        </button>
       {/if}
     </div>
   </div>
@@ -192,16 +195,34 @@
 
     {#if secondaryText}
       <div class="text-track secondary" class:animate={isActive && secondaryOverflows}>
-        <span
-          class="text-inner"
-          bind:this={secondaryEl}
-          style="--marquee-duration: {secondaryDuration};"
-          class:marquee={isActive && secondaryOverflows}
-        >{secondaryText}</span>
-        {#if isActive && secondaryOverflows}
-          <span class="text-inner marquee" aria-hidden="true" style="--marquee-duration: {secondaryDuration};">
-            {secondaryText}
-          </span>
+        {#if secondaryAction}
+          <button
+            class="text-inner secondary-link"
+            bind:this={secondaryEl}
+            style="--marquee-duration: {secondaryDuration};"
+            class:marquee={isActive && secondaryOverflows}
+            on:click|stopPropagation={secondaryAction}
+          >{secondaryText}</button>
+          {#if isActive && secondaryOverflows}
+            <button
+              class="text-inner secondary-link marquee"
+              aria-hidden="true"
+              style="--marquee-duration: {secondaryDuration};"
+              on:click|stopPropagation={secondaryAction}
+            >{secondaryText}</button>
+          {/if}
+        {:else}
+          <span
+            class="text-inner"
+            bind:this={secondaryEl}
+            style="--marquee-duration: {secondaryDuration};"
+            class:marquee={isActive && secondaryOverflows}
+          >{secondaryText}</span>
+          {#if isActive && secondaryOverflows}
+            <span class="text-inner marquee" aria-hidden="true" style="--marquee-duration: {secondaryDuration};">
+              {secondaryText}
+            </span>
+          {/if}
         {/if}
       </div>
     {/if}
@@ -271,7 +292,6 @@
     .cover.round { width: 100px; height: 100px; }
   }
 
-  .cover.ring { box-shadow: 0 0 0 3px var(--accent-primary); }
 
   .cover :global(img) {
     width: 100%;
@@ -320,6 +340,8 @@
     border-radius: var(--radius-full);
     background-color: var(--accent-primary);
     color: var(--bg-base);
+    border: none;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -485,6 +507,34 @@
   .media-card.paused .text-track.secondary .text-inner {
     color: var(--accent-primary);
     opacity: 0.8;
+  }
+
+  /* Secondary text as a clickable button */
+  .secondary-link {
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .secondary-link:hover {
+    text-decoration: underline;
+    color: var(--text-primary);
+  }
+
+  .media-card.now-playing .secondary-link,
+  .media-card.paused .secondary-link {
+    color: var(--accent-primary);
+    opacity: 0.8;
+  }
+
+  .media-card.now-playing .secondary-link:hover,
+  .media-card.paused .secondary-link:hover {
+    opacity: 1;
   }
 
   .text-inner.marquee {
