@@ -1,6 +1,6 @@
 [package]
 name = "audion"
-version = "1.2.2"
+version = "1.2.3"
 description = "A local Spotify-style music player"
 authors = ["AvKov"]
 edition = "2021"
@@ -94,7 +94,8 @@ rodio = { version = "0.19", default-features = false, features = [
     "symphonia-mp3",
     "symphonia-wav",
     "symphonia-aac",
-    "symphonia-isomp4"
+    "symphonia-isomp4", 
+    "symphonia-all" 
 ] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
