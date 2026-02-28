@@ -1,5 +1,7 @@
-## Release Note - 1.2.3
+## Release Note - 1.2.4
 
 
 ### Fixes
-- m4a support
+- text overflow
+- general bug fixes
+- macos focus issue
