@@ -83,7 +83,10 @@ pub async fn sync_logout(
     // Clear all local auth data + sync queue (best-effort: don't fail logout
     // if the database is missing/corrupted — the frontend will reset UI state regardless)
     if let Err(e) = auth::clear_auth(&db) {
-        tracing::warn!("Failed to clear auth data during logout (database may be missing): {}", e);
+        tracing::warn!(
+            "Failed to clear auth data during logout (database may be missing): {}",
+            e
+        );
     }
 
     Ok(())
@@ -129,10 +132,20 @@ pub async fn sync_get_status(
 
 /// Get the server URL for OAuth login (so frontend knows where to open browser).
 #[tauri::command]
-pub async fn sync_get_server_url(
-    sync_state: State<'_, SyncState>,
-) -> Result<String, String> {
+pub async fn sync_get_server_url(sync_state: State<'_, SyncState>) -> Result<String, String> {
     Ok(sync_state.server_url.clone())
+}
+
+/// Get the stored API key.
+#[tauri::command]
+pub async fn sync_get_api_key(db: State<'_, Database>) -> Result<Option<String>, String> {
+    auth::get_api_key(&db)
+}
+
+/// Store the API key.
+#[tauri::command]
+pub async fn sync_set_api_key(api_key: String, db: State<'_, Database>) -> Result<(), String> {
+    auth::set_api_key(&db, &api_key)
 }
 
 /// Enqueue a sync change from the frontend (e.g., when a setting changes).

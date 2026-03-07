@@ -36,14 +36,7 @@ fn format_reqwest_error(context: &str, url: &str, e: &reqwest::Error) -> String 
         "other"
     };
 
-    format!(
-        "{} [{}] for {}: {} ({:?})",
-        context,
-        kind,
-        url,
-        e,
-        e
-    )
+    format!("{} [{}] for {}: {} ({:?})", context, kind, url, e, e)
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -56,6 +49,7 @@ const META_USER_NAME: &str = "user_name";
 const META_USER_AVATAR: &str = "user_avatar";
 const META_DEVICE_ID: &str = "device_id";
 const META_SYNC_CURSOR: &str = "sync_cursor";
+const META_API_KEY: &str = "api_key";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -161,10 +155,8 @@ pub fn store_user_profile(
     avatar_url: Option<&str>,
 ) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    crate::db::queries::set_sync_meta(&conn, META_USER_ID, user_id)
-        .map_err(|e| e.to_string())?;
-    crate::db::queries::set_sync_meta(&conn, META_USER_EMAIL, email)
-        .map_err(|e| e.to_string())?;
+    crate::db::queries::set_sync_meta(&conn, META_USER_ID, user_id).map_err(|e| e.to_string())?;
+    crate::db::queries::set_sync_meta(&conn, META_USER_EMAIL, email).map_err(|e| e.to_string())?;
     if let Some(name) = name {
         crate::db::queries::set_sync_meta(&conn, META_USER_NAME, name)
             .map_err(|e| e.to_string())?;
@@ -233,9 +225,7 @@ pub fn get_sync_cursor(db: &Database) -> Result<i64, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let cursor_str =
         crate::db::queries::get_sync_meta(&conn, META_SYNC_CURSOR).map_err(|e| e.to_string())?;
-    Ok(cursor_str
-        .and_then(|s| s.parse::<i64>().ok())
-        .unwrap_or(0))
+    Ok(cursor_str.and_then(|s| s.parse::<i64>().ok()).unwrap_or(0))
 }
 
 /// Update the sync cursor after a successful sync.
@@ -245,23 +235,34 @@ pub fn set_sync_cursor(db: &Database, cursor: i64) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Get the stored API key.
+pub fn get_api_key(db: &Database) -> Result<Option<String>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::get_sync_meta(&conn, META_API_KEY).map_err(|e| e.to_string())
+}
+
+/// Store the API key.
+pub fn set_api_key(db: &Database, api_key: &str) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::db::queries::set_sync_meta(&conn, META_API_KEY, api_key).map_err(|e| e.to_string())
+}
+
 /// Clear all auth data (on logout).
 pub fn clear_auth(db: &Database) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     crate::db::queries::clear_sync_metadata(&conn).map_err(|e| e.to_string())?;
-    crate::db::queries::clear_sync_queue(&conn).map_err(|e| e.to_string())?;    crate::db::queries::clear_sync_id_map(&conn).map_err(|e| e.to_string())?;    Ok(())
+    crate::db::queries::clear_sync_queue(&conn).map_err(|e| e.to_string())?;
+    crate::db::queries::clear_sync_id_map(&conn).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 // ─── Token refresh ──────────────────────────────────────────────────────────
 
 /// Refresh the access token using the refresh token.
 /// Returns the new access token on success.
-pub async fn refresh_access_token(
-    db: &Database,
-    server_url: &str,
-) -> Result<String, String> {
-    let refresh_token = get_refresh_token(db)?
-        .ok_or_else(|| "No refresh token available".to_string())?;
+pub async fn refresh_access_token(db: &Database, server_url: &str) -> Result<String, String> {
+    let refresh_token =
+        get_refresh_token(db)?.ok_or_else(|| "No refresh token available".to_string())?;
 
     let client = http_client()?;
     let resp = client
@@ -336,9 +337,8 @@ pub async fn fetch_and_store_profile(
     let resp = match resp_opt {
         Some(resp) => resp,
         None => {
-            let network_error = last_error.unwrap_or_else(|| {
-                "Failed to fetch profile: unknown network error".to_string()
-            });
+            let network_error = last_error
+                .unwrap_or_else(|| "Failed to fetch profile: unknown network error".to_string());
 
             tracing::warn!(
                 "Profile request failed due to network issue. Falling back to JWT claims. Error: {}",
@@ -392,8 +392,7 @@ pub async fn authenticated_request(
     let client = http_client()?;
 
     // First attempt with current access token
-    let access_token = get_access_token(db)?
-        .ok_or_else(|| "Not logged in".to_string())?;
+    let access_token = get_access_token(db)?.ok_or_else(|| "Not logged in".to_string())?;
 
     let url = format!("{}{}", server_url, path);
 
@@ -411,6 +410,11 @@ pub async fn authenticated_request(
         request = request
             .header("Content-Type", "application/json")
             .body(body.to_string());
+    }
+
+    // Add API key header if available
+    if let Ok(Some(api_key)) = get_api_key(db) {
+        request = request.header("X-API-Key", api_key);
     }
 
     let resp = request
@@ -437,6 +441,11 @@ pub async fn authenticated_request(
             retry_request = retry_request
                 .header("Content-Type", "application/json")
                 .body(body.to_string());
+        }
+
+        // Add API key header to retry request
+        if let Ok(Some(api_key)) = get_api_key(db) {
+            retry_request = retry_request.header("X-API-Key", api_key);
         }
 
         let retry_resp = retry_request

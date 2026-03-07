@@ -371,6 +371,30 @@
     appSettings.setListenBrainzTokenSet(false, "");
     if ($appSettings.listenBrainzEnabled) appSettings.toggleListenBrainz();
   }
+
+  // ─── API Key ──────────────────────────────────────────────────────────────
+  import { apiKey, setApiKey } from "$lib/stores/sync";
+  let apiKeyInput = $apiKey;
+  let apiKeySaving = false;
+  let apiKeySuccess = false;
+  let apiKeyError = "";
+
+  async function handleSaveApiKey() {
+    apiKeySaving = true;
+    apiKeyError = "";
+    apiKeySuccess = false;
+    try {
+      await setApiKey(apiKeyInput.trim());
+      apiKeySuccess = true;
+      setTimeout(() => {
+        apiKeySuccess = false;
+      }, 3000);
+    } catch (e) {
+      apiKeyError = String(e);
+    } finally {
+      apiKeySaving = false;
+    }
+  }
 </script>
 
 <div class="settings-view">
@@ -462,6 +486,40 @@
                 {/if}
               </button>
             </div>
+
+            <div
+              class="setting-item"
+              style="border-top: 1px solid var(--border-color); padding-top: var(--spacing-md); margin-top: var(--spacing-sm);"
+            >
+              <span class="setting-label">Sync API Key</span>
+              <div class="path-selector">
+                <input
+                  type="password"
+                  bind:value={apiKeyInput}
+                  placeholder="Enter your Sync API Key"
+                  class="lb-token-input"
+                  on:keydown={(e) => e.key === "Enter" && handleSaveApiKey()}
+                />
+                <button
+                  class="selector-btn"
+                  on:click={handleSaveApiKey}
+                  disabled={apiKeySaving}
+                >
+                  {apiKeySaving ? "Saving..." : "Save Key"}
+                </button>
+              </div>
+              <p class="setting-hint">Required for account sync service.</p>
+              {#if apiKeyError}
+                <p class="setting-hint" style="color: var(--text-error);">
+                  ✗ {apiKeyError}
+                </p>
+              {/if}
+              {#if apiKeySuccess}
+                <p class="setting-hint" style="color: var(--accent-primary);">
+                  ✓ API Key saved!
+                </p>
+              {/if}
+            </div>
           </div>
 
           <div class="setting-item">
@@ -510,6 +568,37 @@
                 Sign In
               </button>
             </div>
+          </div>
+
+          <div class="setting-item">
+            <span class="setting-label">Sync API Key</span>
+            <div class="path-selector">
+              <input
+                type="password"
+                bind:value={apiKeyInput}
+                placeholder="Enter your Sync API Key"
+                class="lb-token-input"
+                on:keydown={(e) => e.key === "Enter" && handleSaveApiKey()}
+              />
+              <button
+                class="selector-btn"
+                on:click={handleSaveApiKey}
+                disabled={apiKeySaving}
+              >
+                {apiKeySaving ? "Saving..." : "Save Key"}
+              </button>
+            </div>
+            <p class="setting-hint">Required for account sync service.</p>
+            {#if apiKeyError}
+              <p class="setting-hint" style="color: var(--text-error);">
+                ✗ {apiKeyError}
+              </p>
+            {/if}
+            {#if apiKeySuccess}
+              <p class="setting-hint" style="color: var(--accent-primary);">
+                ✓ API Key saved!
+              </p>
+            {/if}
           </div>
         {/if}
       </section>

@@ -65,6 +65,7 @@ export const authState = writable<AuthState>(defaultAuthState);
 export const syncStatus = writable<SyncStatus>(defaultSyncStatus);
 export const syncProgress = writable<SyncProgress>(defaultSyncProgress);
 export const showLoginModal = writable<boolean>(false);
+export const apiKey = writable<string>('');
 
 // Derived convenience stores
 export const isLoggedIn = derived(authState, ($auth) => $auth.is_logged_in);
@@ -94,6 +95,9 @@ export async function initSync(): Promise<void> {
 
         const status = await invoke<SyncStatus>('sync_get_status');
         syncStatus.set(status);
+
+        const key = await invoke<string | null>('sync_get_api_key');
+        if (key) apiKey.set(key);
     } catch (error) {
         console.error('[Sync] Failed to initialize:', error);
         // If we can't read auth state (e.g. database was deleted), reset to logged-out
@@ -397,5 +401,20 @@ export async function refreshAuthState(): Promise<void> {
         console.error('[Sync] Failed to refresh auth state:', error);
         // If we can't read auth state (e.g. database was deleted), reset to logged-out
         authState.set(defaultAuthState);
+    }
+}
+
+/**
+ * Update the stored API key.
+ */
+export async function setApiKey(key: string): Promise<void> {
+    if (!isTauri()) return;
+
+    try {
+        await invoke('sync_set_api_key', { apiKey: key });
+        apiKey.set(key);
+    } catch (error) {
+        console.error('[Sync] Failed to set API key:', error);
+        throw error;
     }
 }
