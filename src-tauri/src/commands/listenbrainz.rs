@@ -29,13 +29,22 @@ async fn read_token() -> Option<String> {
 
 /// Store or clear the ListenBrainz user token.
 #[tauri::command]
-pub async fn set_listenbrainz_token(token: Option<String>) -> Result<(), String> {
+pub async fn set_listenbrainz_token(
+    token: Option<String>,
+    lb_state: tauri::State<'_, ListenBrainzState>,
+) -> Result<(), String> {
     let path = token_file_path().ok_or("Cannot resolve app data directory")?;
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
             .map_err(|e| e.to_string())?;
     }
+
+    // Clear cache whenever token changes
+    if let Ok(mut cache) = lb_state.cache.lock() {
+        *cache = None;
+    }
+
     match token {
         Some(t) => tokio::fs::write(&path, t.trim().as_bytes())
             .await
@@ -55,10 +64,18 @@ pub async fn get_listenbrainz_token_set() -> Result<bool, String> {
 
 /// Remove the stored ListenBrainz token.
 #[tauri::command]
-pub async fn delete_listenbrainz_token() -> Result<(), String> {
+pub async fn delete_listenbrainz_token(
+    lb_state: tauri::State<'_, ListenBrainzState>,
+) -> Result<(), String> {
     if let Some(path) = token_file_path() {
         let _ = tokio::fs::remove_file(path).await;
     }
+
+    // Clear cache
+    if let Ok(mut cache) = lb_state.cache.lock() {
+        *cache = None;
+    }
+
     Ok(())
 }
 
@@ -183,6 +200,25 @@ pub struct LbRecommendation {
     pub local_track_id: Option<i64>,
 }
 
+#[derive(Debug, Clone)]
+pub struct LbCache {
+    pub recommendations: Vec<LbRecommendation>,
+    pub timestamp: SystemTime,
+    pub username: String,
+}
+
+pub struct ListenBrainzState {
+    pub cache: std::sync::Mutex<Option<LbCache>>,
+}
+
+impl ListenBrainzState {
+    pub fn new() -> Self {
+        Self {
+            cache: std::sync::Mutex::new(None),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 struct LbMetadataRespItem {
     artist: Option<LbMetadataArtist>,
@@ -211,6 +247,7 @@ struct LbMetadataRelease {
 pub async fn fetch_listenbrainz_recommendations(
     limit: Option<usize>,
     db: tauri::State<'_, crate::db::Database>,
+    lb_state: tauri::State<'_, ListenBrainzState>,
 ) -> Result<Vec<LbRecommendation>, String> {
     let token = match read_token().await {
         Some(t) => t,
@@ -223,6 +260,23 @@ pub async fn fetch_listenbrainz_recommendations(
     let username = verify_listenbrainz_token(token.clone()).await?;
     if username.is_empty() {
         return Err("Could not determine ListenBrainz username from token".into());
+    }
+
+    // Check cache first
+    {
+        if let Ok(cache_guard) = lb_state.cache.lock() {
+            if let Some(cache) = cache_guard.as_ref() {
+                if cache.username == username {
+                    if let Ok(elapsed) = cache.timestamp.elapsed() {
+                        // Cache for 1 Day
+                        if elapsed.as_secs() < 86400 {
+                            eprintln!("[LB] Returning cached recommendations for {}", username);
+                            return Ok(cache.recommendations.clone());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     let count = limit.unwrap_or(50);
@@ -362,7 +416,18 @@ pub async fn fetch_listenbrainz_recommendations(
         });
     }
 
-    Ok(results)
+    let final_results = results;
+
+    // Update cache
+    if let Ok(mut cache_guard) = lb_state.cache.lock() {
+        *cache_guard = Some(LbCache {
+            recommendations: final_results.clone(),
+            timestamp: SystemTime::now(),
+            username,
+        });
+    }
+
+    Ok(final_results)
 }
 
 /// Try to find a matching local track by MBID first, then fuzzy artist+title.

@@ -970,3 +970,23 @@ export async function searchArtistsMb(query: string, limit?: number): Promise<Mb
 export async function searchReleasesMb(query: string, limit?: number): Promise<MbDiscoverRelease[]> {
     return await invoke('search_releases_mb', { query, limit });
 }
+
+/** A single track from a MusicBrainz release. */
+export interface MbTrack {
+    mbid: string;
+    title: string;
+    artist: string;
+    duration_ms: number | null;
+    track_number: number;
+    disc_number: number;
+}
+
+/** Fetch all tracks for a given release-group MBID. */
+export async function getReleaseGroupTracksMb(rgMbid: string): Promise<MbTrack[]> {
+    return await invoke('get_release_group_tracks_mb', { rgMbid });
+}
+
+/** Fetch top tracks for an artist by MBID. */
+export async function getArtistTopTracksMb(artistMbid: string): Promise<MbTrack[]> {
+    return await invoke('get_artist_top_tracks_mb', { artistMbid });
+}

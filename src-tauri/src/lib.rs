@@ -321,6 +321,7 @@ pub fn run() {
             tracing::info!("Database initialized");
 
             app.manage(database);
+            app.manage(commands::listenbrainz::ListenBrainzState::new());
 
             // Initialize Discord RPC state (desktop only)
             #[cfg(desktop)]
@@ -545,6 +546,8 @@ pub fn run() {
                     commands::get_artist_discography_mb,
                     commands::search_artists_mb,
                     commands::search_releases_mb,
+                    commands::get_release_group_tracks_mb,
+                    commands::get_artist_top_tracks_mb,
                     // Window commands
                     commands::window::get_window_start_mode,
                     commands::window::set_window_start_mode,
@@ -688,6 +691,7 @@ pub fn run() {
                     commands::get_artist_discography_mb,
                     commands::search_artists_mb,
                     commands::search_releases_mb,
+                    commands::get_release_group_tracks_mb,
                     // =========================================================================
                     // SYNC COMMANDS
                     // =========================================================================

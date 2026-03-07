@@ -6,11 +6,18 @@
         searchReleasesMb,
         getArtistMusicBrainzInfo,
         getArtistDiscographyMb,
+        getReleaseGroupTracksMb,
+        getArtistTopTracksMb,
         type MbDiscoverArtist,
         type MbDiscoverRelease,
         type MbArtistInfo,
         type MbDiscographyItem,
+        type MbTrack,
+        type Track,
     } from "$lib/api/tauri";
+    import { playTracks } from "$lib/stores/player";
+    import { pluginStore } from "$lib/stores/plugin-store";
+    import { addToast } from "$lib/stores/toast";
     import {
         goToArtistDetail,
         goToAlbumDetail,
@@ -36,11 +43,25 @@
     let searchState: SearchState = "idle";
     let errorMsg = "";
 
-    // Inline detail panel
+    // Inline detail panel (Artist)
     let detailArtist: MbDiscoverArtist | null = null;
     let detailInfo: MbArtistInfo | null = null;
     let detailDiscography: MbDiscographyItem[] = [];
     let detailLoading = false;
+
+    // Inline detail panel (Release)
+    let detailRelease: MbDiscoverRelease | null = null;
+    let detailReleaseTracks: MbTrack[] = [];
+    let detailReleaseLoading = false;
+
+    // Navigation stack
+    type ViewState =
+        | { type: "artist"; artist: MbDiscoverArtist }
+        | { type: "release"; release: MbDiscoverRelease };
+
+    let navigationStack: ViewState[] = [];
+    let detailArtistTracks: MbTrack[] = [];
+    let detailArtistTracksLoading = false;
 
     // Local library lookup sets (lowercased)
     $: localArtistSet = new Set(
@@ -107,36 +128,173 @@
         if (isArtistInLibrary(artist.name)) {
             goToArtistDetail(artist.name);
         } else {
-            openArtistDetail(artist);
+            pushNavigation({ type: "artist", artist });
         }
     }
 
-    function handleReleaseClick(release: MbDiscoverRelease) {
+    async function handleReleaseClick(release: MbDiscoverRelease) {
         const localId = findLocalAlbumId(release.title);
         if (localId !== undefined) {
             goToAlbumDetail(localId);
+        } else {
+            pushNavigation({ type: "release", release });
         }
-        // For non-local releases, we could open an inline panel in the future
     }
 
-    async function openArtistDetail(artist: MbDiscoverArtist) {
-        detailArtist = artist;
-        detailInfo = null;
-        detailDiscography = [];
-        detailLoading = true;
-        showAllReleaseTypes = false;
-        try {
-            detailInfo = await getArtistMusicBrainzInfo(artist.name);
-            detailDiscography = await getArtistDiscographyMb(artist.name);
-        } catch (e) {
-            console.error("[MbDiscover] detail fetch error:", e);
-        } finally {
-            detailLoading = false;
+    function pushNavigation(view: ViewState) {
+        navigationStack = [...navigationStack, view];
+        loadView(view);
+    }
+
+    function popNavigation() {
+        if (navigationStack.length > 1) {
+            navigationStack = navigationStack.slice(0, -1);
+            loadView(navigationStack[navigationStack.length - 1]);
+        } else {
+            closeDetail();
         }
     }
 
     function closeDetail() {
         detailArtist = null;
+        detailRelease = null;
+        navigationStack = [];
+    }
+
+    async function loadView(view: ViewState) {
+        if (view.type === "artist") {
+            await openArtistDetail(view.artist, false);
+        } else {
+            await openReleaseDetail(view.release, false);
+        }
+    }
+
+    async function openReleaseDetail(release: MbDiscoverRelease, push = true) {
+        detailArtist = null; // Close other panel
+        detailRelease = release;
+        detailReleaseTracks = [];
+        detailReleaseLoading = true;
+
+        if (push) navigationStack = [{ type: "release", release }];
+
+        try {
+            detailReleaseTracks = await getReleaseGroupTracksMb(release.mbid);
+        } catch (e) {
+            console.error("[MbDiscover] release tracks fetch error:", e);
+        } finally {
+            detailReleaseLoading = false;
+        }
+    }
+
+    async function openArtistDetail(artist: MbDiscoverArtist, push = true) {
+        detailRelease = null; // Close other panel
+        detailArtist = artist;
+        detailInfo = null;
+        detailDiscography = [];
+        detailArtistTracks = [];
+        detailLoading = true;
+        detailArtistTracksLoading = true;
+        showAllReleaseTypes = false;
+
+        if (push) navigationStack = [{ type: "artist", artist }];
+
+        try {
+            // Fetch info and discography in parallel
+            const [info, disco] = await Promise.all([
+                getArtistMusicBrainzInfo(artist.name),
+                getArtistDiscographyMb(artist.name),
+            ]);
+            detailInfo = info;
+            detailDiscography = disco;
+        } catch (e) {
+            console.error("[MbDiscover] artist detail error:", e);
+        } finally {
+            detailLoading = false;
+        }
+
+        try {
+            detailArtistTracks = await getArtistTopTracksMb(artist.mbid);
+        } catch (e) {
+            console.error("[MbDiscover] artist tracks fetch error:", e);
+        } finally {
+            detailArtistTracksLoading = false;
+        }
+    }
+
+    $: isTidalEnabled = $pluginStore.installed.some(
+        (p) => p.name === "Tidal Search" && p.enabled,
+    );
+
+    let playingStreamId: string | null = null;
+
+    async function playOnPlayback(track: MbTrack) {
+        playingStreamId = track.mbid;
+        try {
+            const resp = await fetch(
+                `https://api.listenbrainz.org/1/metadata/lookup/?recording_mbids=${track.mbid}`,
+            );
+            const data = await resp.json();
+            const meta = data[track.mbid];
+
+            let streamUrl = null;
+            let sourceType = "external";
+
+            if (meta) {
+                const recRels = !Array.isArray(meta.recording?.rels)
+                    ? meta.recording?.rels || {}
+                    : {};
+                const artistRels = !Array.isArray(
+                    meta.artist?.artists?.[0]?.rels,
+                )
+                    ? meta.artist?.artists?.[0]?.rels || {}
+                    : {};
+
+                streamUrl =
+                    recRels["free streaming"] ||
+                    recRels["streaming"] ||
+                    artistRels["free streaming"] ||
+                    artistRels["streaming"];
+            }
+
+            if (!streamUrl) {
+                addToast(
+                    "No stream URL available in ListenBrainz metadata",
+                    "error",
+                );
+                return;
+            }
+
+            if (streamUrl.includes("tidal.com")) sourceType = "tidal";
+            else if (streamUrl.includes("spotify.com")) sourceType = "spotify";
+            else if (
+                streamUrl.includes("youtube.com") ||
+                streamUrl.includes("youtu.be")
+            )
+                sourceType = "youtube";
+
+            const audionTrack: Track = {
+                id: -1,
+                path: `plugin://${sourceType}`,
+                title: track.title,
+                artist: track.artist,
+                album: detailRelease?.title || "Unknown Album",
+                track_number: track.track_number,
+                duration: Math.round((track.duration_ms || 0) / 1000),
+                album_id: null,
+                format: "STREAM",
+                bitrate: 0,
+                source_type: sourceType,
+                external_id: streamUrl,
+                cover_url: getReleaseCoverUrl(detailRelease?.mbid || ""),
+                disc_number: track.disc_number,
+            };
+            playTracks([audionTrack], 0);
+        } catch (e) {
+            console.error("[MbDiscover] Metadata lookup error:", e);
+            addToast("Failed to lookup ListenBrainz metadata", "error");
+        } finally {
+            playingStreamId = null;
+        }
     }
 
     function artistInitial(name: string): string {
@@ -173,9 +331,9 @@
 
     function handleImageError(e: Event) {
         const target = e.target as HTMLImageElement;
-        target.style.display = "none";
-        // Ensure its sibling (the icon) is shown if we had a toggle-based fallback,
-        // but here we'll use a local state or just let the CSS handle it if we structure it right.
+        if (target && target.style) {
+            target.style.display = "none";
+        }
     }
     onMount(() => {
         if ($currentView.type === "discover" && $currentView.query) {
@@ -444,7 +602,8 @@
                                             alt={release.title}
                                             loading="lazy"
                                             on:error={(e) => {
-                                                const target = e.currentTarget;
+                                                const target =
+                                                    e.currentTarget as HTMLImageElement;
                                                 target.style.display = "none";
                                                 target.nextElementSibling?.classList.remove(
                                                     "hidden",
@@ -583,6 +742,69 @@
                             </div>
                         </section>
 
+                        <!-- Tracks -->
+                        <section class="detail-section">
+                            <h3>Featured Tracks</h3>
+                            {#if detailArtistTracksLoading}
+                                <div class="tracks-loading">
+                                    <div class="spinner-small"></div>
+                                    <p>Fetching tracks…</p>
+                                </div>
+                            {:else if detailArtistTracks.length > 0}
+                                <div class="tracks-list">
+                                    {#each detailArtistTracks as track}
+                                        <div class="track-row">
+                                            <div class="track-info">
+                                                <span class="track-number"
+                                                    >{track.track_number}</span
+                                                >
+                                                <div class="track-names">
+                                                    <span class="track-title"
+                                                        >{track.title}</span
+                                                    >
+                                                    <span class="track-artist"
+                                                        >{track.artist}</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="track-actions">
+                                                <button
+                                                    class="tidal-btn"
+                                                    class:loading={playingStreamId ===
+                                                        track.mbid}
+                                                    on:click={(e) => {
+                                                        e.stopPropagation();
+                                                        playOnPlayback(track);
+                                                    }}
+                                                    title="Play Stream"
+                                                >
+                                                    {#if playingStreamId === track.mbid}
+                                                        <div
+                                                            class="spinner-tiny"
+                                                        ></div>
+                                                    {:else}
+                                                        <svg
+                                                            viewBox="0 0 24 24"
+                                                            width="16"
+                                                            height="16"
+                                                            fill="currentColor"
+                                                        >
+                                                            <path
+                                                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"
+                                                            />
+                                                        </svg>
+                                                    {/if}
+                                                    Play
+                                                </button>
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <p class="no-tracks">No tracks found.</p>
+                            {/if}
+                        </section>
+
                         <!-- Discography -->
                         {#if detailDiscography.length > 0}
                             <section class="detail-section">
@@ -603,10 +825,29 @@
                                 </div>
                                 <div class="disco-list">
                                     {#each filteredDiscography as item}
+                                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                        <!-- svelte-ignore a11y-no-static-element-interactions -->
                                         <div
-                                            class="disco-item {releaseTypeClass(
-                                                item.release_type,
-                                            )}"
+                                            class="disco-item"
+                                            on:click={() =>
+                                                pushNavigation({
+                                                    type: "release",
+                                                    release: {
+                                                        mbid: item.mbid,
+                                                        title: item.title,
+                                                        artist_name:
+                                                            detailArtist?.name ||
+                                                            "Unknown Artist",
+                                                        artist_mbid:
+                                                            detailArtist?.mbid ??
+                                                            null,
+                                                        release_type:
+                                                            item.release_type,
+                                                        year: item.year || null,
+                                                        country: null,
+                                                        genres: [],
+                                                    },
+                                                })}
                                         >
                                             <div
                                                 class="disco-type-icon {releaseTypeClass(
@@ -621,7 +862,7 @@
                                                     loading="lazy"
                                                     on:error={(e) => {
                                                         const target =
-                                                            e.currentTarget;
+                                                            e.currentTarget as HTMLImageElement;
                                                         target.style.display =
                                                             "none";
                                                         target.nextElementSibling?.classList.remove(
@@ -725,6 +966,170 @@
                         {/if}
                     </div>
                 {/if}
+            </div>
+        </div>
+    {/if}
+
+    <!-- Inline release detail panel -->
+    {#if detailRelease}
+        <div class="detail-overlay" transition:fade={{ duration: 200 }}>
+            <div class="detail-panel" in:fly={{ x: 300, duration: 300 }}>
+                <header class="detail-header">
+                    <button
+                        class="back-btn"
+                        aria-label="Close detail panel"
+                        on:click={closeDetail}
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="24"
+                            height="24"
+                        >
+                            <path
+                                d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"
+                            />
+                        </svg>
+                    </button>
+                    <div class="detail-title-block">
+                        <h2>{detailRelease.title}</h2>
+                        <button
+                            class="artist-link-btn"
+                            on:click={() => {
+                                if (
+                                    detailRelease &&
+                                    detailRelease.artist_mbid
+                                ) {
+                                    pushNavigation({
+                                        type: "artist",
+                                        artist: {
+                                            mbid: detailRelease.artist_mbid,
+                                            name: detailRelease.artist_name,
+                                            genres: [],
+                                            disambiguation: null,
+                                            artist_type: null,
+                                            country: null,
+                                            active_years: null,
+                                        },
+                                    });
+                                }
+                            }}
+                        >
+                            {detailRelease.artist_name}
+                        </button>
+                    </div>
+                </header>
+
+                <div class="detail-body">
+                    <div class="release-detail-header-block">
+                        <div class="release-detail-cover">
+                            <img
+                                src={getReleaseCoverUrl(detailRelease.mbid)}
+                                alt={detailRelease.title}
+                                on:error={(e) => {
+                                    const target =
+                                        e.currentTarget as HTMLImageElement;
+                                    target.style.display = "none";
+                                    target.nextElementSibling?.classList.remove(
+                                        "hidden",
+                                    );
+                                }}
+                            />
+                            <div class="hidden icon-fallback">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                    width="48"
+                                    height="48"
+                                >
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
+                                    />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="release-detail-info-block">
+                            <div class="card-meta">
+                                {#if detailRelease.release_type}
+                                    <span class="meta-chip type-chip"
+                                        >{detailRelease.release_type}</span
+                                    >
+                                {/if}
+                                {#if detailRelease.year}
+                                    <span class="meta-chip"
+                                        >{detailRelease.year}</span
+                                    >
+                                {/if}
+                            </div>
+                            {#if detailRelease.genres.length > 0}
+                                <div class="genre-pills">
+                                    {#each detailRelease.genres as genre}
+                                        <span class="genre-pill">{genre}</span>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <section class="detail-section">
+                        <h3>Tracks</h3>
+                        {#if detailReleaseLoading}
+                            <div class="detail-loading">
+                                <div class="spinner"></div>
+                                <p>Fetching tracklist…</p>
+                            </div>
+                        {:else if detailReleaseTracks.length > 0}
+                            <div class="mb-track-list">
+                                {#each detailReleaseTracks as track}
+                                    <div class="mb-track-item">
+                                        <span class="track-num"
+                                            >{track.track_number}</span
+                                        >
+                                        <div class="track-info">
+                                            <span class="track-name"
+                                                >{track.title}</span
+                                            >
+                                            <span class="track-artist"
+                                                >{track.artist}</span
+                                            >
+                                        </div>
+                                        <div class="track-actions">
+                                            <button
+                                                class="play-tidal-btn"
+                                                title="Play Stream"
+                                                on:click={(e) => {
+                                                    e.stopPropagation();
+                                                    playOnPlayback(track);
+                                                }}
+                                                disabled={playingStreamId ===
+                                                    track.mbid}
+                                            >
+                                                {#if playingStreamId === track.mbid}
+                                                    <div
+                                                        class="spinner-xs"
+                                                    ></div>
+                                                {:else}
+                                                    <svg
+                                                        viewBox="0 0 24 24"
+                                                        fill="currentColor"
+                                                        width="18"
+                                                        height="18"
+                                                    >
+                                                        <path
+                                                            d="M8 5v14l11-7z"
+                                                        />
+                                                    </svg>
+                                                {/if}
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {:else}
+                            <p class="hint">No tracks found for this release</p>
+                        {/if}
+                    </section>
+                </div>
             </div>
         </div>
     {/if}
@@ -1027,16 +1432,171 @@
     .back-btn {
         background: none;
         border: none;
+        padding: 8px;
+        border-radius: var(--radius-full);
         color: var(--text-secondary);
         cursor: pointer;
-        padding: var(--spacing-xs);
-        border-radius: var(--radius-full);
+        transition:
+            background 0.2s,
+            color 0.2s;
         display: flex;
-        transition: color var(--transition-fast);
+        align-items: center;
+        justify-content: center;
     }
 
     .back-btn:hover {
+        background: var(--bg-hover);
         color: var(--text-primary);
+    }
+
+    .artist-link-btn {
+        background: none;
+        border: none;
+        color: var(--accent-primary);
+        padding: 0;
+        font-size: 0.9rem;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+    }
+
+    .artist-link-btn:hover {
+        text-decoration: underline;
+    }
+
+    .tracks-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 40px 20px;
+        color: var(--text-secondary);
+    }
+
+    .tracks-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .track-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: var(--bg-surface);
+        border-radius: var(--radius-md);
+        transition: background 0.2s;
+    }
+
+    .track-row:hover {
+        background: var(--bg-hover);
+    }
+
+    .track-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .track-number {
+        font-family: var(--font-mono);
+        color: var(--text-tertiary);
+        width: 24px;
+        font-size: 0.85rem;
+    }
+
+    .track-names {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .track-title {
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .track-artist {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .track-actions {
+        flex-shrink: 0;
+    }
+
+    .tidal-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #00bfaf;
+        color: white !important;
+        border: none;
+        padding: 4px 12px;
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+            transform 0.1s,
+            opacity 0.2s;
+    }
+
+    .tidal-btn:hover {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+
+    .tidal-btn.loading {
+        opacity: 0.7;
+        cursor: wait;
+    }
+
+    .spinner-small,
+    .spinner-tiny {
+        border: 2px solid var(--border-color);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .spinner-small {
+        width: 20px;
+        height: 20px;
+    }
+
+    .spinner-tiny {
+        width: 14px;
+        height: 14px;
+        border-width: 1.5px;
+        border-top-color: white;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .disco-item {
+        cursor: pointer;
+        transition:
+            background 0.2s,
+            transform 0.2s;
+    }
+
+    .disco-item:hover {
+        background: var(--bg-hover);
+        transform: translateY(-2px);
     }
 
     .detail-title-block h2 {
@@ -1326,5 +1886,100 @@
         .detail-panel {
             width: 100%;
         }
+    }
+    .release-detail-header-block {
+        display: flex;
+        gap: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+    }
+    .release-detail-cover {
+        width: 140px;
+        height: 140px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        background: var(--bg-highlight);
+        flex-shrink: 0;
+        box-shadow: var(--shadow-md);
+    }
+    .release-detail-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .release-detail-info-block {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: var(--spacing-md);
+    }
+    .mb-track-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .mb-track-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        transition: background var(--transition-fast);
+        gap: var(--spacing-md);
+    }
+    .mb-track-item:hover {
+        background: var(--bg-surface);
+    }
+    .track-num {
+        width: 24px;
+        font-size: 0.82rem;
+        color: var(--text-subdued);
+        text-align: right;
+    }
+    .track-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .track-name {
+        font-size: 0.92rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .track-artist {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+    }
+    .play-tidal-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        background: var(--bg-highlight);
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition-fast);
+        border: none;
+        cursor: pointer;
+    }
+    .play-tidal-btn:hover:not(:disabled) {
+        background: var(--accent-primary);
+        color: white;
+        transform: scale(1.1);
+    }
+    .play-tidal-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .spinner-xs {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
     }
 </style>

@@ -1072,6 +1072,20 @@ pub struct MbTrack {
 }
 
 #[derive(Debug, Deserialize)]
+struct MbArtistRecordingsResponse {
+    recordings: Option<Vec<MbArtistRecording>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MbArtistRecording {
+    id: String,
+    title: String,
+    length: Option<u32>,
+    #[serde(rename = "artist-credit")]
+    artist_credit: Option<Vec<MbArtistCredit>>,
+}
+
+#[derive(Debug, Deserialize)]
 struct MbReleaseGroupDetail {
     releases: Option<Vec<MbReleaseInGroupDetail>>,
 }
@@ -1204,6 +1218,65 @@ pub async fn get_release_group_tracks_mb(rg_mbid: String) -> Result<Vec<MbTrack>
             });
         }
     }
+
+    Ok(tracks)
+}
+
+/// Fetch a list of recordings (featured tracks) for an artist by MBID.
+#[tauri::command]
+pub async fn get_artist_top_tracks_mb(artist_mbid: String) -> Result<Vec<MbTrack>, String> {
+    let client = mb_client()?;
+
+    let resp = client
+        .get(format!("{}/recording", MB_API_BASE))
+        .query(&[
+            ("artist", artist_mbid.as_str()),
+            ("limit", "20"),
+            ("inc", "artist-credits"),
+            ("fmt", "json"),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("MB recordings error: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("MB returned {}", resp.status()));
+    }
+
+    let data: MbArtistRecordingsResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {}", e))?;
+
+    let tracks = data
+        .recordings
+        .unwrap_or_default()
+        .into_iter()
+        .enumerate()
+        .map(|(i, r)| {
+            let artist_name = r
+                .artist_credit
+                .and_then(|ac| ac.into_iter().next())
+                .map(|ac| {
+                    ac.name.unwrap_or_else(|| {
+                        ac.artist
+                            .as_ref()
+                            .map(|a| a.name.clone())
+                            .unwrap_or_default()
+                    })
+                })
+                .unwrap_or_else(|| "Unknown Artist".into());
+
+            MbTrack {
+                mbid: r.id,
+                title: r.title,
+                artist: artist_name,
+                duration_ms: r.length,
+                track_number: (i + 1) as u32,
+                disc_number: 1,
+            }
+        })
+        .collect();
 
     Ok(tracks)
 }

@@ -726,7 +726,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                     const externalId = track.external_id;
                     if (sourceType && externalId) {
                         console.log(`[Player] Resolving custom scheme: ${audioPath}`);
-                        const resolved = await runtime.resolveStreamUrl(sourceType, externalId);
+                        const resolved = await runtime.resolveStreamUrl(sourceType, externalId, { track: trackForPlugins });
                         if (resolved) {
                             audioPath = resolved;
                         } else {
