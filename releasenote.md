@@ -8,3 +8,4 @@
 - Sort by added date
 - Pin playlist, album, artist
 - Add custom artwork
+- Offline lyrics download
