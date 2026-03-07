@@ -36,6 +36,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             local_src TEXT,
             track_cover TEXT,
             track_cover_path TEXT,
+            metadata_json TEXT,
             date_added TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
         );
@@ -114,6 +115,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         ("musicbrainz_recording_id", "TEXT"),
         ("date_added", "TEXT DEFAULT CURRENT_TIMESTAMP"),
         ("genre", "TEXT"),
+        ("metadata_json", "TEXT"),
     ];
 
     for (col_name, col_def) in tracks_columns {

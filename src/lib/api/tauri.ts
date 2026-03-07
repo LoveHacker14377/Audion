@@ -109,6 +109,7 @@ export interface Track {
     external_id?: string | null;  // Source-specific ID
     local_src?: string | null; // Local file path for offline playback
     disc_number?: number | null;
+    metadata_json?: string | null;
     date_added?: string | null;
 }
 

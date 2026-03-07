@@ -41,6 +41,10 @@
   import { confirm, prompt } from "$lib/stores/dialogs";
   import { saveScroll, getScroll } from "$lib/stores/scrollMemory";
   import { setCustomArtwork } from "$lib/stores/customArtwork";
+  import MetadataModal from "$lib/components/MetadataModal.svelte";
+
+  // MetadataModal state
+  let metadataModalTrack: Track | null = null;
 
   export let scrollKey: string | null = null;
 
@@ -573,6 +577,16 @@
       },
     ];
 
+    menuItems.push(
+      { type: "separator" },
+      {
+        label: "Show more info",
+        action: () => {
+          metadataModalTrack = track;
+        },
+      },
+    );
+
     if (playlistId) {
       menuItems.push({
         label: "Remove from Playlist",
@@ -882,6 +896,15 @@
     }
   }
 </script>
+
+{#if metadataModalTrack}
+  <MetadataModal
+    track={metadataModalTrack}
+    onClose={() => {
+      metadataModalTrack = null;
+    }}
+  />
+{/if}
 
 <div class="track-list">
   <!-- Header stays fixed -->

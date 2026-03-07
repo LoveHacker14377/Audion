@@ -1,7 +1,9 @@
+use lofty::prelude::*;
+use lofty::probe::Probe;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 /// Get LRC file path for a music file or URL
@@ -340,4 +342,30 @@ pub fn get_current_lyric(
     } else {
         Ok(None)
     }
+}
+
+/// Extract embedded lyrics from a music file using lofty
+#[tauri::command]
+pub fn get_embedded_lyrics(music_path: String) -> Result<Option<String>, String> {
+    let path = Path::new(&music_path);
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let tagged_file = Probe::open(path)
+        .map_err(|e| e.to_string())?
+        .read()
+        .map_err(|e| e.to_string())?;
+
+    let tag = match tagged_file.primary_tag() {
+        Some(t) => t,
+        None => match tagged_file.first_tag() {
+            Some(t) => t,
+            None => return Ok(None),
+        },
+    };
+
+    let lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
+
+    Ok(lyrics)
 }

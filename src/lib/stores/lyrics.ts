@@ -57,7 +57,28 @@ export async function fetchLyricsForTrack(): Promise<void> {
     lyricsError.set(null);
 
     try {
-        // Try to load from local cache first (via Tauri)
+        // 1. Try embedded lyrics first (only for local tracks)
+        if (track.path && !track.source_type) {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                const embedded = await invoke<string | null>('get_embedded_lyrics', { musicPath: track.path });
+                if (embedded && fetchId === currentFetchId) {
+                    const lines = lyricsManager.parseLRC(embedded);
+                    lyricsData.set({
+                        lines,
+                        source: 'embedded',
+                        hasWordSync: lines.some(l => l.words && l.words.length > 0),
+                        raw: embedded
+                    });
+                    lyricsLoading.set(false);
+                    return;
+                }
+            } catch {
+                // Embedded extraction failed, fall through to cache/API
+            }
+        }
+
+        // 2. Try to load from local cache (via Tauri)
         const cached = await loadLrcFromCache(track.path);
         if (cached && fetchId === currentFetchId) {
             const lines = lyricsManager.parseLRC(cached);
@@ -71,7 +92,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
             return;
         }
 
-        // Fetch from APIs
+        // 3. Fetch from APIs
         const result = await lyricsManager.fetchLyrics(
             track.title,
             track.artist,

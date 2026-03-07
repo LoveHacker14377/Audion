@@ -37,7 +37,10 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
     };
 
     if url.path() != "/auth/callback" && url.path() != "auth/callback" {
-        tracing::info!("Deep link is not an auth callback, ignoring: {}", url.path());
+        tracing::info!(
+            "Deep link is not an auth callback, ignoring: {}",
+            url.path()
+        );
         return;
     }
 
@@ -249,7 +252,10 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            tracing::info!("Single instance: another instance launched with args: {:?}", argv);
+            tracing::info!(
+                "Single instance: another instance launched with args: {:?}",
+                argv
+            );
 
             // On Windows/Linux, deep links arrive as command-line arguments
             for arg in argv.iter().skip(1) {
@@ -496,6 +502,7 @@ pub fn run() {
                     commands::musixmatch_request,
                     commands::get_lyrics,
                     commands::get_current_lyric,
+                    commands::get_embedded_lyrics,
                     // Metadata commands
                     commands::download_and_save_audio,
                     commands::update_track_after_download,
@@ -636,6 +643,7 @@ pub fn run() {
                     commands::musixmatch_request,
                     commands::get_lyrics,
                     commands::get_current_lyric,
+                    commands::get_embedded_lyrics,
                     // Metadata commands
                     commands::download_and_save_audio,
                     commands::update_track_after_download,

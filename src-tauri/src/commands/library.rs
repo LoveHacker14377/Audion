@@ -199,6 +199,7 @@ async fn handle_track_import(
         track_cover: None, // Frontend uses track_cover_path via convertFileSrc
         track_cover_path: cover_path,
         disc_number: track_data.disc_number,
+        metadata_json: track_data.metadata_json.clone(),
         date_added,
     };
 
@@ -584,6 +585,7 @@ pub async fn rescan_music(
                             track_cover: None,
                             track_cover_path: cover_path,
                             disc_number: track_data.disc_number,
+                            metadata_json: track_data.metadata_json.clone(),
                             date_added,
                         });
                     }
@@ -950,6 +952,7 @@ pub async fn add_external_track(
         content_hash,
         local_src: None,
         musicbrainz_recording_id: None,
+        metadata_json: None,
     };
 
     queries::insert_or_update_track(&conn, &track_insert)
