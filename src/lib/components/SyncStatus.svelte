@@ -29,12 +29,19 @@
         if (diff < 60) return "Just now";
         if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
         if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        return `${Math.floor(diff / 86400)}d ago`;
+
+        // Format as DD/MM/YYYY for older syncs
+        const date = new Date(seconds * 1000);
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const yyyy = date.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
     }
 
-    $: progressPercent = $syncProgress.total > 0
-        ? Math.round(($syncProgress.current / $syncProgress.total) * 100)
-        : 0;
+    $: progressPercent =
+        $syncProgress.total > 0
+            ? Math.round(($syncProgress.current / $syncProgress.total) * 100)
+            : 0;
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

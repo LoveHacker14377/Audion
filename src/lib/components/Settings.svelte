@@ -290,14 +290,41 @@
   }
 
   function formatTime(ms: number): string {
-    if (!ms || ms === 0) return "";
+    if (!ms || ms === 0) return "0s";
 
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60) return `${seconds}s`;
 
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
+    if (remainingSeconds === 0) return `${minutes}m`;
     return `${minutes}m ${remainingSeconds}s`;
+  }
+
+  function formatLastSynced(isoString: string | null): string {
+    if (!isoString) return "Not synced yet";
+
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+
+      if (diffSec < 60) return "Just now";
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHour < 24) return `${diffHour}h ago`;
+
+      // Format as DD/MM/YYYY
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      console.error("Failed to format last sync date:", e);
+      return isoString;
+    }
   }
 
   function formatBytes(bytes: number): string {
@@ -313,23 +340,25 @@
   }
 
   // ── ListenBrainz ───────────────────────────────────────────────────────────
-  let lbTokenInput = '';
+  let lbTokenInput = "";
   let lbIsVerifying = false;
-  let lbVerifyError = '';
+  let lbVerifyError = "";
   let lbVerifySuccess = false;
 
   async function handleVerifyLbToken() {
     if (!lbTokenInput.trim()) return;
     lbIsVerifying = true;
-    lbVerifyError = '';
+    lbVerifyError = "";
     lbVerifySuccess = false;
     try {
       const username = await verifyListenbrainzToken(lbTokenInput.trim());
       await setListenbrainzToken(lbTokenInput.trim());
       appSettings.setListenBrainzTokenSet(true, username);
       lbVerifySuccess = true;
-      lbTokenInput = '';
-      setTimeout(() => { lbVerifySuccess = false; }, 4000);
+      lbTokenInput = "";
+      setTimeout(() => {
+        lbVerifySuccess = false;
+      }, 4000);
     } catch (e) {
       lbVerifyError = String(e);
     } finally {
@@ -339,7 +368,7 @@
 
   async function handleRemoveLbToken() {
     await deleteListenbrainzToken();
-    appSettings.setListenBrainzTokenSet(false, '');
+    appSettings.setListenBrainzTokenSet(false, "");
     if ($appSettings.listenBrainzEnabled) appSettings.toggleListenBrainz();
   }
 </script>
@@ -359,36 +388,20 @@
           <div class="setting-item account-card">
             <div class="account-profile">
               {#if $authState.avatar_url}
-                <img
-                  src={$authState.avatar_url}
-                  alt="Profile"
-                  class="avatar"
-                />
+                <img src={$authState.avatar_url} alt="Profile" class="avatar" />
               {:else}
                 <div class="avatar avatar-placeholder">
-                  {($authState.name || $authState.email || "U").charAt(0).toUpperCase()}
+                  {($authState.name || $authState.email || "U")
+                    .charAt(0)
+                    .toUpperCase()}
                 </div>
               {/if}
               <div class="account-info">
                 <span class="account-name">{$authState.name || "User"}</span>
                 <span class="account-email">{$authState.email || ""}</span>
               </div>
-            </div>
-            <div class="account-actions">
               <button
-                class="btn-secondary btn-sm"
-                on:click={() => triggerSync()}
-                disabled={$isSyncing}
-                aria-label="Sync now"
-              >
-                {#if $isSyncing}
-                  Syncing...
-                {:else}
-                  Sync Now
-                {/if}
-              </button>
-              <button
-                class="btn-secondary btn-sm"
+                class="logout-btn"
                 on:click={async () => {
                   const ok = await confirm(
                     "Are you sure you want to log out? Unsynced changes will be lost.",
@@ -401,28 +414,54 @@
                 Log Out
               </button>
             </div>
-          </div>
 
-          <div class="setting-item">
-            <div class="sync-info">
-              <span class="setting-label">Sync Status</span>
-              <span class="setting-value">
-                {#if $isSyncing}
-                  Syncing...
-                {:else if $syncStatus.last_error}
-                  <span class="text-error">Error: {$syncStatus.last_error}</span>
-                {:else if $syncStatus.last_sync_at}
-                  Last synced: {$syncStatus.last_sync_at}
-                {:else}
-                  Not synced yet
+            <div class="sync-status-area">
+              <div class="sync-info">
+                <span class="setting-label">Sync Status</span>
+                <span class="setting-value">
+                  {#if $isSyncing}
+                    Syncing...
+                  {:else if $syncStatus.last_error}
+                    <span class="text-error"
+                      >Error: {$syncStatus.last_error}</span
+                    >
+                  {:else}
+                    {formatLastSynced($syncStatus.last_sync_at)}
+                  {/if}
+                </span>
+                {#if $syncStatus.pending_changes > 0}
+                  <span class="setting-hint"
+                    >{$syncStatus.pending_changes} pending change{$syncStatus.pending_changes !==
+                    1
+                      ? "s"
+                      : ""}</span
+                  >
                 {/if}
-              </span>
-            </div>
-            {#if $syncStatus.pending_changes > 0}
-              <span class="setting-hint"
-                >{$syncStatus.pending_changes} pending change{$syncStatus.pending_changes !== 1 ? "s" : ""}</span
+              </div>
+              <button
+                class="btn-secondary btn-sm sync-btn"
+                on:click={() => triggerSync()}
+                disabled={$isSyncing}
+                aria-label="Sync now"
               >
-            {/if}
+                {#if $isSyncing}
+                  <svg
+                    class="spinner"
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                  >
+                    <path
+                      fill="currentColor"
+                      d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
+                    />
+                  </svg>
+                  Syncing
+                {:else}
+                  Sync Now
+                {/if}
+              </button>
+            </div>
           </div>
 
           <div class="setting-item">
@@ -460,8 +499,8 @@
           <div class="setting-item">
             <div class="account-signin">
               <p class="setting-hint">
-                Sign in to sync your playlists, liked songs, and settings
-                across all your devices.
+                Sign in to sync your playlists, liked songs, and settings across
+                all your devices.
               </p>
               <button
                 class="btn-primary"
@@ -832,7 +871,11 @@
               <p class="setting-hint">
                 Submit your listening history and receive personalised
                 recommendations. Requires a free
-                <a href="https://listenbrainz.org" target="_blank" rel="noreferrer">ListenBrainz</a>
+                <a
+                  href="https://listenbrainz.org"
+                  target="_blank"
+                  rel="noreferrer">ListenBrainz</a
+                >
                 account.
               </p>
             </div>
@@ -859,27 +902,33 @@
                 bind:value={lbTokenInput}
                 placeholder="Paste your ListenBrainz token"
                 class="lb-token-input"
-                on:keydown={(e) => e.key === 'Enter' && handleVerifyLbToken()}
+                on:keydown={(e) => e.key === "Enter" && handleVerifyLbToken()}
               />
               <button
                 class="selector-btn"
                 on:click={handleVerifyLbToken}
                 disabled={!lbTokenInput.trim() || lbIsVerifying}
               >
-                {lbIsVerifying ? 'Verifying…' : 'Verify & Save'}
+                {lbIsVerifying ? "Verifying…" : "Verify & Save"}
               </button>
             </div>
             <p class="setting-hint">
               Find your token at
-              <a href="https://listenbrainz.org/settings/" target="_blank" rel="noreferrer"
-                >listenbrainz.org/settings</a
+              <a
+                href="https://listenbrainz.org/settings/"
+                target="_blank"
+                rel="noreferrer">listenbrainz.org/settings</a
               >.
             </p>
             {#if lbVerifyError}
-              <p class="setting-hint" style="color: var(--text-error);">✗ {lbVerifyError}</p>
+              <p class="setting-hint" style="color: var(--text-error);">
+                ✗ {lbVerifyError}
+              </p>
             {/if}
             {#if lbVerifySuccess}
-              <p class="setting-hint" style="color: var(--accent-primary);">✓ Token verified and saved!</p>
+              <p class="setting-hint" style="color: var(--accent-primary);">
+                ✓ Token verified and saved!
+              </p>
             {/if}
           </div>
         {:else}
@@ -889,9 +938,12 @@
                 <span class="setting-label">Token Stored</span>
                 <p class="setting-hint">
                   {#if $appSettings.listenBrainzUsername}
-                    Signed in as <strong>{$appSettings.listenBrainzUsername}</strong>.
+                    Signed in as <strong
+                      >{$appSettings.listenBrainzUsername}</strong
+                    >.
                   {:else}
-                    A token is saved. Enable the toggle above to start scrobbling.
+                    A token is saved. Enable the toggle above to start
+                    scrobbling.
                   {/if}
                 </p>
               </div>
@@ -1726,8 +1778,13 @@
 
   /* Account section */
   .account-card {
+    display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: var(--spacing-lg);
+    background-color: var(--bg-surface);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
   }
 
   .account-profile {
@@ -1738,11 +1795,12 @@
   }
 
   .avatar {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border-radius: var(--radius-full);
     object-fit: cover;
     flex-shrink: 0;
+    border: 2px solid var(--border-color);
   }
 
   .avatar-placeholder {
@@ -1752,19 +1810,23 @@
     background: var(--accent-primary);
     color: #fff;
     font-weight: 700;
-    font-size: 1.125rem;
+    font-size: 1.25rem;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
   }
 
   .account-info {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-width: 0;
   }
 
   .account-name {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.9375rem;
+    font-size: 1rem;
   }
 
   .account-email {
@@ -1775,32 +1837,77 @@
     white-space: nowrap;
   }
 
-  .account-actions {
-    display: flex;
-    gap: var(--spacing-sm);
-    width: 100%;
-  }
-
-  .btn-sm {
+  .logout-btn {
     padding: var(--spacing-xs) var(--spacing-md);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
   }
 
-  .account-signin {
+  .logout-btn:hover {
+    color: var(--error-color);
+    border-color: var(--error-color);
+    background-color: rgba(220, 53, 69, 0.05);
+  }
+
+  .sync-status-area {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
     gap: var(--spacing-md);
-    align-items: flex-start;
   }
 
   .sync-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .sync-info .setting-label {
+    margin-bottom: 0;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .sync-info .setting-value {
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .sync-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .spinner {
+    animation: rotate 2s linear infinite;
+  }
+
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .text-error {
-    color: var(--error-color);
+    color: #dc3545;
     font-size: 0.8125rem;
   }
 

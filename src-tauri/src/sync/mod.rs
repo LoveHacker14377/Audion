@@ -169,24 +169,27 @@ pub async fn perform_sync(db: &Database, sync_state: &SyncState) -> Result<SyncS
 
     sync_state.is_syncing.store(false, Ordering::SeqCst);
 
-    match result {
-        Ok(status) => {
-            // Clear last error on success
-            if let Ok(conn) = db.conn.lock() {
-                let _ = queries::delete_sync_meta(&conn, "last_sync_error");
-                let _ = queries::set_sync_meta(&conn, "last_sync_at", &chrono_now());
-            }
-            Ok(status)
+    if result.is_err() {
+        let e = result.unwrap_err();
+        tracing::error!("Sync failed: {}", e);
+        if let Ok(conn) = db.conn.lock() {
+            let _ = queries::set_sync_meta(&conn, "last_sync_error", &e);
         }
-        Err(e) => {
-            tracing::error!("Sync failed: {}", e);
-            // Store error
-            if let Ok(conn) = db.conn.lock() {
-                let _ = queries::set_sync_meta(&conn, "last_sync_error", &e);
-            }
-            Err(e)
-        }
+        return Err(e);
     }
+
+    let mut status = result.unwrap();
+
+    // On success — clear last error and update last_sync_at
+    if let Ok(conn) = db.conn.lock() {
+        let _ = queries::delete_sync_meta(&conn, "last_sync_error");
+        let now = chrono_now();
+        let _ = queries::set_sync_meta(&conn, "last_sync_at", &now);
+        status.last_sync_at = Some(now);
+    }
+
+    status.is_syncing = false;
+    Ok(status)
 }
 
 async fn perform_sync_inner(db: &Database, sync_state: &SyncState) -> Result<SyncStatus, String> {
@@ -316,21 +319,27 @@ pub async fn perform_full_sync(
 
     sync_state.is_syncing.store(false, Ordering::SeqCst);
 
-    match &result {
-        Ok(_) => {
-            if let Ok(conn) = db.conn.lock() {
-                let _ = queries::delete_sync_meta(&conn, "last_sync_error");
-                let _ = queries::set_sync_meta(&conn, "last_sync_at", &chrono_now());
-            }
+    if result.is_err() {
+        let e = result.unwrap_err();
+        tracing::error!("Full sync failed: {}", e);
+        if let Ok(conn) = db.conn.lock() {
+            let _ = queries::set_sync_meta(&conn, "last_sync_error", &e);
         }
-        Err(e) => {
-            if let Ok(conn) = db.conn.lock() {
-                let _ = queries::set_sync_meta(&conn, "last_sync_error", e);
-            }
-        }
+        return Err(e);
     }
 
-    result
+    let mut status = result.unwrap();
+
+    // On success — clear last error and update last_sync_at
+    if let Ok(conn) = db.conn.lock() {
+        let _ = queries::delete_sync_meta(&conn, "last_sync_error");
+        let now = chrono_now();
+        let _ = queries::set_sync_meta(&conn, "last_sync_at", &now);
+        status.last_sync_at = Some(now);
+    }
+
+    status.is_syncing = false;
+    Ok(status)
 }
 
 async fn perform_full_sync_inner(
@@ -1125,13 +1134,63 @@ fn apply_single_server_change(db: &Database, change: &ServerChange) -> Result<()
             }
         }
         "playlist_track" => {
-            tracing::info!(
-                "Server change: playlist_track {} {} (applied on next full sync)",
-                change.entity_id,
-                change.operation
-            );
-            // Playlist track sync from server → client requires matching tracks by hash
-            // to the local track DB. This is complex and best done during full sync pull.
+            let playlist_server_id = change
+                .payload
+                .get("playlistId")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let track_hash = change
+                .payload
+                .get("trackHash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if !playlist_server_id.is_empty() && !track_hash.is_empty() {
+                // 1. Find local playlist ID
+                if let Ok(Some(local_playlist_id)) =
+                    queries::find_playlist_by_server_id(&conn, playlist_server_id)
+                {
+                    // 2. Find local track ID
+                    let parts: Vec<&str> = track_hash.splitn(3, '|').collect();
+                    if parts.len() == 3 {
+                        if let (Some(t), Some(a)) = (Some(parts[0]), Some(parts[1])) {
+                            if !t.is_empty() && !a.is_empty() {
+                                if let Ok(local_track_id) =
+                                    find_local_track_by_metadata(&conn, t, a)
+                                {
+                                    match change.operation.as_str() {
+                                        "create" | "update" => {
+                                            let _ = queries::add_track_to_playlist(
+                                                &conn,
+                                                local_playlist_id,
+                                                local_track_id,
+                                            );
+                                            tracing::info!(
+                                                "Added track {} to playlist {} via sync",
+                                                local_track_id,
+                                                local_playlist_id
+                                            );
+                                        }
+                                        "delete" => {
+                                            let _ = queries::remove_track_from_playlist(
+                                                &conn,
+                                                local_playlist_id,
+                                                local_track_id,
+                                            );
+                                            tracing::info!(
+                                                "Removed track {} from playlist {} via sync",
+                                                local_track_id,
+                                                local_playlist_id
+                                            );
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         "liked_track" => {
             match change.operation.as_str() {
@@ -1295,12 +1354,18 @@ fn translate_entity_id(
 ) -> String {
     match entity_type {
         "playlist" => {
-            // entity_id format: "local_{playlist_id}" — strip prefix, map to UUID
             let raw_id = local_entity_id
                 .strip_prefix("local_")
                 .unwrap_or(local_entity_id);
-            queries::get_or_create_server_id(conn, raw_id, "playlist")
-                .unwrap_or_else(|_| local_entity_id.to_string())
+            let server_id = queries::get_or_create_server_id(conn, raw_id, "playlist")
+                .unwrap_or_else(|_| local_entity_id.to_string());
+
+            // CRITICAL: Also update the playlists table so subsequent pull doesn't create a duplicate
+            if let Ok(id) = raw_id.parse::<i64>() {
+                let _ = queries::set_playlist_server_id(conn, id, &server_id);
+            }
+
+            server_id
         }
         "playlist_track" => {
             // entity_id format: "local_{playlist_id}_{track_id}" or "local_{playlist_id}_reorder"
