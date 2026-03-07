@@ -17,7 +17,12 @@
   import { initAndroidNotification } from "$lib/services/android-notification";
   import { loadLikedTracks } from "$lib/stores/liked";
   import { goBack, navigationHistory } from "$lib/stores/view";
-  import { isFullScreen, isQueueVisible, contextMenu } from "$lib/stores/ui";
+  import {
+    isFullScreen,
+    isQueueVisible,
+    contextMenu,
+    isMiniPlayer,
+  } from "$lib/stores/ui";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import PromptDialog from "$lib/components/PromptDialog.svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
@@ -237,7 +242,7 @@
   }
 </script>
 
-{#if !$isMobile}
+{#if !$isMobile && !$isMiniPlayer}
   <TitleBar />
 {/if}
 <ConfirmDialog />
@@ -280,7 +285,7 @@
   </div>
 {/if}
 
-<div class="app-content" class:mobile={$isMobile}>
+<div class="app-content" class:mobile={$isMobile} class:pip={$isMiniPlayer}>
   <slot />
 </div>
 
@@ -356,6 +361,11 @@
   }
 
   .app-content.mobile {
+    padding-top: 0;
+  }
+
+  /* PIP mode: no title bar, no padding */
+  .app-content.pip {
     padding-top: 0;
   }
 
