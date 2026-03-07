@@ -532,6 +532,7 @@ pub fn run() {
                     commands::proxy_fetch,
                     // ListenBrainz commands
                     commands::set_listenbrainz_token,
+                    commands::get_listenbrainz_token,
                     commands::get_listenbrainz_token_set,
                     commands::delete_listenbrainz_token,
                     commands::verify_listenbrainz_token,
@@ -677,6 +678,7 @@ pub fn run() {
                     commands::proxy_fetch,
                     // ListenBrainz commands
                     commands::set_listenbrainz_token,
+                    commands::get_listenbrainz_token,
                     commands::get_listenbrainz_token_set,
                     commands::delete_listenbrainz_token,
                     commands::verify_listenbrainz_token,

@@ -770,6 +770,11 @@ export async function getListenbrainzTokenSet(): Promise<boolean> {
     return await invoke('get_listenbrainz_token_set');
 }
 
+/** Retrieve the currently stored ListenBrainz token. */
+export async function getListenbrainzToken(): Promise<string | null> {
+    return await invoke('get_listenbrainz_token');
+}
+
 /** Remove the stored token. */
 export async function deleteListenbrainzToken(): Promise<void> {
     return await invoke('delete_listenbrainz_token');

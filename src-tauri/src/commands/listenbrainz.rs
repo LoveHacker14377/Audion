@@ -62,6 +62,12 @@ pub async fn get_listenbrainz_token_set() -> Result<bool, String> {
     Ok(read_token().await.is_some())
 }
 
+/// Retrieve the currently stored ListenBrainz token.
+#[tauri::command]
+pub async fn get_listenbrainz_token() -> Result<Option<String>, String> {
+    Ok(read_token().await)
+}
+
 /// Remove the stored ListenBrainz token.
 #[tauri::command]
 pub async fn delete_listenbrainz_token(

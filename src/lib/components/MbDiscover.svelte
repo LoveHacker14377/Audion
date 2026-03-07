@@ -8,6 +8,7 @@
         getArtistDiscographyMb,
         getReleaseGroupTracksMb,
         getArtistTopTracksMb,
+        getListenbrainzToken,
         type MbDiscoverArtist,
         type MbDiscoverRelease,
         type MbArtistInfo,
@@ -230,8 +231,23 @@
     async function playOnPlayback(track: MbTrack) {
         playingStreamId = track.mbid;
         try {
+            const token = await getListenbrainzToken();
+            const headers: Record<string, string> = {
+                Accept: "application/json",
+            };
+            if (token) {
+                headers["Authorization"] = `Token ${token}`;
+            }
+
+            const query = new URLSearchParams({
+                recording_mbids: track.mbid,
+                artist_name: track.artist,
+                recording_name: track.title,
+                inc: "metadata",
+            });
             const resp = await fetch(
-                `https://api.listenbrainz.org/1/metadata/lookup/?recording_mbids=${track.mbid}`,
+                `https://api.listenbrainz.org/1/metadata/lookup/?${query.toString()}`,
+                { headers },
             );
             const data = await resp.json();
             const meta = data[track.mbid];
@@ -1939,6 +1955,7 @@
         display: flex;
         flex-direction: column;
         min-width: 0;
+        text-align: left;
     }
     .track-name {
         font-size: 0.92rem;
