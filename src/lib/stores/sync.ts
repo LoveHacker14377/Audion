@@ -326,10 +326,16 @@ export async function triggerSync(): Promise<void> {
         await reloadAfterSync();
     } catch (error) {
         console.error('[Sync] Sync failed:', error);
+
+        let errorMessage = String(error);
+        if (errorMessage.includes('403') || errorMessage.includes('Invalid or missing API Key')) {
+            errorMessage = 'Account sync is only available for supporters who donated to the project.';
+        }
+
         syncStatus.update((s) => ({
             ...s,
             is_syncing: false,
-            last_error: String(error),
+            last_error: errorMessage,
         }));
         syncProgress.set(defaultSyncProgress);
     }

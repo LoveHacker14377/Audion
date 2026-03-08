@@ -13,9 +13,14 @@
         type MbDiscographyItem,
     } from "$lib/api/tauri";
     import { playTracks } from "$lib/stores/player";
-    import { goToArtists, goToAlbumDetail } from "$lib/stores/view";
+    import {
+        goToArtists,
+        goToAlbumDetail,
+        goToArtistDetail,
+    } from "$lib/stores/view";
     import AlbumGrid from "./AlbumGrid.svelte";
     import TrackList from "./TrackList.svelte";
+    import MediaCard from "./MediaCard.svelte";
     import {
         downloadTracks,
         hasDownloadableTracks,
@@ -561,28 +566,29 @@
                         {:else if similarArtists.length > 0}
                             <div class="similar-list">
                                 {#each similarArtists as a}
-                                    <div
-                                        class="similar-item"
-                                        class:in-library={a.in_library}
+                                    <MediaCard
+                                        variant="round"
+                                        primaryText={a.name}
+                                        secondaryText={a.relation_type}
+                                        isPinned={false}
+                                        on:click={() =>
+                                            goToArtistDetail(a.name)}
                                     >
-                                        <div class="similar-avatar">
-                                            {a.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div class="similar-meta">
-                                            <span class="similar-name"
-                                                >{a.name}</span
-                                            >
-                                            <span class="similar-rel"
-                                                >{a.relation_type}</span
-                                            >
-                                        </div>
-                                        {#if a.in_library}
-                                            <span
-                                                class="in-library-dot"
-                                                title="In your library">•</span
-                                            >
-                                        {/if}
-                                    </div>
+                                        <svelte:fragment slot="cover">
+                                            <div class="artist-initial-sm">
+                                                {a.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        </svelte:fragment>
+                                        <svelte:fragment slot="extra-info">
+                                            {#if a.in_library}
+                                                <span
+                                                    class="in-library-dot"
+                                                    title="In your library"
+                                                    >•</span
+                                                >
+                                            {/if}
+                                        </svelte:fragment>
+                                    </MediaCard>
                                 {/each}
                             </div>
                         {:else if similarFetched}
@@ -619,12 +625,14 @@
                         {:else if filteredDisco.length > 0}
                             <div class="disco-grid">
                                 {#each filteredDisco as item (item.mbid)}
-                                    <div
-                                        class="disco-card {discoTypeClass(
-                                            item.release_type,
-                                        )}"
+                                    <MediaCard
+                                        primaryText={item.title}
+                                        secondaryText={item.year
+                                            ? `${item.release_type} • ${item.year}`
+                                            : item.release_type}
+                                        ariaLabel={item.title}
                                     >
-                                        <div class="disco-cover-wrap">
+                                        <svelte:fragment slot="cover">
                                             {#if !failedCovers.has(item.mbid)}
                                                 <img
                                                     class="disco-cover"
@@ -715,29 +723,8 @@
                                                     {/if}
                                                 </div>
                                             {/if}
-                                        </div>
-                                        <div class="disco-card-body">
-                                            <span
-                                                class="disco-card-title"
-                                                title={item.title}
-                                                >{item.title}</span
-                                            >
-                                            <div class="disco-card-meta">
-                                                <span
-                                                    class="disco-badge {discoTypeClass(
-                                                        item.release_type,
-                                                    )}"
-                                                    >{item.release_type}</span
-                                                >
-                                                {#if item.year}
-                                                    <span
-                                                        class="disco-card-year"
-                                                        >{item.year}</span
-                                                    >
-                                                {/if}
-                                            </div>
-                                        </div>
-                                    </div>
+                                        </svelte:fragment>
+                                    </MediaCard>
                                 {/each}
                             </div>
                         {:else if discoFetched}
@@ -1062,62 +1049,21 @@
 
     /* ── Similar artists ── */
     .similar-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .similar-item {
-        display: flex;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: var(--spacing-sm);
-        padding: 6px 10px;
-        border-radius: var(--radius-sm);
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid transparent;
-        transition: background var(--transition-fast);
     }
 
-    .similar-item.in-library {
-        border-color: rgba(var(--accent-primary-rgb, 30 215 96) / 0.2);
-        background: rgba(var(--accent-primary-rgb, 30 215 96) / 0.05);
-    }
-
-    .similar-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: var(--radius-full);
-        background: var(--bg-highlight);
+    .artist-initial-sm {
+        position: absolute;
+        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.875rem;
+        font-size: 2rem;
         font-weight: 700;
-        color: var(--text-secondary);
-        flex-shrink: 0;
-    }
-
-    .similar-meta {
-        flex: 1;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-    }
-
-    .similar-name {
-        font-size: 0.875rem;
-        font-weight: 600;
         color: var(--text-primary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .similar-rel {
-        font-size: 0.7rem;
-        color: var(--text-subdued);
-        text-transform: capitalize;
+        background: var(--bg-highlight);
     }
 
     .in-library-dot {
@@ -1162,49 +1108,6 @@
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: var(--spacing-sm);
-    }
-
-    .disco-card {
-        display: flex;
-        flex-direction: column;
-        background: var(--bg-elevated);
-        border-radius: var(--radius-md);
-        overflow: hidden;
-        border: 1px solid var(--border-color);
-        transition: all var(--transition-fast);
-        border-left: 3px solid var(--border-color);
-    }
-
-    .disco-card:hover {
-        background: var(--bg-highlight);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    /* Per-type card left borders */
-    .disco-card.rt-album {
-        border-left-color: #3b82f6;
-    }
-    .disco-card.rt-single {
-        border-left-color: #22c55e;
-    }
-    .disco-card.rt-ep {
-        border-left-color: #a855f7;
-    }
-    .disco-card.rt-live {
-        border-left-color: #ef4444;
-    }
-    .disco-card.rt-compilation {
-        border-left-color: #f59e0b;
-    }
-    .disco-card.rt-soundtrack {
-        border-left-color: #ec4899;
-    }
-    .disco-card.rt-remix {
-        border-left-color: #06b6d4;
-    }
-    .disco-card.rt-other {
-        border-left-color: #6b7280;
     }
 
     .disco-cover-wrap {
@@ -1262,79 +1165,6 @@
     .disco-cover-placeholder.rt-other {
         color: #6b7280;
         background: rgba(107, 114, 128, 0.08);
-    }
-
-    .disco-card-body {
-        padding: 8px 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 0;
-    }
-
-    .disco-card-title {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1.3;
-    }
-
-    .disco-card-meta {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .disco-badge {
-        font-size: 0.62rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        padding: 1px 6px;
-        border-radius: var(--radius-full);
-        line-height: 1.5;
-    }
-
-    .disco-badge.rt-album {
-        color: #3b82f6;
-        background: rgba(59, 130, 246, 0.15);
-    }
-    .disco-badge.rt-single {
-        color: #22c55e;
-        background: rgba(34, 197, 94, 0.15);
-    }
-    .disco-badge.rt-ep {
-        color: #a855f7;
-        background: rgba(168, 85, 247, 0.15);
-    }
-    .disco-badge.rt-live {
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.15);
-    }
-    .disco-badge.rt-compilation {
-        color: #f59e0b;
-        background: rgba(245, 158, 11, 0.15);
-    }
-    .disco-badge.rt-soundtrack {
-        color: #ec4899;
-        background: rgba(236, 72, 153, 0.15);
-    }
-    .disco-badge.rt-remix {
-        color: #06b6d4;
-        background: rgba(6, 182, 212, 0.15);
-    }
-    .disco-badge.rt-other {
-        color: #6b7280;
-        background: rgba(107, 114, 128, 0.15);
-    }
-
-    .disco-card-year {
-        font-size: 0.68rem;
-        color: var(--text-subdued);
-        font-weight: 500;
     }
 
     /* ── Mobile ── */

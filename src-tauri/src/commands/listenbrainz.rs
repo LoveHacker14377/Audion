@@ -7,17 +7,18 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 
 const LB_API_BASE: &str = "https://api.listenbrainz.org/1";
 
 // ── Token storage (app-data file) ─────────────────────────────────────────────
 
-fn token_file_path() -> Option<std::path::PathBuf> {
-    dirs::data_local_dir().map(|d| d.join("audion").join("lb_token"))
+fn token_file_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("lb_token"))
 }
 
-async fn read_token() -> Option<String> {
-    let path = token_file_path()?;
+async fn read_token(app: &tauri::AppHandle) -> Option<String> {
+    let path = token_file_path(app)?;
     let t = tokio::fs::read_to_string(&path).await.ok()?;
     let t = t.trim().to_string();
     if t.is_empty() {
@@ -31,9 +32,10 @@ async fn read_token() -> Option<String> {
 #[tauri::command]
 pub async fn set_listenbrainz_token(
     token: Option<String>,
+    app: tauri::AppHandle,
     lb_state: tauri::State<'_, ListenBrainzState>,
 ) -> Result<(), String> {
-    let path = token_file_path().ok_or("Cannot resolve app data directory")?;
+    let path = token_file_path(&app).ok_or("Cannot resolve app data directory")?;
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -58,22 +60,23 @@ pub async fn set_listenbrainz_token(
 
 /// Returns `true` if a token is currently stored.
 #[tauri::command]
-pub async fn get_listenbrainz_token_set() -> Result<bool, String> {
-    Ok(read_token().await.is_some())
+pub async fn get_listenbrainz_token_set(app: tauri::AppHandle) -> Result<bool, String> {
+    Ok(read_token(&app).await.is_some())
 }
 
 /// Retrieve the currently stored ListenBrainz token.
 #[tauri::command]
-pub async fn get_listenbrainz_token() -> Result<Option<String>, String> {
-    Ok(read_token().await)
+pub async fn get_listenbrainz_token(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    Ok(read_token(&app).await)
 }
 
 /// Remove the stored ListenBrainz token.
 #[tauri::command]
 pub async fn delete_listenbrainz_token(
+    app: tauri::AppHandle,
     lb_state: tauri::State<'_, ListenBrainzState>,
 ) -> Result<(), String> {
-    if let Some(path) = token_file_path() {
+    if let Some(path) = token_file_path(&app) {
         let _ = tokio::fs::remove_file(path).await;
     }
 
@@ -128,8 +131,9 @@ pub async fn submit_listenbrainz_listen(
     album: Option<String>,
     duration_secs: Option<i32>,
     now_playing: bool,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let token = match read_token().await {
+    let token = match read_token(&app).await {
         Some(t) => t,
         None => return Ok(()), // silently skip – no token configured
     };
@@ -254,8 +258,9 @@ pub async fn fetch_listenbrainz_recommendations(
     limit: Option<usize>,
     db: tauri::State<'_, crate::db::Database>,
     lb_state: tauri::State<'_, ListenBrainzState>,
+    app: tauri::AppHandle,
 ) -> Result<Vec<LbRecommendation>, String> {
-    let token = match read_token().await {
+    let token = match read_token(&app).await {
         Some(t) => t,
         None => {
             return Err("No ListenBrainz token configured. Enable it in Settings first.".into())

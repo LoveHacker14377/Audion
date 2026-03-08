@@ -1953,7 +1953,6 @@
     .track-info {
         flex: 1;
         display: flex;
-        flex-direction: column;
         min-width: 0;
         text-align: left;
     }

@@ -390,7 +390,15 @@
         apiKeySuccess = false;
       }, 3000);
     } catch (e) {
-      apiKeyError = String(e);
+      let errorMessage = String(e);
+      if (
+        errorMessage.includes("403") ||
+        errorMessage.includes("Invalid or missing API Key")
+      ) {
+        errorMessage =
+          "Account sync is only available for supporters who donated to the project.";
+      }
+      apiKeyError = errorMessage;
     } finally {
       apiKeySaving = false;
     }
@@ -508,7 +516,10 @@
                   {apiKeySaving ? "Saving..." : "Save Key"}
                 </button>
               </div>
-              <p class="setting-hint">Required for account sync service.</p>
+              <p class="setting-hint">
+                Account sync is available for supporters who donated to the
+                project.
+              </p>
               {#if apiKeyError}
                 <p class="setting-hint" style="color: var(--text-error);">
                   ✗ {apiKeyError}
@@ -588,7 +599,10 @@
                 {apiKeySaving ? "Saving..." : "Save Key"}
               </button>
             </div>
-            <p class="setting-hint">Required for account sync service.</p>
+            <p class="setting-hint">
+              Account sync is available for supporters who donated to the
+              project.
+            </p>
             {#if apiKeyError}
               <p class="setting-hint" style="color: var(--text-error);">
                 ✗ {apiKeyError}
@@ -1942,6 +1956,13 @@
     color: var(--error-color);
     border-color: var(--error-color);
     background-color: rgba(220, 53, 69, 0.05);
+  }
+
+  .account-signin {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: flex-start;
   }
 
   .sync-status-area {
