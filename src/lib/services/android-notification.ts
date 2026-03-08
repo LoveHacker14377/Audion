@@ -4,6 +4,7 @@ import { currentTrack, isPlaying, togglePlay, nextTrack, previousTrack, currentT
 import { nativeAudioStop } from '$lib/services/native-audio';
 import { getTrackCoverSrc } from '$lib/api/tauri';
 import { isAndroid, isTauri } from '$lib/api/tauri';
+import { isLoved, toggleLove } from '$lib/stores/loved';
 
 interface AndroidInterface {
     startNotification(
@@ -11,6 +12,7 @@ interface AndroidInterface {
         artist: string,
         album: string,
         isPlaying: boolean,
+        isLoved: boolean,
         artUrl: string | null,
         currentTime: string,
         duration: string
@@ -20,6 +22,7 @@ interface AndroidInterface {
         artist: string,
         album: string,
         isPlaying: boolean,
+        isLoved: boolean,
         artUrl: string | null,
         currentTime: string,
         duration: string
@@ -31,7 +34,7 @@ interface AndroidInterface {
 declare global {
     interface Window {
         AndroidMediaNotification?: AndroidInterface;
-        __audionMediaAction?: (action: 'playPause' | 'next' | 'previous' | 'stop') => void;
+        __audionMediaAction?: (action: 'playPause' | 'next' | 'previous' | 'love' | 'stop') => void;
     }
 }
 
@@ -59,6 +62,9 @@ export async function initAndroidNotification() {
             case 'previous':
                 previousTrack();
                 break;
+            case 'love':
+                toggleLove();
+                break;
             case 'stop':
                 nativeAudioStop();
                 isPlaying.set(false);
@@ -76,6 +82,7 @@ export async function initAndroidNotification() {
         }
 
         const playing = get(isPlaying);
+        const loved = get(isLoved) as boolean;
         const artUrl = getTrackCoverSrc(track);
         const pos = get(currentTime);
         const dur = get(duration);
@@ -114,6 +121,7 @@ export async function initAndroidNotification() {
             track.artist || 'Unknown Artist',
             track.album || '',
             playing,
+            loved,
             artData,
             formatDuration(pos),
             formatDuration(dur)
@@ -123,6 +131,7 @@ export async function initAndroidNotification() {
     isPlaying.subscribe(async (playing) => {
         const track = get(currentTrack);
         if (track) {
+            const loved = get(isLoved) as boolean;
             const pos = get(currentTime);
             const dur = get(duration);
             const { formatDuration } = await import('$lib/api/tauri');
@@ -131,6 +140,7 @@ export async function initAndroidNotification() {
                 track.artist || 'Unknown Artist',
                 track.album || '',
                 playing,
+                loved,
                 lastArtBase64,
                 formatDuration(pos),
                 formatDuration(dur)

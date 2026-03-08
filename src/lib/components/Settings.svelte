@@ -11,6 +11,7 @@
     setListenbrainzToken,
     deleteListenbrainzToken,
     verifyListenbrainzToken,
+    isAndroid,
     type MergeCoverResult,
   } from "$lib/api/tauri";
   import { loadLibrary } from "$lib/stores/library";
@@ -172,9 +173,27 @@
 
   async function handleSetDownloadLocation() {
     try {
-      const selected = await selectMusicFolder();
-      if (selected) {
-        appSettings.setDownloadLocation(selected);
+      if (isAndroid()) {
+        // Use native Android SAF folder picker
+        const path = await new Promise<string | null>((resolve) => {
+          // Register one-shot callback for the result
+          (window as any).__onAndroidFolderPicked = (
+            pickedPath: string | null,
+          ) => {
+            delete (window as any).__onAndroidFolderPicked;
+            resolve(pickedPath);
+          };
+          // Launch the native picker
+          (window as any).AndroidFolderPicker?.pickFolder();
+        });
+        if (path) {
+          appSettings.setDownloadLocation(path);
+        }
+      } else {
+        const selected = await selectMusicFolder();
+        if (selected) {
+          appSettings.setDownloadLocation(selected);
+        }
       }
     } catch (error) {
       console.error("Failed to select download location:", error);
@@ -412,6 +431,40 @@
 
   <div class="settings-content">
     <div class="settings-container">
+      <!-- Support Links -->
+      <section class="settings-section">
+        <div class="support-links">
+          <a
+            href="https://discord.gg/27XRVQsBd9"
+            target="_blank"
+            rel="noreferrer"
+            class="support-btn discord-btn"
+            aria-label="Join our Discord"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path
+                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"
+              />
+            </svg>
+            Discord
+          </a>
+          <a
+            href="https://ko-fi.com/N4N5UMNR1"
+            target="_blank"
+            rel="noreferrer"
+            class="support-btn kofi-btn"
+            aria-label="Support on Ko-fi"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path
+                d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-.995 4.032.019.152.154.16.166.152.166s.068-.112.151-.166c1.27-1.241 3.563-.78 4.346.394.886 1.318.488 2.927-.127 3.332zm4.906.658c-.375.133-1.259.053-1.259.053l.13-3.998s.932-.171 1.432.064c1.004.472.835 3.44-.303 3.881z"
+              />
+            </svg>
+            Ko-fi
+          </a>
+        </div>
+      </section>
+
       <!-- Account & Sync -->
       <section class="settings-section">
         <h3 class="section-title">Account</h3>
@@ -798,61 +851,63 @@
           <p class="setting-hint">Where downloaded songs will be saved</p>
         </div>
 
-        <div class="setting-item">
-          <span class="setting-label">Window Start Mode</span>
-          <div class="theme-modes">
-            <button
-              class="mode-btn"
-              class:active={$appSettings.startMode === "normal"}
-              on:click={() => appSettings.setStartMode("normal")}
-              aria-label="Start window in normal mode"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                fill="currentColor"
+        {#if !isAndroid()}
+          <div class="setting-item">
+            <span class="setting-label">Window Start Mode</span>
+            <div class="theme-modes">
+              <button
+                class="mode-btn"
+                class:active={$appSettings.startMode === "normal"}
+                on:click={() => appSettings.setStartMode("normal")}
+                aria-label="Start window in normal mode"
               >
-                <path
-                  d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"
-                />
-              </svg>
-              <span>Normal</span>
-            </button>
-            <button
-              class="mode-btn"
-              class:active={$appSettings.startMode === "maximized"}
-              on:click={() => appSettings.setStartMode("maximized")}
-              aria-label="Start window maximized"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                fill="currentColor"
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"
+                  />
+                </svg>
+                <span>Normal</span>
+              </button>
+              <button
+                class="mode-btn"
+                class:active={$appSettings.startMode === "maximized"}
+                on:click={() => appSettings.setStartMode("maximized")}
+                aria-label="Start window maximized"
               >
-                <path d="M4 4h16v16H4V4zm2 4v10h12V8H6z" />
-              </svg>
-              <span>Maximized</span>
-            </button>
-            <button
-              class="mode-btn"
-              class:active={$appSettings.startMode === "minimized"}
-              on:click={() => appSettings.setStartMode("minimized")}
-              aria-label="Start window minimized"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                fill="currentColor"
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                >
+                  <path d="M4 4h16v16H4V4zm2 4v10h12V8H6z" />
+                </svg>
+                <span>Maximized</span>
+              </button>
+              <button
+                class="mode-btn"
+                class:active={$appSettings.startMode === "minimized"}
+                on:click={() => appSettings.setStartMode("minimized")}
+                aria-label="Start window minimized"
               >
-                <path d="M6 19h12v2H6z" />
-              </svg>
-              <span>Minimized</span>
-            </button>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                >
+                  <path d="M6 19h12v2H6z" />
+                </svg>
+                <span>Minimized</span>
+              </button>
+            </div>
           </div>
-        </div>
+        {/if}
 
         <div class="setting-item">
           <div class="toggle-container">
@@ -1737,7 +1792,52 @@
     color: var(--text-subdued);
   }
 
-  /* Toggle Switch */
+  /* Support links (Discord / Ko-fi) */
+  .support-links {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+
+  .support-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+      opacity var(--transition-fast),
+      transform var(--transition-fast);
+    flex: 1;
+    justify-content: center;
+    min-width: 120px;
+  }
+
+  .support-btn:active {
+    transform: scale(0.96);
+  }
+
+  .discord-btn {
+    background-color: #5865f2;
+    color: #fff;
+  }
+
+  .discord-btn:hover {
+    opacity: 0.9;
+  }
+
+  .kofi-btn {
+    background-color: #ff5e5b;
+    color: #fff;
+  }
+
+  .kofi-btn:hover {
+    opacity: 0.9;
+  }
+
   .toggle-container {
     display: flex;
     justify-content: space-between;

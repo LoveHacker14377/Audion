@@ -1833,6 +1833,18 @@
       border-radius: var(--radius-sm);
     }
 
+    /* Align cover flush left in its column */
+    .list-body.mobile-playlist .col-cover {
+      justify-content: flex-start;
+      align-items: center;
+    }
+
+    /* Ensure title col aligns center without extra top shift */
+    .list-body.mobile-playlist .col-title {
+      padding-top: 0;
+      justify-content: center;
+    }
+
     /* Title + Artist stacked */
     .list-body.mobile-playlist .track-name {
       font-size: 0.9375rem;
@@ -1888,6 +1900,18 @@
       width: 48px;
       height: 48px;
       border-radius: var(--radius-sm);
+    }
+
+    /* Align cover flush left in its column */
+    .list-body.mobile-library .col-cover {
+      justify-content: flex-start;
+      align-items: center;
+    }
+
+    /* Ensure title col aligns center without extra top shift */
+    .list-body.mobile-library .col-title {
+      padding-top: 0;
+      justify-content: center;
     }
 
     /* Title + Artist stacked */
