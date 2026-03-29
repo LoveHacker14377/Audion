@@ -131,6 +131,7 @@ export interface Playlist {
     id: number;
     name: string;
     created_at: string | null;
+    folder_path?: string | null;
 }
 
 export interface Library {
@@ -417,6 +418,10 @@ export async function reorderPlaylistTracks(playlistId: number, fromIndex: numbe
     return await invoke('reorder_playlist_tracks', { playlistId, fromIndex, toIndex });
 }
 
+export async function beginFolderImport(folderPath: string): Promise<number> {
+    return await invoke('begin_folder_import', { folderPath });
+}
+
 
 // Activity commands (liked tracks + play history)
 
@@ -497,6 +502,13 @@ export async function selectMusicFolder(): Promise<string | null> {
         title: 'Select Music Folder',
     });
     return selected as string | null;
+}
+
+export async function pickFolder(): Promise<string | null> {
+    await ensureTauriLoaded();
+    const selected = await openFunc!({ directory: true, multiple: false, title: 'Select Playlist Folder', });
+    if (!selected) return null;
+    return typeof selected === "string" ? selected : (selected as string[])[0] ?? null;
 }
 
 // Ensure the correct path for downloaded files

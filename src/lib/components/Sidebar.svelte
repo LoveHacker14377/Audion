@@ -560,7 +560,7 @@
                             )}
                             on:click={() =>
                                 navigateAndClose(() =>
-                                    goToPlaylistDetail(playlist.id),
+                                    goToPlaylistDetail(playlist.id, playlist.name),
                                 )}
                             on:contextmenu={(e) =>
                                 handlePlaylistContextMenu(e, playlist)}

@@ -127,8 +127,8 @@ export function goToPlaylists(): void {
     currentView.set({ type: 'playlists' });
 }
 
-export function goToPlaylistDetail(playlistId: number): void {
-    currentView.set({ type: 'playlist-detail', id: playlistId });
+export function goToPlaylistDetail(playlistId: number, name: string): void {
+    currentView.set({ type: 'playlist-detail', id: playlistId, name });
 }
 
 export function goToPlugins(): void {
