@@ -3,6 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
+use::std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
@@ -49,6 +50,7 @@ pub struct Playlist {
     pub name: String,
     pub cover_url: Option<String>,
     pub created_at: Option<String>,
+    pub folder_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -863,7 +865,7 @@ pub fn create_playlist(conn: &Connection, name: &str) -> Result<i64> {
 
 pub fn get_all_playlists(conn: &Connection) -> Result<Vec<Playlist>> {
     let mut stmt =
-        conn.prepare("SELECT id, name, cover_url, created_at FROM playlists ORDER BY name")?;
+        conn.prepare("SELECT id, name, cover_url, created_at, folder_path FROM playlists ORDER BY name")?;
 
     let playlists = stmt
         .query_map([], |row| {
@@ -872,6 +874,7 @@ pub fn get_all_playlists(conn: &Connection) -> Result<Vec<Playlist>> {
                 name: row.get(1)?,
                 cover_url: row.get(2)?,
                 created_at: row.get(3)?,
+                folder_path: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>>>()?;
@@ -969,6 +972,26 @@ pub fn update_playlist_cover(
     Ok(())
 }
 
+pub fn get_folder_playlists(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, folder_path FROM playlists WHERE folder_path IS NOT NULL"
+    )?;
+    let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
+pub fn set_playlist_folder_path(conn: &Connection, playlist_id: i64, folder_path: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE playlists SET folder_path = ?1 WHERE id = ?2",
+        params![folder_path, playlist_id],
+    )?;
+    Ok(())
+}
+
 // Music folder operations
 pub fn add_music_folder(conn: &Connection, path: &str) -> Result<i64> {
     conn.execute(
@@ -976,6 +999,34 @@ pub fn add_music_folder(conn: &Connection, path: &str) -> Result<i64> {
         [path],
     )?;
     Ok(conn.last_insert_rowid())
+}
+
+/// Returns true if the folder was registered, false if it was already covered.
+pub fn register_music_folder(conn: &Connection, path: &str) -> Result<bool> {
+    let existing = {
+        let mut stmt = conn.prepare("SELECT path FROM music_folders")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut v = Vec::new();
+        for r in rows { v.push(r?); }
+        v
+    };
+
+    // If any existing folder is a parent
+    if existing.iter().any(|f| Path::new(path).starts_with(Path::new(f))) {
+        return Ok(false);
+    }
+
+    // Remove any existing folders that are subfolders of the new path
+    for f in existing.iter().filter(|f| Path::new(f).starts_with(Path::new(path))) {
+        conn.execute("DELETE FROM music_folders WHERE path = ?1", [f])?;
+    }
+
+    conn.execute(
+        "INSERT OR IGNORE INTO music_folders (path, last_scanned) VALUES (?1, CURRENT_TIMESTAMP)",
+        [path],
+    )?;
+
+    Ok(true)
 }
 
 pub fn get_music_folders(conn: &Connection) -> Result<Vec<String>> {

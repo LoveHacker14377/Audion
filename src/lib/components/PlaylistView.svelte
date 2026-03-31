@@ -6,6 +6,8 @@
         getPlaylistTracks,
         deletePlaylist,
         renamePlaylist,
+        beginFolderImport,
+        pickFolder,
     } from "$lib/api/tauri";
     import {
         playlistCovers,
@@ -31,6 +33,7 @@
     import MediaCard from "./MediaCard.svelte";
     import { onDestroy } from "svelte";
     import { saveScroll, getScroll } from "$lib/stores/scrollMemory";
+    import { progressiveScan } from "$lib/stores/progressiveScan"
 
     let currentScrollTop = getScroll("playlists");
 
@@ -38,7 +41,7 @@
         saveScroll("playlists", currentScrollTop);
     });
 
-    type Playlist = { id: number; name: string };
+    type Playlist = { id: number; name: string; folder_path?: string | null };
 
     // playlistCovers
     const typedPlaylistCovers: Writable<Record<string, string>> =
@@ -137,7 +140,7 @@
     // Navigation
     function handlePlaylistClick(playlist: Playlist, e: MouseEvent) {
         if ((e.target as HTMLElement).closest("[data-mediacard-play]")) return;
-        goToPlaylistDetail(playlist.id);
+        goToPlaylistDetail(playlist.id, playlist.name);
     }
 
     async function handlePlaylistContextMenu(
@@ -304,6 +307,48 @@
         }
     }
 
+    async function handleImportFolder() {
+        try {
+            const path = await pickFolder();
+            if (!path) return;
+
+            // 1. Register listeners before the backend can fire events
+            await progressiveScan.prepareImport();
+
+            // 2. invoke the backend
+            const playlistId = await beginFolderImport(path);
+
+            // 3. playlist ID into store state (listeners already live)
+            await progressiveScan.startImport(playlistId);
+
+            // Wait for scan to finish, with a timeout in case the
+            // complete event is never received (e.g. backend crash, reload mid-scan).
+            await new Promise<void>((resolve) => {
+                const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+                const timer = setTimeout(() => {
+                    console.warn('[handleImportFolder] Scan completion timed out — forcing resolution');
+                    unsub();
+                    resolve();
+                }, TIMEOUT_MS);
+
+                const unsub = progressiveScan.subscribe(state => {
+                    if (!state.isScanning) {
+                        clearTimeout(timer);
+                        unsub();
+                        resolve();
+                    }
+                });
+            });
+
+            await loadPlaylists();
+        } catch (err) {
+            console.error('Failed to import folder as playlist:', err);
+        } finally {
+            progressiveScan.reset();
+        }
+    }
+
     // Sorting
     $: sortedPlaylists = [...$playlists].sort((a, b) => {
         const aPinned = isPinned("playlist", a.id, $pinnedItems);
@@ -323,7 +368,17 @@
 <div class="playlist-view">
     <header class="view-header">
         <h1>Playlists</h1>
-        <button
+        <div class="header-actions">
+            <button
+                class="btn-secondary"
+                on:click={handleImportFolder}
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                </svg>
+                Import Folder
+            </button>
+            <button
             class="btn-secondary"
             on:click={() => (showCreateForm = !showCreateForm)}
             aria-expanded={showCreateForm}
@@ -340,6 +395,7 @@
             </svg>
             New Playlist
         </button>
+        </div>
     </header>
 
     {#if showCreateForm}
@@ -460,6 +516,12 @@
     .view-header h1 {
         font-size: 2rem;
         font-weight: 700;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
     }
 
     .create-form {

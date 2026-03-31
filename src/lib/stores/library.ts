@@ -209,6 +209,27 @@ export const artists = writable<Artist[]>([]);
 // Playlist store
 export const playlists = writable<Playlist[]>([]);
 
+// Map of playlistId . tracks pending UI insertion after a drag-drop.
+// arrive before the reactive in PlaylistDetail drains them.
+export const playlistPendingTracks = writable<Record<number, Track[]>>({});
+
+export function pushPendingTrack(playlistId: number, track: Track): void {
+    playlistPendingTracks.update(map => {
+        const existing = map[playlistId] ?? [];
+        return { ...map, [playlistId]: [...existing, track] };
+    });
+}
+
+export function drainPendingTracks(playlistId: number): Track[] {
+    let drained: Track[] = [];
+    playlistPendingTracks.update(map => {
+        drained = map[playlistId] ?? [];
+        const { [playlistId]: _, ...rest } = map;
+        return rest;
+    });
+    return drained;
+}
+
 // Loading state
 export const isLoading = writable(false);
 

@@ -17,7 +17,7 @@
     import { contextMenu } from "$lib/stores/ui";
     import { playTracks, addToQueue } from "$lib/stores/player";
     import { goToPlaylists, goToTracksMultiSelect } from "$lib/stores/view";
-    import { loadPlaylists, playlists } from "$lib/stores/library";
+    import { loadPlaylists, playlists, playlistPendingTracks, drainPendingTracks } from "$lib/stores/library";
     import TrackList from "./TrackList.svelte";
     import {
         playlistCovers,
@@ -68,6 +68,13 @@
             `<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter, system-ui, sans-serif' font-size='${Math.floor(size / 3)}' fill='white' font-weight='700'>${initials}</text>` +
             `</svg>`;
         return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    }
+
+    // Drain any tracks that were dropped onto this playlist while it was active
+    // it reads and clears in one update
+    // so multiple rapid drops won't double append
+    $: if ($playlistPendingTracks[playlistId]?.length) {
+        tracks = [...tracks, ...drainPendingTracks(playlistId)];
     }
 
     // Reactive cover source - updates instantly when playlistCovers changes
@@ -427,7 +434,14 @@
                 {/if}
             </div>
             <div class="playlist-info">
-                <span class="playlist-type">Playlist</span>
+                <span class="playlist-type" title={playlist.folder_path ?? undefined}>
+                    {#if playlist.folder_path}
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12" style="vertical-align: middle; margin-right: 4px;">
+                            <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                        </svg>
+                    {/if}
+                    Playlist
+                </span>
                 {#if isEditing}
                     <input
                         type="text"
@@ -559,6 +573,7 @@
                 <TrackList
                     {tracks}
                     showAlbum={false}
+                    {playlistId}
                     playbackContext={{
                         type: "playlist",
                         playlistId,
