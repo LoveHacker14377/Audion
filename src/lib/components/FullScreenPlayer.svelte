@@ -900,9 +900,18 @@
                               $activeLine,
                               $wordSyncState.activeWordIdx,
                             )}
-                            {@const isCurrentWord = i === $activeLine && wordIdx === $wordSyncState.activeWordIdx}
-                            {@const isPastWord = i < $activeLine || (i === $activeLine && wordIdx < $wordSyncState.activeWordIdx)}
-                            {@const wordProgress = isCurrentWord ? $wordSyncState.progress : (isPastWord ? 100 : 0)}
+                            {@const isCurrentWord =
+                              i === $activeLine &&
+                              wordIdx === $wordSyncState.activeWordIdx}
+                            {@const isPastWord =
+                              i < $activeLine ||
+                              (i === $activeLine &&
+                                wordIdx < $wordSyncState.activeWordIdx)}
+                            {@const wordProgress = isCurrentWord
+                              ? $wordSyncState.progress
+                              : isPastWord
+                                ? 100
+                                : 0}
                             <span
                               class="desktop-lyric-word {wordState}"
                               style="--word-progress: {wordProgress}%;"
@@ -1465,11 +1474,14 @@
     font-size: 2.25rem;
     font-weight: 800;
     color: rgba(255, 255, 255, 0.15);
-    padding: 1.25rem 0;
+    padding: 0.7rem 0;
     cursor: pointer;
-    transition: color 0.5s ease, opacity 0.5s ease, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), margin 0.5s ease;
+    transition:
+      color 0.5s ease,
+      opacity 0.5s ease,
+      transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: left;
-    line-height: 1.3;
+    line-height: 1.4;
     letter-spacing: -0.01em;
     will-change: transform, opacity;
     backface-visibility: hidden;
@@ -1477,25 +1489,32 @@
   }
 
   .desktop-lyric-line.past-line {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.45);
     transform: scale(0.98);
   }
 
   .desktop-lyric-line:hover {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.35);
   }
 
   .desktop-lyric-line.active {
     color: #fff;
-    transform: scale(1.06);
-    margin: 1.5rem 0;
+    transform: scale(1.08);
+    margin: 0;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+  }
+
+  .desktop-lyric-word.highlighted {
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
   }
 
   .desktop-lyric-word {
     position: relative;
     display: inline-block;
     /* Transition only opacity/transform, not background which updates every frame */
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     background: linear-gradient(
