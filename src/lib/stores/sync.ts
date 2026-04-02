@@ -178,39 +178,59 @@ export async function initSync(): Promise<void> {
 
     // ─── Automatic Sync Trigger ──────────────────────────────────────────
     // Watch for pending changes and online status. Trigger sync after a short delay.
-    // Enforces a minimum 30-second cooldown between auto-syncs to avoid hammering
-    // the server (and burning D1 read rows) when the store updates rapidly.
+    // Enforces a 12-hour cooldown between auto-syncs to reduce server load.
     let syncTimeout: ReturnType<typeof setTimeout> | null = null;
-    let lastAutoSyncAt = 0;
-    const AUTO_SYNC_COOLDOWN_MS = 30_000;
+    
+    // Load last sync time from storage
+    const LAST_SYNC_KEY = 'audion_last_auto_sync_at';
+    let lastAutoSyncAt = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    const AUTO_SYNC_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours
+    
+    // Prevent initial sync on app open
+    let isInitialCheck = true;
 
     syncStatus.subscribe(($status) => {
+        // Skip the very first check to prevent sync on app open
+        if (isInitialCheck) {
+            isInitialCheck = false;
+            console.log('[Sync] Initial check skipped (cooldown active)');
+            return;
+        }
+
         const now = Date.now();
+        const cooldownRemaining = lastAutoSyncAt + AUTO_SYNC_COOLDOWN_MS - now;
+        
         const canSync =
             $status.pending_changes > 0 &&
             !$status.is_syncing &&
             get(isOnline) &&
             get(isLoggedIn) &&
-            now - lastAutoSyncAt >= AUTO_SYNC_COOLDOWN_MS;
+            cooldownRemaining <= 0;
 
         if (canSync) {
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
                 lastAutoSyncAt = Date.now();
+                localStorage.setItem(LAST_SYNC_KEY, lastAutoSyncAt.toString());
                 triggerSync();
-            }, 2000); // 2 second debounce
+            }, 5000); // 5 second debounce for auto-sync
         } else if (syncTimeout && ($status.is_syncing || $status.pending_changes === 0)) {
             clearTimeout(syncTimeout);
             syncTimeout = null;
         }
     });
 
-    // Also trigger when coming back online
+    // Also trigger when coming back online, but still respect cooldown
     isOnline.subscribe(($online) => {
-        if ($online) {
+        if ($online && !isInitialCheck) {
             const $status = get(syncStatus);
-            if ($status.pending_changes > 0 && !$status.is_syncing && get(isLoggedIn)) {
+            const now = Date.now();
+            if ($status.pending_changes > 0 && 
+                !$status.is_syncing && 
+                get(isLoggedIn) && 
+                (now - lastAutoSyncAt >= AUTO_SYNC_COOLDOWN_MS)) {
                 lastAutoSyncAt = Date.now();
+                localStorage.setItem(LAST_SYNC_KEY, lastAutoSyncAt.toString());
                 triggerSync();
             }
         }
@@ -383,6 +403,10 @@ export async function triggerSync(): Promise<void> {
         syncProgress.set({ phase: 'sync', message: 'Starting sync...', current: 0, total: 0 });
         const status = await invoke<SyncStatus>('sync_trigger');
         console.log('[Sync] Manual sync completed:', status);
+        
+        // Manual sync resets the auto-sync timer
+        localStorage.setItem('audion_last_auto_sync_at', Date.now().toString());
+        
         syncStatus.set(status);
         syncProgress.set(defaultSyncProgress);
         await reloadAfterSync();
@@ -472,30 +496,3 @@ export async function refreshAuthState(): Promise<void> {
     }
 }
 
-/**
- * Link a Ko-fi donation email to the current account (Flow B — email mismatch).
- * Routes through the Rust sync_link_kofi command which handles auth + token refresh.
- * Returns the updated supporter status and updates the local authState store.
- */
-export async function linkKofiEmail(kofiEmail: string): Promise<{
-    is_supporter: boolean;
-    supporter_until: string | null;
-    tier: string | null;
-}> {
-    if (!isTauri()) throw new Error('Not running in Tauri');
-
-    // The Rust command handles auth, calls /auth/link-kofi, stores the new token,
-    // and returns the full updated AuthState.
-    const updatedAuth = await invoke<AuthState>('sync_link_kofi', { kofiEmail });
-
-    // Update the local store so the UI reacts immediately
-    authState.set(updatedAuth);
-
-    return {
-        is_supporter: updatedAuth.is_supporter,
-        supporter_until: updatedAuth.supporter_until
-            ? new Date(updatedAuth.supporter_until).toISOString()
-            : null,
-        tier: null, // tier is not stored in AuthState; the success UI shows a generic message
-    };
-}

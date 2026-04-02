@@ -146,8 +146,9 @@
         position: relative;
         cursor: pointer;
         padding: 6px;
-        border-radius: var(--radius-sm);
-        transition: background var(--transition-fast);
+        border-radius: 8px;
+        transition: all var(--transition-fast);
+        background: transparent;
     }
 
     .sync-status:hover {
@@ -155,10 +156,10 @@
     }
 
     .icon {
-        width: 16px;
-        height: 16px;
+        width: 15px; /* Slightly smaller for elegance */
+        height: 15px;
         color: var(--text-subdued);
-        transition: color var(--transition-fast);
+        transition: all var(--transition-fast);
     }
 
     .sync-status:hover .icon {
@@ -182,43 +183,48 @@
     }
 
     .spinning {
-        animation: spin 1s linear infinite;
+        animation: spin 1s linear infinite, glow-pulse 2s ease-in-out infinite;
+        color: var(--accent-primary) !important;
     }
 
     @keyframes spin {
-        from {
-            transform: rotate(0deg);
-        }
-        to {
-            transform: rotate(360deg);
-        }
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes glow-pulse {
+        0%, 100% { filter: drop-shadow(0 0 1px var(--accent-primary)); opacity: 0.8; }
+        50% { filter: drop-shadow(0 0 4px var(--accent-primary)); opacity: 1; }
     }
 
     .badge {
         position: absolute;
-        top: 2px;
-        right: 2px;
+        top: 0px;
+        right: 0px;
         background: var(--accent-warning, #ffae42);
         color: #000;
-        font-size: 9px;
-        font-weight: 700;
-        min-width: 14px;
-        height: 14px;
+        font-size: 8px;
+        font-weight: 800;
+        min-width: 13px;
+        height: 13px;
         border-radius: var(--radius-full);
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0 3px;
         line-height: 1;
+        box-shadow: 0 0 0 2px var(--bg-base);
     }
 
     .progress-text {
         font-size: 10px;
-        font-weight: 600;
-        color: var(--text-secondary);
-        margin-left: 4px;
+        font-weight: 700;
+        color: var(--accent-primary);
+        margin-left: 6px;
         white-space: nowrap;
-        min-width: 24px;
+        min-width: 28px;
         text-align: center;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
     }
 </style>
