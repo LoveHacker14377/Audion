@@ -179,7 +179,25 @@ export async function initSync(): Promise<void> {
     // ─── Automatic Sync Trigger ──────────────────────────────────────────
     // Watch for pending changes and online status. Trigger sync after a short delay.
     // Enforces a 12-hour cooldown between auto-syncs to reduce server load.
+    // Also pauses sync when the app is in the background for > 5 minutes.
     let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+    let lastVisibleAt = Date.now();
+    let isAppVisible = true;
+
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            isAppVisible = document.visibilityState === 'visible';
+            if (isAppVisible) {
+                lastVisibleAt = Date.now();
+            }
+        });
+    }
+
+    const isBackgroundPaused = () => {
+        if (isAppVisible) return false;
+        const backgroundDuration = Date.now() - lastVisibleAt;
+        return backgroundDuration > 5 * 60 * 1000; // 5 minutes
+    };
     
     // Load last sync time from storage
     const LAST_SYNC_KEY = 'audion_last_auto_sync_at';
@@ -205,7 +223,8 @@ export async function initSync(): Promise<void> {
             !$status.is_syncing &&
             get(isOnline) &&
             get(isLoggedIn) &&
-            cooldownRemaining <= 0;
+            cooldownRemaining <= 0 &&
+            !isBackgroundPaused();
 
         if (canSync) {
             if (syncTimeout) clearTimeout(syncTimeout);
@@ -226,9 +245,9 @@ export async function initSync(): Promise<void> {
             const $status = get(syncStatus);
             const now = Date.now();
             if ($status.pending_changes > 0 && 
-                !$status.is_syncing && 
                 get(isLoggedIn) && 
-                (now - lastAutoSyncAt >= AUTO_SYNC_COOLDOWN_MS)) {
+                (now - lastAutoSyncAt >= AUTO_SYNC_COOLDOWN_MS) &&
+                !isBackgroundPaused()) {
                 lastAutoSyncAt = Date.now();
                 localStorage.setItem(LAST_SYNC_KEY, lastAutoSyncAt.toString());
                 triggerSync();
