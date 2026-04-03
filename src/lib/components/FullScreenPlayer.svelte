@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade, fly } from "svelte/transition";
+  import { flip } from "svelte/animate";
   import { derived } from "svelte/store";
   import {
     isFullScreen,
@@ -98,18 +99,19 @@
     },
   );
 
-  // Get word state: 'past', 'highlighted', or 'future'
-  function getWordState(
+  // Get word progress percentage for smooth filling
+  function getWordPercentage(
     lineIdx: number,
     wordIdx: number,
     currentActiveLine: number,
-    currentActiveWord: number,
-  ): string {
-    if (lineIdx < currentActiveLine) return "past";
-    if (lineIdx > currentActiveLine) return "future";
-    if (wordIdx < currentActiveWord) return "past";
-    if (wordIdx === currentActiveWord) return "highlighted";
-    return "future";
+    currentActiveWordIdx: number,
+    currentWordProgress: number,
+  ): number {
+    if (lineIdx < currentActiveLine) return 100;
+    if (lineIdx > currentActiveLine) return 0;
+    if (wordIdx < currentActiveWordIdx) return 100;
+    if (wordIdx === currentActiveWordIdx) return currentWordProgress;
+    return 0;
   }
 
   // Load album art
@@ -361,52 +363,119 @@
           </svg>
         </button>
         <span class="now-playing-label">Now Playing</span>
-        <button class="chevron-btn" on:click={toggleQueue} aria-label="Queue">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-            <path
-              d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
-            />
-          </svg>
-        </button>
+        <div class="mobile-header-btns">
+          <button
+            class="chevron-btn"
+            class:active={$lyricsVisible}
+            on:click={toggleLyrics}
+            aria-label="Lyrics"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <path
+                d="M19 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 16H5V4h14v14zM7 10h10V8H7v2zm10 3H7v-2h10v2zm-3 3H7v-2h7v2z"
+              />
+            </svg>
+          </button>
+          <button class="chevron-btn" on:click={toggleQueue} aria-label="Queue">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <path
+                d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="player-content mobile-view">
-        <div
-          class="art-container"
-          in:fly={{ y: 20, duration: 500, delay: 100 }}
-        >
-          {#if albumArt}
-            <img src={albumArt} alt="Album Art" decoding="async" />
-          {:else}
-            <div class="art-placeholder">
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                width="64"
-                height="64"
-              >
-                <path
-                  d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                />
-              </svg>
-            </div>
-          {/if}
-        </div>
-
-        <div class="track-info">
-          <h1 class="track-title">{$currentTrack?.title || "Unknown Title"}</h1>
-          <button
-            class="track-artist"
-            on:click={() => {
-              if ($currentTrack?.artist) {
-                toggleFullScreen();
-                goToArtistDetail($currentTrack.artist);
-              }
-            }}
+        {#if !$lyricsVisible}
+          <div
+            class="art-container"
+            in:fly={{ y: 20, duration: 500, delay: 100 }}
           >
-            {$currentTrack?.artist || "Unknown Artist"}
-          </button>
-        </div>
+            {#if albumArt}
+              <img src={albumArt} alt="Album Art" decoding="async" />
+            {:else}
+              <div class="art-placeholder">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  width="64"
+                  height="64"
+                >
+                  <path
+                    d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+                  />
+                </svg>
+              </div>
+            {/if}
+          </div>
+
+          <div class="track-info">
+            <h1 class="track-title">
+              {$currentTrack?.title || "Unknown Title"}
+            </h1>
+            <button
+              class="track-artist"
+              on:click={() => {
+                if ($currentTrack?.artist) {
+                  toggleFullScreen();
+                  goToArtistDetail($currentTrack.artist);
+                }
+              }}
+            >
+              {$currentTrack?.artist || "Unknown Artist"}
+            </button>
+          </div>
+        {:else}
+          <!-- In-place Lyrics for Mobile -->
+          <div class="mobile-lyrics-wrapper" in:fade>
+            <div class="lyrics-container" bind:this={lyricsContainer}>
+              {#if $lyricsData?.lines && $lyricsData.lines.length > 0}
+                {#each $lyricsData.lines as line, i}
+                  {@const hasWordSync = line.words && line.words.length > 0}
+                  <div
+                    class="lyric-line"
+                    class:active={i === $activeLine}
+                    role="button"
+                    tabindex="0"
+                    on:click={() => {
+                      const dur = $duration;
+                      if (dur && dur > 0) seek(line.time / dur);
+                    }}
+                    on:keydown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        const dur = $duration;
+                        if (dur && dur > 0) seek(line.time / dur);
+                      }
+                    }}
+                  >
+                    {#if hasWordSync && i === $activeLine && line.words}
+                      {#each line.words as word, wordIdx}
+                        {@const wordProgress = getWordPercentage(
+                          i,
+                          wordIdx,
+                          $activeLine,
+                          $wordSyncState.activeWordIdx,
+                          $wordSyncState.progress,
+                        )}
+                        <span
+                          class="lyric-word"
+                          style="--word-progress: {wordProgress}%;"
+                          >{word.word}</span
+                        >
+                        {#if wordIdx < line.words.length - 1}{" "}{/if}
+                      {/each}
+                    {:else}
+                      {line.text}
+                    {/if}
+                  </div>
+                {/each}
+              {:else}
+                <div class="no-lyrics"><p>No lyrics available</p></div>
+              {/if}
+            </div>
+          </div>
+        {/if}
 
         <div class="player-controls">
           <div class="progress-bar-container">
@@ -527,48 +596,44 @@
           </div>
         </div>
 
-        <div class="right-panel">
-          <div class="lyrics-container" bind:this={lyricsContainer}>
-            {#if $lyricsData?.lines && $lyricsData.lines.length > 0}
-              {#each $lyricsData.lines as line, i}
-                {@const hasWordSync = line.words && line.words.length > 0}
-                <div
-                  class="lyric-line"
-                  class:active={i === $activeLine}
-                  role="button"
-                  tabindex="0"
-                  on:click={() => {
-                    const dur = $duration;
-                    if (dur && dur > 0) seek(line.time / dur);
-                  }}
-                  on:keydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      const dur = $duration;
-                      if (dur && dur > 0) seek(line.time / dur);
-                    }
-                  }}
-                >
-                  {#if hasWordSync && i === $activeLine && line.words}
+        {#if !$lyricsVisible && $lyricsData?.lines}
+          <div class="compact-lyrics-mobile" in:fade>
+            {#each [$activeLine - 1, $activeLine, $activeLine + 1].filter((idx) => idx >= 0 && idx < $lyricsData.lines.length) as lineIdx (lineIdx)}
+              {@const line = $lyricsData.lines[lineIdx]}
+              {@const isCurrent = lineIdx === $activeLine}
+              {@const hasWordSync = line.words && line.words.length > 0}
+              <div
+                class="compact-line"
+                class:current={isCurrent}
+                class:dimmed={!isCurrent}
+                animate:flip={{ duration: 300 }}
+                in:fly={{ y: 20, duration: 300 }}
+                out:fly={{ y: -20, duration: 300 }}
+              >
+                  {#if isCurrent && hasWordSync && line.words}
                     {#each line.words as word, wordIdx}
-                      {@const wordState = getWordState(
-                        i,
+                      {@const wordProgress = getWordPercentage(
+                        lineIdx,
                         wordIdx,
                         $activeLine,
                         $wordSyncState.activeWordIdx,
+                        $wordSyncState.progress,
                       )}
-                      <span class="lyric-word {wordState}">{word.word}</span>
+                      <span
+                        class="lyric-word"
+                        style="--word-progress: {wordProgress}%;"
+                        >{word.word}</span
+                      >
                       {#if wordIdx < line.words.length - 1}{" "}{/if}
                     {/each}
                   {:else}
                     {line.text}
                   {/if}
                 </div>
-              {/each}
-            {:else}
-              <div class="no-lyrics"><p>No lyrics available</p></div>
-            {/if}
+            {/each}
           </div>
-        </div>
+        {/if}
+
       </div>
     {:else}
       <!-- Desktop layout (enhanced 2-column) -->
@@ -894,26 +959,15 @@
                       >
                         {#if hasWordSync && line.words}
                           {#each line.words as word, wordIdx (word.time || wordIdx)}
-                            {@const wordState = getWordState(
+                            {@const wordProgress = getWordPercentage(
                               i,
                               wordIdx,
                               $activeLine,
                               $wordSyncState.activeWordIdx,
+                              $wordSyncState.progress,
                             )}
-                            {@const isCurrentWord =
-                              i === $activeLine &&
-                              wordIdx === $wordSyncState.activeWordIdx}
-                            {@const isPastWord =
-                              i < $activeLine ||
-                              (i === $activeLine &&
-                                wordIdx < $wordSyncState.activeWordIdx)}
-                            {@const wordProgress = isCurrentWord
-                              ? $wordSyncState.progress
-                              : isPastWord
-                                ? 100
-                                : 0}
                             <span
-                              class="desktop-lyric-word {wordState}"
+                              class="desktop-lyric-word"
                               style="--word-progress: {wordProgress}%;"
                               >{word.word}</span
                             >
@@ -1504,41 +1558,27 @@
     text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
   }
 
-  .desktop-lyric-word.highlighted {
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
-  }
 
   .desktop-lyric-word {
     position: relative;
     display: inline-block;
-    /* Transition only opacity/transform, not background which updates every frame */
     transition:
       opacity 0.3s ease,
-      transform 0.3s ease;
+      transform 0.3s ease,
+      background-size 0.1s linear;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    background: linear-gradient(
-      to right,
-      #fff var(--word-progress),
-      rgba(255, 255, 255, 0.2) var(--word-progress)
-    );
+    background-image: 
+      /* Top layer: White fill */
+      linear-gradient(to right, #fff, #fff),
+      /* Bottom layer: Dim base color */
+      linear-gradient(to right, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2));
+    background-repeat: no-repeat;
+    background-size: var(--word-progress, 0%) 100%, 100% 100%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-  }
-
-  .desktop-lyric-word.past {
-    background: rgba(255, 255, 255, 0.85);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .desktop-lyric-word.future {
-    background: rgba(255, 255, 255, 0.2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: rgba(255, 255, 255, 0.2);
   }
 
   .no-lyrics-desktop {
@@ -1608,9 +1648,9 @@
   .player-content.mobile-view {
     display: flex;
     flex-direction: column;
-    padding: 1rem 2rem 3rem;
+    padding: 0.5rem 2rem 2rem;
     height: 100%;
-    gap: 2rem;
+    gap: 1.25rem;
     z-index: 10;
   }
 
@@ -1619,6 +1659,8 @@
     aspect-ratio: 1;
     border-radius: 16px;
     overflow: hidden;
+    max-height: 48vh;
+    margin: 0 auto;
   }
 
   .mobile-view .art-container img {
@@ -1694,19 +1736,83 @@
     justify-content: center;
   }
 
-  .mobile-view .right-panel {
-    display: none; /* Mobile uses separate toggles usually */
+  .mobile-header-btns {
+    display: flex;
+    gap: 0.5rem;
   }
 
-  .lyric-word.highlighted {
+  .chevron-btn.active {
+    color: #1ed760;
+  }
+
+  .mobile-lyrics-wrapper {
+    flex: 1;
+    overflow: hidden;
+    margin-top: -1rem;
+    margin-bottom: 0;
+  }
+
+  .mobile-lyrics-wrapper .lyrics-container {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 2rem 0 25vh;
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 75%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 75%, transparent);
+  }
+
+  .compact-lyrics-mobile {
+    margin-top: 1rem;
+    text-align: center;
     color: #fff;
+    min-height: 4.5em;
+    padding: 0 1rem;
+    line-height: 1.4;
+    overflow: hidden;
   }
 
-  .lyric-word.past {
+  .compact-line {
+    transition: all 0.3s ease;
+  }
+
+  .compact-line.current {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0.25rem 0;
+  }
+
+  .compact-line.dimmed {
+    font-size: 0.85rem;
+    font-weight: 500;
+    opacity: 0.4;
+  }
+
+  .mobile-lyrics-wrapper .lyric-line {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.4;
+    padding: 0.75rem 0;
+    color: rgba(255, 255, 255, 0.4);
+    transition: all 0.3s ease;
+  }
+
+  .mobile-lyrics-wrapper .lyric-line.active {
     color: #fff;
+    transform: scale(1.05);
   }
 
-  .lyric-word.future {
+  .lyric-word {
+    position: relative;
+    display: inline-block;
+    transition: background-size 0.1s linear;
+    background-image: 
+      linear-gradient(to right, #fff, #fff),
+      linear-gradient(to right, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2));
+    background-repeat: no-repeat;
+    background-size: var(--word-progress, 0%) 100%, 100% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     color: rgba(255, 255, 255, 0.2);
   }
 
