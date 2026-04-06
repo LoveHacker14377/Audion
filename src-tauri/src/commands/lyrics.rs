@@ -350,6 +350,25 @@ fn parse_lrc_timestamp(s: &str) -> Option<f64> {
     Some(minutes * 60.0 + seconds + subsec)
 }
 
+/// Returns true only if the content contains at least one valid LRC timestamp
+/// like [mm:ss.xx] .not just any square bracket (e.g. [Verse 1]).
+fn looks_like_lrc(content: &str) -> bool {
+    let mut rest = content;
+    while let Some(ob) = rest.find('[') {
+        rest = &rest[ob + 1..];
+        if let Some(cb) = rest.find(']') {
+            let inner = &rest[..cb];
+            if parse_lrc_timestamp(inner).is_some() {
+                return true;
+            }
+            rest = &rest[cb + 1..];
+        } else {
+            break;
+        }
+    }
+    false
+}
+
 /// Parse LRC content into structured format
 fn parse_lrc_content(lrc: &str) -> Vec<LyricLineJson> {
     let mut lyrics = Vec::new();
@@ -363,38 +382,82 @@ fn parse_lrc_content(lrc: &str) -> Vec<LyricLineJson> {
         let time = match parse_lrc_timestamp(timestamp) { Some(t) => t, None => continue };
 
         let mut words: Vec<WordTimingJson> = Vec::new();
-        let mut clean  = String::new();
-        let mut i      = 0;
-        let chars: Vec<char> = text.chars().collect();
+        let mut clean = String::new();
 
-        while i < chars.len() {
-            if chars[i] == '<' {
-                i += 1;
-                let mut ts = String::new();
-                let mut closed = false;
-                while i < chars.len() {
-                    if chars[i] == '>' { closed = true; i += 1; break; }
-                    ts.push(chars[i]); i += 1;
+        // ── Angle-bracket word timing: <mm:ss.xx>word ──────────────────────
+        if text.contains('<') {
+            let mut i = 0;
+            let chars: Vec<char> = text.chars().collect();
+            while i < chars.len() {
+                if chars[i] == '<' {
+                    i += 1;
+                    let mut ts = String::new();
+                    let mut closed = false;
+                    while i < chars.len() {
+                        if chars[i] == '>' { closed = true; i += 1; break; }
+                        ts.push(chars[i]); i += 1;
+                    }
+                    if closed {
+                        if let Some(wt) = parse_lrc_timestamp(&ts) {
+                            let mut wb = String::new();
+                            while i < chars.len() && chars[i] != '<' { wb.push(chars[i]); i += 1; }
+                            let word = wb.trim();
+                            if !word.is_empty() {
+                                words.push(WordTimingJson { word: word.to_string(), time: wt, end_time: 0.0 });
+                                clean.push_str(word); clean.push(' ');
+                            }
+                        }
+                    } else { clean.push('<'); clean.push_str(&ts); }
+                } else {
+                    if words.is_empty() { clean.push(chars[i]); }
+                    i += 1;
                 }
-                if closed {
-                    if let Some(wt) = parse_lrc_timestamp(&ts) {
-                        let mut wb = String::new();
-                        while i < chars.len() && chars[i] != '<' { wb.push(chars[i]); i += 1; }
-                        let word = wb.trim();
+            }
+            // Fill end_times: each word ends when the next begins
+            for j in 0..words.len() {
+                words[j].end_time = if j + 1 < words.len() { words[j+1].time } else { words[j].time + 0.5 };
+            }
+
+        // ── Square-bracket word timing: word[mm:ss.xxx]word ────────────────
+        // timestamp trails the word that just ended.
+        // The line timestamp is the start of the first word.
+        } else if text.contains('[') {
+            let mut current_time = time;
+            let mut remaining = text;
+            loop {
+                match remaining.find('[') {
+                    None => {
+                        let word = remaining.trim();
                         if !word.is_empty() {
-                            words.push(WordTimingJson { word: word.to_string(), time: wt, end_time: 0.0 });
+                            words.push(WordTimingJson { word: word.to_string(), time: current_time, end_time: current_time + 0.5 });
                             clean.push_str(word); clean.push(' ');
                         }
+                        break;
                     }
-                } else { clean.push('<'); clean.push_str(&ts); }
-            } else {
-                if words.is_empty() { clean.push(chars[i]); }
-                i += 1;
+                    Some(ob) => {
+                        let pending_word = remaining[..ob].trim().to_string();
+                        remaining = &remaining[ob + 1..];
+                        match remaining.find(']') {
+                            None => break,
+                            Some(cb2) => {
+                                let ts_str = &remaining[..cb2];
+                                remaining = &remaining[cb2 + 1..];
+                                if let Some(next_time) = parse_lrc_timestamp(ts_str) {
+                                    if !pending_word.is_empty() {
+                                        words.push(WordTimingJson {
+                                            word: pending_word.clone(),
+                                            time: current_time,
+                                            end_time: next_time,
+                                        });
+                                        clean.push_str(&pending_word); clean.push(' ');
+                                    }
+                                    current_time = next_time;
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
-
-        for j in 0..words.len() {
-            words[j].end_time = if j + 1 < words.len() { words[j+1].time } else { words[j].time + 0.5 };
         }
 
         let final_text = if words.is_empty() { text.to_string() } else { clean.trim().to_string() };
@@ -482,6 +545,19 @@ pub struct EmbeddedLyricsResult {
     pub synced:  bool,
 }
 
+fn mpeg_samples_per_frame(properties: &lofty::mpeg::MpegProperties) -> u64 {
+    use lofty::mpeg::{Layer, MpegVersion};
+    match (properties.version(), properties.layer()) {
+        (MpegVersion::V1, Layer::Layer1)                          => 384,
+        (MpegVersion::V1, Layer::Layer2)                          => 1152,
+        (MpegVersion::V1, Layer::Layer3)                          => 1152,
+        (MpegVersion::V2 | MpegVersion::V2_5, Layer::Layer1)     => 384,
+        (MpegVersion::V2 | MpegVersion::V2_5, Layer::Layer2)     => 1152,
+        (MpegVersion::V2 | MpegVersion::V2_5, Layer::Layer3)     => 576,
+        _                                                          => 1152,
+    }
+}
+
 /// Convert a SYLT content vec to an LRC string.
 ///
 /// Each entry is `(timestamp_ms, line_text)`.  Lines with empty text are
@@ -505,8 +581,7 @@ fn sylt_to_lrc(entries: &[(u32, String)]) -> String {
 /// Priority:
 ///   1. SYLT (ID3v2 only) .synchronized; converted to LRC before returning.
 ///      Prefers English; falls back to the first language found.
-///      MPEG-frames timestamp format is not supported and is skipped with a
-///      warning
+///      MPEG-frames timestamp format is parsed acording to lofty 0.22.4
 ///   2. USLT (ID3v2) — iterates frames directly, same language preference.
 ///   3. Generic ItemKey::Lyrics accessor  for FLAC/Vorbis, MP4, APEv2, etc.
 ///
@@ -537,6 +612,11 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
         // we fall through to the generic path below which covers USLT via ItemKey::Lyrics.
         let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
         if let Ok(mpeg) = MpegFile::read_from(&mut file, ParseOptions::new()) {
+            // Compute these once for MPEG-frame SYLT conversion
+            let properties = mpeg.properties();
+            let sr = properties.sample_rate() as u64;
+            let sr = if sr > 0 { sr } else { 44100 };
+            let spf = mpeg_samples_per_frame(properties);
             if let Some(id3) = mpeg.id3v2() {
                 let mut sylt_best: Option<String> = None;
                 let mut uslt_best: Option<String> = None;
@@ -553,16 +633,19 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
                                 Err(_) => continue,
                             };
 
-                            // Skip MPEG-frames format
-                            if parsed.timestamp_format == TimestampFormat::MPEG {
-                                eprintln!(
-                                    "[get_embedded_lyrics] Skipping SYLT frame with MPEG-frames \
-                                     timestamp format (not supported)"
-                                );
-                                continue;
-                            }
+                            let lrc = if parsed.timestamp_format == TimestampFormat::MPEG {
+                                let converted: Vec<(u32, String)> = parsed.content
+                                    .iter()
+                                    .map(|(frame_num, text)| {
+                                        let ms = (*frame_num as u64 * spf * 1000) / sr;
+                                        (ms as u32, text.clone())
+                                    })
+                                    .collect();
+                                sylt_to_lrc(&converted)
+                            } else {
+                                sylt_to_lrc(&parsed.content)
+                            };
 
-                            let lrc = sylt_to_lrc(&parsed.content);
                             if lrc.is_empty() {
                                 continue;
                             }
@@ -607,7 +690,7 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
                 }
 
                 if let Some(content) = uslt_best {
-                    let synced = content.contains('[');
+                    let synced = looks_like_lrc(&content);
                     return Ok(Some(EmbeddedLyricsResult { content, synced }));
                 }
 
@@ -624,7 +707,7 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
 
     if let Some(content) = tag.get_string(&ItemKey::Lyrics).map(|s| s.trim().to_string()) {
         if !content.is_empty() {
-            let synced = content.contains('[');
+            let synced = looks_like_lrc(&content);
             return Ok(Some(EmbeddedLyricsResult { content, synced }));
         }
     }
