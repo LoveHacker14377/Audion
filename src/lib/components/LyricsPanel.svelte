@@ -146,8 +146,7 @@
         ...Object.fromEntries(LYRICS_SOURCES.map((s: LyricsSource) => [s.id, s.label])),
     };
 
-    $: switchableSources  = LYRICS_SOURCES.map((s: LyricsSource) => s.id);
-    $: showSourcePicker   = switchableSources.length > 1;
+    $: showSourcePicker = LYRICS_SOURCES.length > 1 || $availableSources.includes('embedded');
     $: activeSourceLabel  = $lyricsData
         ? (ALL_SOURCE_LABELS[$lyricsData.source] ?? $lyricsData.source)
         : '';
@@ -240,6 +239,30 @@
 
                         {#if sourceMenuOpen}
                             <ul class="source-menu" role="listbox" aria-label="Lyrics source">
+                                {#if $availableSources.includes('embedded')}
+                                    {@const isActive = $lyricsData?.source === 'embedded'}
+                                    <li
+                                        class="source-menu-item"
+                                        class:active={isActive}
+                                        role="option"
+                                        aria-selected={isActive}
+                                        tabindex="0"
+                                        on:click={() => handleSourceSelect('embedded')}
+                                        on:keydown={(e) => e.key === 'Enter' && handleSourceSelect('embedded')}
+                                    >
+                                        <span class="source-menu-label">Embedded</span>
+                                        <span class="source-menu-format">
+                                            {#if $lyricsData?.source === 'embedded' && $lyricsData?.format}
+                                                {$lyricsData.format.toUpperCase()}
+                                            {/if}
+                                        </span>
+                                        {#if isActive}
+                                            <svg class="source-menu-check" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            </svg>
+                                        {/if}
+                                    </li>
+                                {/if}
                                 {#each LYRICS_SOURCES as source}
                                     {@const isActive = $lyricsData?.source === source.id}
                                     {@const isCached = $availableSources.includes(source.id)}
@@ -340,6 +363,11 @@
                         <div class="no-lyrics-sources">
                             <span class="no-lyrics-hint">Try a different source:</span>
                             <div class="no-lyrics-source-btns">
+                                {#if $availableSources.includes('embedded')}
+                                    <button class="source-try-btn" on:click={() => handleSourceSelect('embedded')}>
+                                        Embedded
+                                    </button>
+                                {/if}
                                 {#each LYRICS_SOURCES as source}
                                     <button
                                         class="source-try-btn"

@@ -1,5 +1,7 @@
 use lofty::prelude::*;
 use lofty::probe::Probe;
+use metaflac::Tag as FlacTag;
+use mp4ameta::Tag as Mp4Tag;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -581,9 +583,11 @@ fn sylt_to_lrc(entries: &[(u32, String)]) -> String {
 /// Priority:
 ///   1. SYLT (ID3v2 only) .synchronized; converted to LRC before returning.
 ///      Prefers English; falls back to the first language found.
-///      MPEG-frames timestamp format is parsed acording to lofty 0.22.4
+///      MPEG-frames timestamp format is parsed according to lofty 0.22.4
 ///   2. USLT (ID3v2) — iterates frames directly, same language preference.
 ///   3. Generic ItemKey::Lyrics accessor  for FLAC/Vorbis, MP4, APEv2, etc.
+///   4. metaflac fallback. reads the LYRICS Vorbis comment directly.
+///   5. mp4ameta fallback. reads the iTunes lyrics atom directly.
 ///
 /// Returns None if no tag or no lyrics field is found at all.
 #[tauri::command]
@@ -699,10 +703,13 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
         }
     }
 
-    // ---- Path 2: non-ID3v2 tags (FLAC, MP4, APEv2, …) --------------------
+    // ---- Path 2: non-ID3v2 tags (FLAC, MP4, APEv2, …) via lofty ----------
     let tag = match tagged.primary_tag().or_else(|| tagged.first_tag()) {
         Some(t) => t,
-        None => return Ok(None),
+        None => {
+            // lofty found no tags . fall through to format-specific fallbacks
+            return get_embedded_lyrics_fallback(path);
+        }
     };
 
     if let Some(content) = tag.get_string(&ItemKey::Lyrics).map(|s| s.trim().to_string()) {
@@ -712,5 +719,65 @@ pub fn get_embedded_lyrics(music_path: String) -> Result<Option<EmbeddedLyricsRe
         }
     }
 
-    Ok(None)
+    // lofty found tags but no lyrics field .try format-specific fallbacks
+    get_embedded_lyrics_fallback(path)
 }
+ 
+/// Fallback lyrics extraction using metaflac (FLAC) and mp4ameta (M4A/MP4).
+/// Called when lofty either found no tags or found tags but no lyrics field.
+fn get_embedded_lyrics_fallback(path: &Path) -> Result<Option<EmbeddedLyricsResult>, String> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+ 
+    match ext.as_str() {
+        // ---- FLAC: read LYRICS Vorbis comment via metaflac -----------------
+        "flac" => {
+            match FlacTag::read_from_path(path) {
+                Ok(tag) => {
+                    // Vorbis comments are case-insensitive by convention; metaflac
+                    // stores them uppercased, so "LYRICS" is the canonical key.
+                    if let Some(values) = tag.get_vorbis("LYRICS") {
+                        let content: String = values.map(|s| s.to_string()).collect::<Vec<_>>().join("\n");
+                        let content = content.trim().to_string();
+                        if !content.is_empty() {
+                            let synced = looks_like_lrc(&content);
+                            return Ok(Some(EmbeddedLyricsResult { content, synced }));
+                        }
+                    }
+                    Ok(None)
+                }
+                Err(e) => {
+                    eprintln!("[Lyrics] metaflac fallback failed for {}: {}", path.display(), e);
+                    Ok(None)
+                }
+            }
+        }
+ 
+        // ---- M4A / MP4: read lyrics atom via mp4ameta ---------------------
+        "m4a" | "mp4" => {
+            match Mp4Tag::read_from_path(path) {
+                Ok(tag) => {
+                    if let Some(content) = tag.lyrics() {
+                        let content = content.trim().to_string();
+                        if !content.is_empty() {
+                            let synced = looks_like_lrc(&content);
+                            return Ok(Some(EmbeddedLyricsResult { content, synced }));
+                        }
+                    }
+                    Ok(None)
+                }
+                Err(e) => {
+                    eprintln!("[Lyrics] mp4ameta fallback failed for {}: {}", path.display(), e);
+                    Ok(None)
+                }
+            }
+        }
+ 
+        // No fallback available for this format
+        _ => Ok(None),
+    }
+}
+ 

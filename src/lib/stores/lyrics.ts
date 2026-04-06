@@ -119,12 +119,20 @@ async function saveSourceLyrics(
 }
 
 /** Refresh the availableSources store from the filesystem. */
-async function refreshAvailableSources(musicPath: string): Promise<string[]> {
+async function refreshAvailableSources(musicPath: string, isStream = false): Promise<string[]> {
     try {
-        const cached = await invoke<Array<{ source_id: string; format: string }>>(
-            'get_cached_sources', { musicPath, sourceIds: SOURCE_IDS }
-        );
+        const [cached, embeddedResult] = await Promise.all([
+            invoke<Array<{ source_id: string; format: string }>>(
+                'get_cached_sources', { musicPath, sourceIds: SOURCE_IDS }
+            ),
+            isStream
+                ? Promise.resolve(null)
+                : invoke<{ content: string; synced: boolean } | null>(
+                    'get_embedded_lyrics', { musicPath }
+                ).catch(() => null),
+        ]);
         const ids = cached.map(c => c.source_id);
+        if (embeddedResult && embeddedResult.content) ids.unshift('embedded');
         availableSources.set(ids);
         return ids;
     } catch {
@@ -177,6 +185,7 @@ function reparseFromCache(
 export async function fetchLyricsForTrack(): Promise<void> {
     const track = get(currentTrack);
     if (!track) { lyricsData.set(null); return; }
+    const isStream = !!track.source_type;
 
     const fetchId = ++currentFetchId;
     lyricsLoading.set(true);
@@ -189,7 +198,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
             const result = reparseFromCache(userFile.content, userFile.format, 'user');
             if (result) {
                 lyricsData.set(result);
-                await refreshAvailableSources(track.path);
+                await refreshAvailableSources(track.path, isStream);
                 lyricsLoading.set(false);
                 return;
             }
@@ -225,7 +234,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
                             raw:         embedded.content,
                             synced:      embedded.synced,
                         });
-                        await refreshAvailableSources(track.path);
+                        await refreshAvailableSources(track.path, isStream);
                         lyricsLoading.set(false);
                         return;
                     }
@@ -242,7 +251,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
                 const result = reparseFromCache(cached.content, cached.format, preferred);
                 if (result) {
                     lyricsData.set(result);
-                    await refreshAvailableSources(track.path);
+                    await refreshAvailableSources(track.path, isStream);
                     lyricsLoading.set(false);
                     return;
                 }
@@ -255,7 +264,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
             if (fetched && fetchId === currentFetchId) {
                 await saveSourceLyrics(track.path, preferred, fetched.format, fetched.raw);
                 lyricsData.set(fetched);
-                await refreshAvailableSources(track.path);
+                await refreshAvailableSources(track.path, isStream);
                 lyricsLoading.set(false);
                 return;
             }
@@ -270,7 +279,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
                 const result = reparseFromCache(cached.content, cached.format, source.id);
                 if (result) {
                     lyricsData.set(result);
-                    await refreshAvailableSources(track.path);
+                    await refreshAvailableSources(track.path, isStream);
                     lyricsLoading.set(false);
                     return;
                 }
@@ -289,7 +298,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
                     if (fetchId !== currentFetchId) return;
                     await saveSourceLyrics(track.path, source.id, result.format, result.raw);
                     lyricsData.set(result);
-                    await refreshAvailableSources(track.path);
+                    await refreshAvailableSources(track.path, isStream);
                     lyricsLoading.set(false);
                     return;
                 }
@@ -301,7 +310,7 @@ export async function fetchLyricsForTrack(): Promise<void> {
             lyricsData.set(null);
             lyricsError.set('No lyrics found');
             addToast('No lyrics found for this track', 'error');
-            await refreshAvailableSources(track.path);
+            await refreshAvailableSources(track.path, isStream);
         }
 
     } catch {
@@ -344,6 +353,48 @@ export async function switchLyricsSource(sourceId: string): Promise<void> {
     };
 
     try {
+        if (sourceId === 'embedded') {
+            try {
+                const embedded = await invoke<{ content: string; synced: boolean } | null>(
+                    'get_embedded_lyrics', { musicPath: track.path }
+                );
+                if (!embedded || !embedded.content) {
+                    revert('No embedded lyrics found');
+                    return;
+                }
+                if (fetchId !== currentFetchId) return;
+                let lines;
+                if (embedded.synced) {
+                    lines = lyricsManager.parseLRC(embedded.content, false);
+                } else {
+                    lines = embedded.content
+                        .split('\n')
+                        .map((l: string) => l.trim())
+                        .filter((l: string) => l.length > 0)
+                        .map((text: string) => ({ time: 0, text }));
+                }
+                if (lines.length === 0) {
+                    revert('No embedded lyrics found');
+                    return;
+                }
+                // Determine format for the badge
+                const format: LyricsFormat = 'lrc';
+                lyricsData.set({
+                    lines,
+                    source:      'embedded',
+                    format,
+                    hasWordSync: false,
+                    raw:         embedded.content,
+                    synced:      embedded.synced,
+                });
+                addToast('Switched to Embedded', 'success');
+                lyricsLoading.set(false);
+                return;
+            } catch {
+                revert('Failed to read embedded lyrics');
+                return;
+            }
+        }
         // Try cache first
         const cached = await loadSourceLyrics(track.path, sourceId);
         if (cached && fetchId === currentFetchId) {
