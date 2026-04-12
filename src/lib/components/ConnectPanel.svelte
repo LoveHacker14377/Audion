@@ -124,7 +124,7 @@
     <div class="footer">
         <div class="sync-status" class:online={$wsStore.connected}>
             <div class="indicator"></div>
-            {$wsStore.connected ? 'Real-time sync active' : 'Connecting to server...'}
+            {$wsStore.statusText || ($wsStore.connected ? 'Real-time sync active' : 'Connecting...')}
         </div>
     </div>
   </div>

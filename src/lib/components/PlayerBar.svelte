@@ -335,6 +335,16 @@
                     role="group"
                 >
                     <button
+                        class="mini-btn connect-btn"
+                        class:active={connectedDevices > 0}
+                        on:click|stopPropagation={() => (showConnectPanel = !showConnectPanel)}
+                        title="Connect to a device"
+                    >
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                            <path d="M19,2H5A3,3,0,0,0,2,5V15a3,3,0,0,0,3,3H9.17l-1.42,1.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.42,0L11,18.99,12.83,20.83a1,1,0,0,0,1.42,0,1,1,0,0,0,0-1.42L12.83,18H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2Zm1,13a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V5A1,1,0,0,1,5,4H19a1,1,0,0,1,1,1Z"/>
+                        </svg>
+                    </button>
+                    <button
                         class="mini-btn"
                         on:click={togglePlay}
                         title={$isPlaying ? "Pause" : "Play"}

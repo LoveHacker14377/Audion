@@ -29,9 +29,11 @@ function createWebsocketStore() {
     const { subscribe, set, update } = writable<{
         connected: boolean;
         devices: RemoteDevice[];
+        statusText: string;
     }>({
         connected: false,
-        devices: []
+        devices: [],
+        statusText: 'Connecting...'
     });
 
     let socket: WebSocket | null = null;
@@ -43,29 +45,36 @@ function createWebsocketStore() {
         if (socket || !get(isLoggedIn)) return;
 
         try {
+            update(s => ({ ...s, statusText: 'Authenticating...' }));
             const serverUrl = await invoke<string>('sync_get_server_url');
             const token = await invoke<string | null>('sync_get_access_token');
             deviceId = await invoke<string>('sync_get_device_id');
 
-            if (!token) return;
             if (!token) {
                 console.log('[WS] Cannot connect: No access token available');
+                update(s => ({ ...s, statusText: 'No access token available' }));
+                scheduleReconnect(); // We should retry just in case it's loading
                 return;
             }
 
             // Convert http/https to ws/wss
             const wsUrl = serverUrl.replace(/^http/, 'ws') + `?token=${token}`;
             console.log(`[WS] Connecting to ${wsUrl.substring(0, 50)}...`);
+            update(s => ({ ...s, statusText: 'Establishing real-time connection...' }));
             
             socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
                 console.log('[WS] Connected successfully');
-                update(s => ({ ...s, connected: true }));
+                update(s => ({ ...s, connected: true, statusText: 'Real-time sync active' }));
                 reconnectDelay = INITIAL_RECONNECT_DELAY;
                 
-                // Identify this device
-                const deviceName = "Desktop Player"; // We can make this configurable later
+                let deviceName = "Unknown Device";
+                if (typeof window !== 'undefined') {
+                    const isMobileDev = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    deviceName = isMobileDev ? "Mobile Player" : "Desktop Player";
+                }
+                
                 send('identify', { deviceId, deviceName });
             };
 
@@ -84,7 +93,7 @@ function createWebsocketStore() {
                 const reason = event.reason;
                 console.log(`[WS] Closed. Clean: ${wasClean}, Code: ${code}, Reason: ${reason}`);
                 
-                update(s => ({ ...s, connected: false }));
+                update(s => ({ ...s, connected: false, statusText: 'Connection closed' }));
                 socket = null;
                 scheduleReconnect();
             };
@@ -95,6 +104,7 @@ function createWebsocketStore() {
 
         } catch (err) {
             console.error('[WS] Connection failed:', err);
+            update(s => ({ ...s, statusText: `Connection failed: ${err}` }));
             scheduleReconnect();
         }
     }
@@ -151,6 +161,7 @@ function createWebsocketStore() {
             connect();
             reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
         }, reconnectDelay);
+        update(s => ({ ...s, statusText: `Reconnecting in ${Math.ceil(reconnectDelay/1000)}s...` }));
     }
 
     function send(type: string, payload: any) {
@@ -165,7 +176,7 @@ function createWebsocketStore() {
             socket.close();
             socket = null;
         }
-        set({ connected: false, devices: [] });
+        set({ connected: false, devices: [], statusText: 'Disconnected' });
     }
 
     // Auto connect/disconnect based on auth state
