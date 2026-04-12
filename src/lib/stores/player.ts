@@ -1043,15 +1043,16 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                     await audio.play();
                 } catch (err) {
                     if (err instanceof DOMException && err.name === 'AbortError') {
-                        // This usually means another PLAY request came in, so we can ignore this one
-                        // or it means we paused/loaded too fast. 
-                        // If Playback was intentional, we should log it.
                         console.warn('[Player] Playback aborted (likely replaced by new track)', err);
                     } else {
                         throw err;
                     }
                 }
 
+                if (startTime > 0) {
+                    audio.currentTime = startTime;
+                }
+                
                 console.log('[Player] HTML5 streaming started:', track.title);
             }
 
@@ -1075,6 +1076,11 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                 const vol = sliderToAudioVolume(get(volume));
                 await nativeAudioSetVolume(vol);
 
+                // Seek if starting from a specific position (for playback transfer)
+                if (startTime > 0 && track.duration) {
+                    await nativeAudioSeek(startTime / track.duration);
+                }
+
                 // Preload next track for gapless playback
                 _schedulePreload();
 
@@ -1090,13 +1096,16 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                 audio.volume = sliderToAudioVolume(get(volume));
 
                 await audio.play();
+                if (startTime > 0) {
+                    audio.currentTime = startTime;
+                }
                 activeBackend.set('html5');
                 console.log('[Player] Local playback started via HTML5:', track.title);
             }
         }
 
         currentTrack.set(trackForPlugins);
-        currentTime.set(0);
+        currentTime.set(startTime);
         duration.set(track.duration || 0);
         isPlaying.set(true);
 
@@ -1935,8 +1944,11 @@ export async function transferPlayback(state: any) {
     console.log('[Player] Transferring playback to this device...', state.track.title);
     
     // 1. Stop remote playback (by sending a command to specific device)
-    // Actually, the server handles "relayToOthers", so we just need to start playing here.
-    // The other device will receive our 'player_state' which says it's playing HERE.
+    if (state.deviceId) {
+        console.log('[Player] Pausing remote device:', state.deviceId);
+        sendRemoteCommand(state.deviceId, 'pause');
+    }
+    
     // 2. Resolve the local track object if possible (Fast ID lookup first)
     const remoteTrack = state.track;
     let localTrack: any = getTrackByIdSync(Number(remoteTrack.id));
