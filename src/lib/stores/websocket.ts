@@ -20,7 +20,12 @@ export interface RemotePlayerState {
     isPlaying: boolean;
     currentTime: number;
     duration: number;
+    volume: number;
+    shuffle: boolean;
+    repeat: 'none' | 'one' | 'all';
 }
+
+export const activeRemoteDevice = writable<string | null>(null);
 
 const INITIAL_RECONNECT_DELAY = 1000;
 const MAX_RECONNECT_DELAY = 30000;

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { fade, fly, slide } from "svelte/transition";
-  import { wsStore, type RemoteDevice } from "$lib/stores/websocket";
-  import { currentTrack, isPlaying, transferPlayback, sendRemoteCommand } from "$lib/stores/player";
+  import { wsStore, type RemoteDevice, activeRemoteDevice } from "$lib/stores/websocket";
+  import { currentTrack, isPlaying, transferPlayback, sendRemoteCommand, activeBackend } from "$lib/stores/player";
+  import { isLoggedIn } from "$lib/stores/sync";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
@@ -22,9 +23,39 @@
   function handleRemoteCommand(deviceId: string, command: string) {
     sendRemoteCommand(deviceId, command);
   }
+
+  function toggleControl(device: RemoteDevice) {
+    if ($activeBackend === 'remote' && $activeRemoteDevice === device.deviceId) {
+      activeBackend.set('none');
+      activeRemoteDevice.set(null);
+    } else {
+      activeBackend.set('remote');
+      activeRemoteDevice.set(device.deviceId);
+      
+      // Update local stores with initial state immediately
+      if (device.playerState) {
+          if (device.playerState.track) {
+              currentTrack.set({
+                  id: device.playerState.track.id,
+                  title: device.playerState.track.title,
+                  artist: device.playerState.track.artist,
+                  album: device.playerState.track.album,
+                  track_cover: device.playerState.track.coverUrl,
+              } as any);
+          }
+          isPlaying.set(device.playerState.isPlaying);
+      }
+    }
+  }
 </script>
 
-<div class="connect-overlay" on:click|self={close} transition:fade={{ duration: 200 }}>
+<div 
+  class="connect-overlay" 
+  on:click|self={close} 
+  on:keydown|self={(e) => e.key === 'Escape' && close()}
+  transition:fade={{ duration: 200 }}
+  role="presentation"
+>
   <div class="connect-panel" in:fly={{ y: 20, duration: 300, opacity: 0 }} out:fly={{ y: 20, duration: 200, opacity: 0 }}>
     <header>
       <h2>Connect to a device</h2>
@@ -42,10 +73,15 @@
         </svg>
       </div>
       <div class="device-info">
-        <span class="device-name">This Device</span>
-        <span class="device-status">Listening locally</span>
+        {#if $activeBackend === 'remote'}
+          <span class="device-name">Remote Session</span>
+          <span class="device-status">Controlling another device</span>
+        {:else}
+          <span class="device-name">This Device</span>
+          <span class="device-status">Listening locally</span>
+        {/if}
       </div>
-      {#if $isPlaying}
+      {#if $isPlaying || $activeBackend === 'remote'}
         <div class="playing-bars">
           <div class="bar"></div>
           <div class="bar"></div>
@@ -111,9 +147,14 @@
                   </button>
                 </div>
 
-                <button class="transfer-btn" on:click={() => handleTransfer(device)}>
-                  Play Here
-                </button>
+                <div class="remote-actions">
+                  <button class="control-btn" class:active={$activeBackend === 'remote' && $activeRemoteDevice === device.deviceId} on:click={() => toggleControl(device)}>
+                    {$activeBackend === 'remote' && $activeRemoteDevice === device.deviceId ? 'Stop Control' : 'Control'}
+                  </button>
+                  <button class="transfer-btn" on:click={() => handleTransfer(device)}>
+                    Play Here
+                  </button>
+                </div>
               {/if}
             </div>
           </div>
@@ -124,8 +165,25 @@
     <div class="footer">
         <div class="sync-status" class:online={$wsStore.connected}>
             <div class="indicator"></div>
-            {$wsStore.statusText || ($wsStore.connected ? 'Real-time sync active' : 'Connecting...')}
+            <div class="status-content">
+              <span class="status-text">
+                  {$wsStore.statusText || ($wsStore.connected ? 'Real-time sync active' : 'Connecting...')}
+              </span>
+              {#if !$wsStore.connected}
+                <button class="retry-btn" on:click={() => wsStore.connect()}>
+                  Retry
+                </button>
+              {/if}
+            </div>
         </div>
+        {#if !$isLoggedIn}
+          <div class="login-warning">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <span>Please log in to use sync</span>
+          </div>
+        {/if}
     </div>
   </div>
 </div>
@@ -383,6 +441,39 @@
     color: var(--accent-primary);
   }
 
+  .remote-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+  }
+
+  .control-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--text-secondary);
+  }
+
+  .control-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+  }
+
+  .control-btn.active:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+  }
+
   .transfer-btn {
     background: var(--accent-primary);
     color: var(--bg-base);
@@ -412,6 +503,40 @@
       gap: var(--spacing-sm);
       font-size: 0.75rem;
       color: var(--text-subdued);
+      width: 100%;
+  }
+
+  .status-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex: 1;
+  }
+
+  .retry-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+  }
+
+  .retry-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--text-secondary);
+  }
+
+  .login-warning {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: 0.7rem;
+      color: #ff4444;
+      margin-top: 4px;
+      padding-left: 14px;
   }
 
   .sync-status .indicator {
