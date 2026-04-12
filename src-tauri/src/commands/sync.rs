@@ -250,21 +250,31 @@ pub async fn sync_get_access_token(
     db: State<'_, Database>,
     sync_state: State<'_, SyncState>,
 ) -> Result<Option<String>, String> {
-    let token = auth::get_access_token(&db)?;
-    if token.is_none() {
+    // Check if we have a refresh token (implies we're logged in)
+    let rt = auth::get_refresh_token(&db)?;
+    if rt.is_none() {
         return Ok(None);
     }
 
-    // Check if token is expired or close to expiry (manual check or just try a refresh)
-    // For simplicity, we can let the WebSocket connection fail and then the frontend 
-    // will trigger a reconnect which will call this command. 
-    // But to be proactive, we can attempt a refresh here if we think it's stale.
-    // However, refresh_access_token is already robust. 
-    
-    // Let's just return the current one, and if the WS fails, the frontend's 
-    // retry logic combined with other sync activities will likely refresh it.
-    // Actually, let's just make it return the token.
-    Ok(token)
+    // Attempt to refresh the access token only if missing or expired.
+    let access_token = auth::get_access_token(&db)?;
+    if let Some(token) = &access_token {
+        if !auth::is_token_expired(token) {
+            return Ok(Some(token.clone()));
+        }
+    }
+
+    // Attempt to refresh the access token to ensure it's valid for the WS connection.
+    // If it's already fresh, the server should return a new one or the same one.
+    // This is better than returning a potentially expired token and getting a WS 401.
+    match auth::refresh_access_token(&db, &sync_state.server_url).await {
+        Ok(token) => Ok(Some(token)),
+        Err(e) => {
+            tracing::warn!("Failed to refresh token for WebSocket: {}", e);
+            // Fallback to current token if refresh fails (might still work if it's not expired)
+            Ok(auth::get_access_token(&db)?)
+        }
+    }
 }
 
 /// Get the device ID for identification.

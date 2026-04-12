@@ -48,14 +48,19 @@ function createWebsocketStore() {
             deviceId = await invoke<string>('sync_get_device_id');
 
             if (!token) return;
+            if (!token) {
+                console.log('[WS] Cannot connect: No access token available');
+                return;
+            }
 
             // Convert http/https to ws/wss
             const wsUrl = serverUrl.replace(/^http/, 'ws') + `?token=${token}`;
+            console.log(`[WS] Connecting to ${wsUrl.substring(0, 50)}...`);
             
             socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
-                console.log('[WS] Connected to sync server');
+                console.log('[WS] Connected successfully');
                 update(s => ({ ...s, connected: true }));
                 reconnectDelay = INITIAL_RECONNECT_DELAY;
                 
@@ -73,15 +78,19 @@ function createWebsocketStore() {
                 }
             };
 
-            socket.onclose = () => {
-                console.log('[WS] Disconnected');
+            socket.onclose = (event) => {
+                const wasClean = event.wasClean;
+                const code = event.code;
+                const reason = event.reason;
+                console.log(`[WS] Closed. Clean: ${wasClean}, Code: ${code}, Reason: ${reason}`);
+                
                 update(s => ({ ...s, connected: false }));
                 socket = null;
                 scheduleReconnect();
             };
 
             socket.onerror = (err) => {
-                console.error('[WS] Error:', err);
+                console.error('[WS] Connection error event:', err);
             };
 
         } catch (err) {

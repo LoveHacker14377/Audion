@@ -20,7 +20,9 @@
     // Format the last sync time as relative (e.g., "2m ago")
     function formatLastSync(timestamp: string | null): string {
         if (!timestamp) return "Never";
-        const seconds = parseInt(timestamp, 10);
+        
+        const date = new Date(timestamp);
+        const seconds = Math.floor(date.getTime() / 1000);
         if (isNaN(seconds)) return "Never";
 
         const now = Math.floor(Date.now() / 1000);
@@ -31,7 +33,6 @@
         if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
 
         // Format as DD/MM/YYYY for older syncs
-        const date = new Date(seconds * 1000);
         const dd = String(date.getDate()).padStart(2, "0");
         const mm = String(date.getMonth() + 1).padStart(2, "0");
         const yyyy = date.getFullYear();
