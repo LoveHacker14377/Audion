@@ -11,9 +11,10 @@
     } from "$lib/stores/library";
     import {
         selectMusicFolder,
+        pickAndroidFolder,
         addFolder,
         rescanMusic,
-        getDefaultMusicDirs,
+        isAndroid,
         type Album,
         type Artist,
         type Track,
@@ -29,6 +30,7 @@
     import { progressiveScan, isScanning } from "$lib/stores/progressiveScan";
     import { addToast } from "$lib/stores/toast";
     import { isMobile } from "$lib/stores/mobile";
+    import { appSettings } from "$lib/stores/settings";
     import { getLikedTracks } from "$lib/api/tauri";
     import { likedTrackIds } from "$lib/stores/liked";
     import {
@@ -161,78 +163,53 @@
 
     async function handleAddFolder() {
         try {
-            if ($isMobile) {
-                // On mobile (Android): scan default music directories automatically
-                const dirs = await getDefaultMusicDirs();
-                if (dirs.length === 0) {
-                    addToast("No music folders found on this device", "error");
-                    return;
-                }
+            const onAndroid = $isMobile && isAndroid();
+            const path = onAndroid
+                ? await pickAndroidFolder()
+                : await selectMusicFolder();
 
-                await progressiveScan.startScan(true);
-
-                for (const dir of dirs) {
-                    try {
-                        await addFolder(dir);
-                    } catch (e) {
-                        console.warn(`Failed to add folder ${dir}:`, e);
-                    }
-                }
-
-                const result = await rescanMusic();
-
-                if (result.errors.length > 0) {
-                    console.warn("Scan errors:", result.errors);
-                }
-
-                await loadAlbumsAndArtists();
-                await loadPlaylists();
-
-                const parts = [];
-                if (result.tracks_added > 0)
-                    parts.push(`${result.tracks_added} added`);
-                if (result.tracks_updated > 0)
-                    parts.push(`${result.tracks_updated} updated`);
-                if (result.tracks_deleted > 0)
-                    parts.push(`${result.tracks_deleted} deleted`);
-
-                const message =
-                    parts.length > 0
-                        ? `Scan complete: ${parts.join(", ")}`
-                        : "Scan complete — no tracks found";
-
-                addToast(message, "success", 4000);
-            } else {
-                // On desktop: use folder picker dialog
-                const path = await selectMusicFolder();
-                if (path) {
-                    await progressiveScan.startScan(true);
-                    await addFolder(path);
-                    const result = await rescanMusic();
-
-                    if (result.errors.length > 0) {
-                        console.warn("Scan errors:", result.errors);
-                    }
-
-                    await loadAlbumsAndArtists();
-                    await loadPlaylists();
-
-                    const parts = [];
-                    if (result.tracks_added > 0)
-                        parts.push(`${result.tracks_added} added`);
-                    if (result.tracks_updated > 0)
-                        parts.push(`${result.tracks_updated} updated`);
-                    if (result.tracks_deleted > 0)
-                        parts.push(`${result.tracks_deleted} deleted`);
-
-                    const message =
-                        parts.length > 0
-                            ? `Scan complete: ${parts.join(", ")}`
-                            : "Scan complete — no new tracks found";
-
-                    addToast(message, "success", 4000);
-                }
+            if (!path) {
+                return;
             }
+
+            if (path.startsWith("content://")) {
+                addToast(
+                    "Folder URI not supported yet. Please pick a local Music folder.",
+                    "error",
+                );
+                return;
+            }
+
+            await progressiveScan.startScan(true);
+
+            await addFolder(path);
+            if (onAndroid) {
+                appSettings.setAndroidMusicFolder(path);
+            }
+
+            const result = await rescanMusic();
+
+            if (result.errors.length > 0) {
+                console.warn("Scan errors:", result.errors);
+            }
+
+            await loadAlbumsAndArtists();
+            await loadPlaylists();
+
+            const parts = [];
+            if (result.tracks_added > 0)
+                parts.push(`${result.tracks_added} added`);
+            if (result.tracks_updated > 0)
+                parts.push(`${result.tracks_updated} updated`);
+            if (result.tracks_deleted > 0)
+                parts.push(`${result.tracks_deleted} deleted`);
+
+            const message =
+                parts.length > 0
+                    ? `Scan complete: ${parts.join(", ")}`
+                    : "Scan complete — no new tracks found";
+
+            addToast(message, "success", 4000);
         } catch (error) {
             console.error("Scan failed:", error);
             addToast("Failed to scan music folder", "error");

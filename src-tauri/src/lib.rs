@@ -449,6 +449,7 @@ pub fn run() {
                     // Library commands
                     commands::scan_music,
                     commands::add_folder,
+                    commands::set_single_music_folder,
                     commands::rescan_music,
                     commands::get_default_music_dirs,
                     commands::get_library,
@@ -608,6 +609,7 @@ pub fn run() {
                     // Library commands
                     commands::scan_music,
                     commands::add_folder,
+                    commands::set_single_music_folder,
                     commands::rescan_music,
                     commands::get_default_music_dirs,
                     commands::get_library,

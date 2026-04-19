@@ -187,6 +187,10 @@ export async function addFolder(path: string): Promise<void> {
     return await invoke('add_folder', { path });
 }
 
+export async function setSingleMusicFolder(path: string): Promise<void> {
+    return await invoke('set_single_music_folder', { path });
+}
+
 export async function rescanMusic(): Promise<ScanResult> {
     return await invoke('rescan_music');
 }
@@ -519,6 +523,29 @@ export async function pickFolder(): Promise<string | null> {
     return typeof selected === "string" ? selected : (selected as string[])[0] ?? null;
 }
 
+export async function pickAndroidFolder(): Promise<string | null> {
+    if (!isAndroid()) {
+        return selectMusicFolder();
+    }
+
+    return await new Promise<string | null>((resolve) => {
+        (window as any).__onAndroidFolderPicked = (pickedPath: string | null) => {
+            delete (window as any).__onAndroidFolderPicked;
+            resolve(pickedPath);
+        };
+
+        const picker = (window as any).AndroidFolderPicker;
+        if (picker?.pickFolder) {
+            picker.pickFolder();
+            return;
+        }
+
+        // Fallback in case native bridge is unavailable
+        delete (window as any).__onAndroidFolderPicked;
+        selectMusicFolder().then(resolve).catch(() => resolve(null));
+    });
+}
+
 // Ensure the correct path for downloaded files
 export async function getDownloadPath(): Promise<string> {
     try {
@@ -704,9 +731,9 @@ export async function ensureStoragePermission(): Promise<boolean> {
     const req = await requestStoragePermission();
     console.log('[Permissions] Storage permission request result:', req);
 
-    // For Android 11+, the check is immediate
-    if (req.status === 'checked' || req.granted === true) {
-        return req.granted === true;
+    // In some flows permission is granted immediately
+    if (req.status === 'granted') {
+        return true;
     }
 
     // For older Android, wait a bit for the system dialog and re-check
@@ -728,22 +755,10 @@ export async function downloadTrack(trackId: number): Promise<void> {
 
         // Ensure storage permissions are granted on Android
         if (isAndroid()) {
-            console.log('Checking storage permissions...');
-            // Use the permissions plugin on mobile
-            const storageStatus = await invokeFunc!('plugin:permissions|check_storage_permission');
-            console.log('Storage permission status:', storageStatus);
-
-            const granted = storageStatus && storageStatus.granted === true;
+            console.log('Ensuring storage permissions...');
+            const granted = await ensureStoragePermission();
             if (!granted) {
-                console.log('Requesting storage permission...');
-                const req = await invokeFunc!('plugin:permissions|request_storage_permission');
-                console.log('Storage permission request result:', req);
-
-                // After requesting, re-check
-                const recheck = await invokeFunc!('plugin:permissions|check_storage_permission');
-                if (!recheck || recheck.granted !== true) {
-                    throw new Error('Storage permission not granted. Cannot proceed with download.');
-                }
+                throw new Error('Storage permission not granted. Cannot proceed with download.');
             }
         }
 
