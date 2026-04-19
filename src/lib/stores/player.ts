@@ -1257,6 +1257,9 @@ export async function resume(): Promise<void> {
 
         if (get(currentTime) >= get(duration) && get(duration) > 0) {
             await playTrack(track);
+        } else if (get(activeBackend) === 'none') {
+            // App just opened, no audio loaded yet - start playback from saved position
+            await playTrack(track, false, get(currentTime));
         } else if (get(activeBackend) === 'html5') {
             await getHtml5Audio().play();
             isPlaying.set(true);
