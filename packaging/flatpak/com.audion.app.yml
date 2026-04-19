@@ -33,8 +33,8 @@ modules:
     build-commands:
       - npm ci
       - npm run build
-      - cargo build --release --locked
-      - install -Dm755 target/release/audion /app/bin/audion
+      - cargo build --manifest-path src-tauri/Cargo.toml --release --locked
+      - install -Dm755 src-tauri/target/release/audion /app/bin/audion
       - install -Dm644 packaging/flatpak/com.audion.app.desktop /app/share/applications/com.audion.app.desktop
       - install -Dm644 packaging/flatpak/com.audion.app.metainfo.xml /app/share/metainfo/com.audion.app.metainfo.xml
       - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/com.audion.app.png
