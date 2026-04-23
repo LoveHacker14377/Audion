@@ -1,10 +1,11 @@
 app-id: com.audion.app
-runtime: org.freedesktop.Platform
-runtime-version: '24.08'
-sdk: org.freedesktop.Sdk
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node20
-  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.gnome.Sdk.Extension.node20
+  - org.gnome.Sdk.Extension.rust-stable
+  - org.gnome.Sdk.WebKitGTK
 command: audion
 
 finish-args:
@@ -18,14 +19,13 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
 
 build-options:
-  # Starter implementation for CI/local builds.
-  # NOTE: Flathub generally requires fully vendored dependencies and no network access.
   build-args:
     - --share=network
   append-path: /usr/lib/sdk/node20/bin:/usr/lib/sdk/rust-stable/bin
   env:
     CARGO_HOME: /run/build/audion/.cargo
     npm_config_cache: /run/build/audion/.npm
+    PKG_CONFIG_PATH: /usr/lib/sdk/WebKitGTK/lib/pkgconfig:${PKG_CONFIG_PATH}
 
 modules:
   - name: audion
