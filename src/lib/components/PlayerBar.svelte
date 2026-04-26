@@ -39,6 +39,14 @@
     import { isMobile } from "$lib/stores/mobile";
     import type { Album } from "$lib/api/tauri";
     import { likedTrackIds, toggleLike } from "$lib/stores/liked";
+    import {
+        sleepTimerActive,
+        sleepTimerLastDurationMinutes,
+        sleepTimerRemainingMs,
+        SLEEP_TIMER_PRESETS,
+        startSleepTimer,
+        stopSleepTimer,
+    } from "$lib/stores/sleepTimer";
     import ConnectPanel from "./ConnectPanel.svelte";
     import { wsStore } from "$lib/stores/websocket";
 
@@ -63,6 +71,8 @@
     let imageLoadFailed = false;
     let loadedAlbum: any = null;
     let showConnectPanel = false;
+    let showSleepTimerMenu = false;
+    let sleepTimerElement: HTMLDivElement;
 
     $: connectedDevices = $wsStore.devices.length;
 
@@ -187,6 +197,34 @@
         return "";
     }
 
+    function formatSleepTimerRemaining(ms: number): string {
+        const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        if (minutes >= 60) {
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            return `${hours}h ${remainingMinutes}m`;
+        }
+
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function toggleSleepTimerMenu() {
+        showSleepTimerMenu = !showSleepTimerMenu;
+    }
+
+    function setSleepTimer(minutes: number) {
+        startSleepTimer(minutes);
+        showSleepTimerMenu = false;
+    }
+
+    function cancelSleepTimer() {
+        stopSleepTimer();
+        showSleepTimerMenu = false;
+    }
+
     onMount(() => {
         // Global mouse events for seeking and volume
         const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -197,9 +235,19 @@
             isSeeking = false;
             isVolumeChanging = false;
         };
+        const handleDocumentMouseDown = (e: MouseEvent) => {
+            if (
+                showSleepTimerMenu &&
+                sleepTimerElement &&
+                !sleepTimerElement.contains(e.target as Node)
+            ) {
+                showSleepTimerMenu = false;
+            }
+        };
 
         window.addEventListener("mousemove", handleGlobalMouseMove);
         window.addEventListener("mouseup", handleGlobalMouseUp);
+        document.addEventListener("mousedown", handleDocumentMouseDown);
 
         // Register UI slots
         if (slotStart)
@@ -210,6 +258,7 @@
         return () => {
             window.removeEventListener("mousemove", handleGlobalMouseMove);
             window.removeEventListener("mouseup", handleGlobalMouseUp);
+            document.removeEventListener("mousedown", handleDocumentMouseDown);
 
             // Unregister slots
             uiSlotManager.unregisterContainer("playerbar:left");
@@ -618,6 +667,67 @@
             </button>
 
             <div class="utility-controls">
+                <div class="sleep-timer" bind:this={sleepTimerElement}>
+                    <button
+                        class="icon-btn"
+                        class:active={$sleepTimerActive}
+                        on:click={toggleSleepTimerMenu}
+                        title={$sleepTimerActive
+                            ? `Sleep timer: ${formatSleepTimerRemaining($sleepTimerRemainingMs)} remaining`
+                            : "Sleep timer"}
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="20"
+                            height="20"
+                        >
+                            <path
+                                d="M9.37 5.51A7 7 0 0 0 18.5 14.63a8 8 0 1 1-9.13-9.12z"
+                            />
+                        </svg>
+                    </button>
+
+                    {#if showSleepTimerMenu}
+                        <div class="sleep-timer-menu">
+                            <div class="sleep-timer-header">
+                                <span class="sleep-timer-title">Sleep timer</span>
+                                {#if $sleepTimerActive}
+                                    <span class="sleep-timer-remaining"
+                                        >{formatSleepTimerRemaining(
+                                            $sleepTimerRemainingMs,
+                                        )}</span
+                                    >
+                                {/if}
+                            </div>
+
+                            <div class="sleep-timer-presets">
+                                {#each SLEEP_TIMER_PRESETS as minutes}
+                                    <button
+                                        class="sleep-preset-btn"
+                                        class:active={
+                                            $sleepTimerLastDurationMinutes ===
+                                            minutes
+                                        }
+                                        on:click={() => setSleepTimer(minutes)}
+                                    >
+                                        {minutes}m
+                                    </button>
+                                {/each}
+                            </div>
+
+                            {#if $sleepTimerActive}
+                                <button
+                                    class="sleep-cancel-btn"
+                                    on:click={cancelSleepTimer}
+                                >
+                                    Cancel timer
+                                </button>
+                            {/if}
+                        </div>
+                    {/if}
+                </div>
+
                 <button
                     class="icon-btn"
                     class:active={$isQueueVisible}
@@ -1225,6 +1335,77 @@
         margin-left: 2px;
         padding-left: 12px;
         border-left: 1px solid var(--border-color);
+    }
+
+    .sleep-timer {
+        position: relative;
+    }
+
+    .sleep-timer-menu {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 10px);
+        width: 220px;
+        padding: 10px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background: var(--bg-elevated);
+        box-shadow: var(--shadow-lg);
+        z-index: 60;
+    }
+
+    .sleep-timer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        gap: 8px;
+    }
+
+    .sleep-timer-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .sleep-timer-remaining {
+        font-size: 0.72rem;
+        color: var(--accent-color, #1db954);
+        font-weight: 600;
+    }
+
+    .sleep-timer-presets {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .sleep-preset-btn,
+    .sleep-cancel-btn {
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
+        color: var(--text-secondary);
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        height: 30px;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .sleep-preset-btn:hover,
+    .sleep-cancel-btn:hover {
+        border-color: var(--accent-color, #1db954);
+        color: var(--text-primary);
+    }
+
+    .sleep-preset-btn.active {
+        border-color: var(--accent-color, #1db954);
+        color: var(--accent-color, #1db954);
+    }
+
+    .sleep-cancel-btn {
+        width: 100%;
+        margin-top: 8px;
     }
 
     .volume-controls-main {
