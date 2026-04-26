@@ -762,7 +762,8 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    padding: var(--spacing-md);
+    padding: calc(var(--safe-area-top) + var(--spacing-md)) var(--spacing-md)
+      var(--spacing-md);
     overflow-x: hidden; /* Prevent horizontal overflow */
     box-sizing: border-box;
   }

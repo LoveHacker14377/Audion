@@ -808,12 +808,13 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Check if close-to-tray is enabled
                 let config = commands::window::load_window_config(window.app_handle());
                 if config.close_to_tray {
                     api.prevent_close();
-                    window.hide().ok();
+                    let _ = window.hide();
                     tracing::info!("Window hidden to tray");
                 }
             }

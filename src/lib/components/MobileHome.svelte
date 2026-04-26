@@ -753,7 +753,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: var(--spacing-lg) var(--spacing-md) var(--spacing-md);
+        padding: calc(var(--safe-area-top) + var(--spacing-lg))
+            var(--spacing-md) var(--spacing-md);
     }
 
     .home-header h1 {

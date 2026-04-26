@@ -1933,7 +1933,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.5rem;
+    padding: calc(1rem + var(--safe-area-top)) 1.5rem 1rem;
     z-index: 100;
   }
 

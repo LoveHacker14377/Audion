@@ -1208,7 +1208,8 @@
   }
 
   .view-header {
-    padding: var(--spacing-lg) var(--spacing-md);
+    padding: calc(var(--safe-area-top) + var(--spacing-lg)) var(--spacing-md)
+      var(--spacing-md);
     flex-shrink: 0;
     max-width: 800px;
     width: 100%;
