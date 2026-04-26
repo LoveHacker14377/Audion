@@ -651,22 +651,22 @@
         <div class="volume-controls">
             <!-- Plugin slot: Right -->
             <div class="plugin-slot" bind:this={slotEnd}></div>
-            
-            <button
-                class="icon-btn connect-btn"
-                class:active={connectedDevices > 0}
-                on:click={() => (showConnectPanel = !showConnectPanel)}
-                title="Connect to a device"
-            >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M19,2H5A3,3,0,0,0,2,5V15a3,3,0,0,0,3,3H9.17l-1.42,1.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.42,0L11,18.99,12.83,20.83a1,1,0,0,0,1.42,0,1,1,0,0,0,0-1.42L12.83,18H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2Zm1,13a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V5A1,1,0,0,1,5,4H19a1,1,0,0,1,1,1Z"/>
-                </svg>
-                {#if connectedDevices > 0}
-                    <div class="device-dot"></div>
-                {/if}
-            </button>
 
             <div class="utility-controls">
+                <!-- Connect button moved into utility group -->
+                <button
+                    class="icon-btn connect-btn"
+                    class:active={connectedDevices > 0}
+                    on:click={() => (showConnectPanel = !showConnectPanel)}
+                    title="Connect to a device"
+                >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M19,2H5A3,3,0,0,0,2,5V15a3,3,0,0,0,3,3H9.17l-1.42,1.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.42,0L11,18.99,12.83,20.83a1,1,0,0,0,1.42,0,1,1,0,0,0,0-1.42L12.83,18H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2Zm1,13a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V5A1,1,0,0,1,5,4H19a1,1,0,0,1,1,1Z"/>
+                    </svg>
+                    {#if connectedDevices > 0}
+                        <div class="device-dot"></div>
+                    {/if}
+                </button>
                 <div class="sleep-timer" bind:this={sleepTimerElement}>
                     <button
                         class="icon-btn"
@@ -734,15 +734,8 @@
                     on:click={toggleQueue}
                     title="Queue (Q)"
                 >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                    >
-                        <path
-                            d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
-                        />
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
                     </svg>
                 </button>
                 <button
@@ -751,15 +744,8 @@
                     on:click={toggleLyrics}
                     title="Lyrics (L)"
                 >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                    >
-                        <path
-                            d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"
-                        />
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
                     </svg>
                 </button>
                 <button
@@ -768,15 +754,8 @@
                     on:click={() => pluginDrawerOpen.set(true)}
                     title="Plugin Actions"
                 >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                    >
-                        <path
-                            d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"
-                        />
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z" />
                     </svg>
                 </button>
             </div>
@@ -853,26 +832,12 @@
                     title="Fullscreen"
                 >
                     {#if $isFullScreen}
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="20"
-                            height="20"
-                        >
-                            <path
-                                d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
-                            />
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
                         </svg>
                     {:else}
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="20"
-                            height="20"
-                        >
-                            <path
-                                d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
-                            />
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
                         </svg>
                     {/if}
                 </button>
@@ -881,15 +846,8 @@
                     on:click={toggleMiniPlayer}
                     title="Mini Player (P)"
                 >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                    >
-                        <path
-                            d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"
-                        />
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
                     </svg>
                 </button>
             </div>
@@ -935,8 +893,8 @@
     }
 
     .album-art {
-        width: 64px;
-        height: 64px;
+        width: 54px;
+        height: 54px;
         border-radius: var(--radius-md);
         overflow: hidden;
         flex-shrink: 0;
@@ -1080,23 +1038,23 @@
     .controls-buttons {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         flex-shrink: 0;
     }
 
     .controls-buttons .icon-btn {
-        width: 40px;
-        height: 40px;
+        width: 34px;
+        height: 34px;
     }
 
     .controls-buttons .icon-btn svg {
-        width: 22px;
-        height: 22px;
+        width: 18px;
+        height: 18px;
     }
 
     .play-btn {
-        width: 52px;
-        height: 52px;
+        width: 44px;
+        height: 44px;
         position: relative;
         border-radius: var(--radius-full);
         background-color: var(--text-primary);
@@ -1110,8 +1068,8 @@
     }
 
     .play-btn svg {
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
     }
 
     .play-btn:hover {
@@ -1322,7 +1280,7 @@
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: var(--spacing-sm);
+        gap: 10px;
         min-width: 0;
         padding-left: var(--spacing-sm);
         /* overflow: hidden; - Removed to allow nested menus */
@@ -1331,10 +1289,12 @@
     .utility-controls {
         display: flex;
         align-items: center;
-        gap: var(--spacing-xs);
-        margin-left: 2px;
-        padding-left: 12px;
-        border-left: 1px solid var(--border-color);
+        gap: 2px;
+    }
+
+    .utility-controls .icon-btn {
+        width: 32px;
+        height: 32px;
     }
 
     .sleep-timer {
@@ -1411,21 +1371,24 @@
     .volume-controls-main {
         display: flex;
         align-items: center;
-        gap: var(--spacing-xs);
-        margin-left: 2px;
+        gap: 4px;
     }
 
     .view-controls {
         display: flex;
         align-items: center;
         gap: 2px;
-        margin-left: 2px;
+    }
+
+    .view-controls .icon-btn {
+        width: 32px;
+        height: 32px;
     }
 
     .volume-bar {
-        width: 80px;
+        width: 96px;
         flex-shrink: 1;
-        min-width: 40px;
+        min-width: 60px;
     }
 
     .plugin-slot {
