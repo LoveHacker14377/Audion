@@ -508,28 +508,37 @@
       <!-- Section: Support -->
       <section class="settings-section" aria-labelledby="support-heading">
         <h2 id="support-heading" class="section-label">{$_('settings.support', { default: 'Support' })}</h2>
-        <div class="settings-card">
-          <div class="card-title-group compact">
-            <h3 class="setting-title">{$_('settings.supportAudion', { default: 'Support Audion' })}</h3>
-            <span class="setting-description">{$_('settings.supportDesc', { default: 'Help keep development active' })}</span>
+        <div class="settings-card support-card-premium">
+          <div class="support-content">
+            <div class="support-text">
+              <h3 class="support-title">{$_('settings.supportAudion', { default: 'Support Audion' })}</h3>
+              <p class="support-description">{$_('settings.supportDesc', { default: 'Help keep development active and unlock unlimited sync features.' })}</p>
+            </div>
+            <div class="support-icon-large">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.84-8.84 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+               </svg>
+            </div>
           </div>
 
-          <div class="button-group-row support-links-row" style="margin-top: var(--spacing-sm)">
+          <div class="support-grid">
             <a
               href="https://ko-fi.com/N4N5UMNR1"
               target="_blank"
               rel="noreferrer"
-              class="btn-primary-compact btn-support-compact"
+              class="support-platform-card kofi"
             >
-              Ko-fi
+              <span class="platform-name">Ko-fi</span>
+              <span class="platform-tag">One-time / Monthly</span>
             </a>
             <a
               href="https://www.patreon.com/AudionPlayer"
               target="_blank"
               rel="noreferrer"
-              class="btn-outline-compact btn-support-compact"
+              class="support-platform-card patreon"
             >
-              Patreon
+              <span class="platform-name">Patreon</span>
+              <span class="platform-tag">Membership</span>
             </a>
           </div>
         </div>
@@ -1550,9 +1559,114 @@
     text-align: center;
   }
 
+  .support-card-premium {
+    background: linear-gradient(135deg, rgba(29, 185, 84, 0.15) 0%, rgba(29, 185, 84, 0.05) 100%);
+    border: 1px solid rgba(29, 185, 84, 0.2) !important;
+    position: relative;
+    overflow: hidden;
+    padding: var(--spacing-lg) !important;
+  }
+
+  .support-card-premium::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(29, 185, 84, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .support-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .support-text {
+    flex: 1;
+  }
+
+  .support-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.01em;
+  }
+
+  .support-description {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .support-icon-large {
+    width: 42px;
+    height: 42px;
+    color: var(--accent-primary);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+
+  .support-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+  }
+
+  .support-platform-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 0 !important; /* Reset touch target min-height for cards */
+  }
+
+  .support-platform-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    text-decoration: none;
+  }
+
+  .platform-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .platform-tag {
+    font-size: 0.75rem;
+    color: var(--text-subdued);
+    margin-top: 2px;
+  }
+
+  .support-platform-card.kofi:hover .platform-name {
+    color: #29abe0;
+  }
+
+  .support-platform-card.patreon:hover .platform-name {
+    color: #f96854;
+  }
+
   @media (max-width: 520px) {
-    .support-links-row {
+    .support-grid {
       grid-template-columns: 1fr;
+    }
+    
+    .support-content {
+      flex-direction: row;
+      align-items: flex-start;
     }
   }
 
