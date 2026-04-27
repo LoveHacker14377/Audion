@@ -136,8 +136,6 @@ export interface SearchResult {
   track_number?: number | null;
   disc_number?: number | null;
   cover_url?: string | null;
-  album_art?: string | null;
-  track_cover?: string | null;
   // Identifiers
   musicbrainz_recording_id?: string | null;
 
@@ -699,8 +697,6 @@ export class PluginRuntime {
             album: trackData.album || null,
             duration: trackData.duration || null,
             cover_url: trackData.cover_url || null,
-            album_art: trackData.album_art || null,
-            track_cover: trackData.track_cover || null,
             source_type: trackData.source_type,
             external_id: trackData.external_id,
             format: trackData.format || null,
@@ -834,8 +830,6 @@ export class PluginRuntime {
         album?: string | null;
         duration?: number | null;
         cover_url?: string | null;
-        album_art?: string | null;
-        track_cover?: string | null;
         source_type: string;
         external_id: string;
         format?: string | null;
