@@ -1,6 +1,5 @@
 import { writable, get } from 'svelte/store';
-import { getCurrentWindow, LogicalSize, LogicalPosition } from '@tauri-apps/api/window';
-import { isTauri } from '$lib/api/tauri';
+import { isTauri, isAndroid } from '$lib/api/tauri';
 
 export const isFullScreen = writable(false);
 export const isMiniPlayer = writable(false);
@@ -38,8 +37,15 @@ export async function setMiniPlayer(enable: boolean) {
     if (miniPlayerTransitionInFlight) return;
 
     if (isTauri()) {
+        // PiP is desktop-only , skip window manipulation on Android
+        if (isAndroid()) {
+            isMiniPlayer.set(enable);
+            return;
+        }
+
         try {
             miniPlayerTransitionInFlight = true;
+            const { getCurrentWindow, LogicalSize, LogicalPosition } = await import('@tauri-apps/api/window');
             const appWindow = getCurrentWindow();
 
             if (enable) {

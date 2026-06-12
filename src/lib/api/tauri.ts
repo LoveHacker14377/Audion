@@ -91,23 +91,38 @@ async function ensureTauriLoaded() {
         throw new Error('Not running in Tauri environment');
     }
     if (!invokeFunc) {
+        console.log('[Tauri] importing @tauri-apps/api/core...');
         const core = await import('@tauri-apps/api/core');
         invokeFunc = core.invoke;
         convertFileSrcFunc = core.convertFileSrc;
+        console.log('[Tauri] @tauri-apps/api/core loaded');
     }
     if (!openFunc) {
+        console.log('[Tauri] importing @tauri-apps/plugin-dialog...');
         const dialog = await import('@tauri-apps/plugin-dialog');
         openFunc = dialog.open;
+        console.log('[Tauri] @tauri-apps/plugin-dialog loaded');
     }
     if (!listenFunc) {
+        console.log('[Tauri] importing @tauri-apps/api/event...');
         const event = await import('@tauri-apps/api/event');
         listenFunc = event.listen;
+        console.log('[Tauri] @tauri-apps/api/event loaded');
     }
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+    console.log(`[Tauri] invoke START: ${cmd}`);
     await ensureTauriLoaded();
-    return invokeFunc!(cmd, args);
+    console.log(`[Tauri] invoke BRIDGE: ${cmd}`);
+    try {
+        const result = await invokeFunc!(cmd, args);
+        console.log(`[Tauri] invoke OK: ${cmd}`);
+        return result as T;
+    } catch (e) {
+        console.error(`[Tauri] invoke ERROR: ${cmd}`, e);
+        throw e;
+    }
 }
 
 // Convert file path to asset:// URL for WebView

@@ -609,14 +609,22 @@ export async function loadLibrary(): Promise<void> {
     lastError.set(null);
 
     try {
-        console.time('[Library] IPC load initial');
+        console.log('[Library] loadLibrary START');
 
-        // Parallel: library metadata, first track batch, first album batch
+        console.log('[Library] calling getLibrary()...');
+        const libraryPromise = getLibrary().then(r => { console.log('[Library] getLibrary() resolved'); return r; });
+
+        console.log('[Library] calling getTracksPaginated()...');
+        const tracksPromise = getTracksPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0).then(r => { console.log('[Library] getTracksPaginated() resolved'); return r; });
+
+        console.log('[Library] calling getAlbumsPaginated()...');
+        const albumsPromise = getAlbumsPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0).then(r => { console.log('[Library] getAlbumsPaginated() resolved'); return r; });
+
+        console.log('[Library] awaiting Promise.all...');
         const [library, initialTracks, initialAlbums] = await Promise.all([
-            getLibrary(),
-            getTracksPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0),
-            getAlbumsPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0)  // Paginated albums
+            libraryPromise, tracksPromise, albumsPromise
         ]);
+        console.log(`[Library] Promise.all resolved — tracks: ${initialTracks.length}, albums: ${initialAlbums.length}, artists: ${library.artists.length}`);
 
         console.timeEnd('[Library] IPC load initial');
 
@@ -726,7 +734,7 @@ export async function searchInLibrary(query: string): Promise<void> {
     try {
         const results = await searchLibrary(query, 100, 0);
         // Search results go through the same ingestion
-        const lightResults = ingestTracks(results);
+        const lightResults = ingestTracks(results.tracks);
         tracks.set(lightResults);
         // trackCount intentionally not updated. pagination logic uses it for
         // "have we loaded everything?" checks which don't apply during search.
@@ -774,10 +782,12 @@ export async function loadAlbumsAndArtists(): Promise<void> {
 // PLAYLISTS
 export async function loadPlaylists(): Promise<void> {
     try {
+        console.log('[Library] loadPlaylists START');
         const playlistList = await getPlaylists();
+        console.log(`[Library] loadPlaylists resolved — count: ${playlistList.length}`);
         playlists.set(playlistList);
     } catch (error) {
-        console.error('Failed to load playlists:', error);
+        console.error('[Library] loadPlaylists ERROR:', error);
     }
 }
 

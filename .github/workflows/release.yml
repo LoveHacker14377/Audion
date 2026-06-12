@@ -502,6 +502,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           platform: android
+          rust_targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
       - name: Cache tauri-cli
         uses: actions/cache@v4
@@ -510,7 +511,7 @@ jobs:
           key: tauri-cli-2.11.0
 
       - name: Install tauri-cli (if not already)
-        run: cargo install tauri-cli --version 2.11.0
+        run: cargo install tauri-cli --version 2.11.0 --locked
 
       - name: Setup Signing
         run: |
@@ -520,8 +521,52 @@ jobs:
       - name: Initialize Android project
         run: npm run tauri android init
 
+      - name: Bundle libc++_shared.so into jniLibs
+        run: |
+          NDK_DIR="${ANDROID_HOME}/ndk/$(ls "${ANDROID_HOME}/ndk" | sort -V | tail -1)"
+          # NDK r23+ moved libc++_shared.so out of sysroot/usr/lib/<abi>/
+          # It now lives under toolchains/llvm/prebuilt/<host>/lib/ per target triple
+          TOOLCHAIN="${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64"
+          JNI_DIR="src-tauri/gen/android/app/src/main/jniLibs"
+          declare -A ABI_TRIPLE=(
+            [arm64-v8a]=aarch64-linux-android
+            [armeabi-v7a]=arm-linux-androideabi
+            [x86]=i686-linux-android
+            [x86_64]=x86_64-linux-android
+          )
+          for ABI in arm64-v8a armeabi-v7a x86 x86_64; do
+            TRIPLE="${ABI_TRIPLE[$ABI]}"
+            SO=$(find "${TOOLCHAIN}" -name "libc++_shared.so" -path "*/${TRIPLE}/*" | head -1)
+            if [ -z "$SO" ]; then
+              echo "ERROR: libc++_shared.so not found for ${ABI} (triple: ${TRIPLE})"
+              find "${TOOLCHAIN}" -name "libc++_shared.so" || true
+              exit 1
+            fi
+            mkdir -p "${JNI_DIR}/${ABI}"
+            cp "$SO" "${JNI_DIR}/${ABI}/"
+            echo "Copied: $SO -> ${JNI_DIR}/${ABI}/"
+          done
+
       - name: Build Tauri app for Android (Signed)
         run: npm run tauri android build
+
+      - name: Verify libc++_shared.so is bundled
+        run: |
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK found"
+            exit 1
+          fi
+          echo "Checking APK: $APK"
+          echo "--- All .so files in APK ---"
+          unzip -l "$APK" | grep "\.so" || echo "WARNING: No .so files found at all"
+          echo "--- libc++ check ---"
+          if unzip -l "$APK" | grep -q "libc++_shared.so"; then
+            echo "OK: libc++_shared.so is bundled"
+          else
+            echo "ERROR: libc++_shared.so NOT FOUND in APK — app will crash at launch"
+            exit 1
+          fi
 
       - name: Set version and prerelease flags
         id: info
