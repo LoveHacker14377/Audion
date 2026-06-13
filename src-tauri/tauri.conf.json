@@ -57,7 +57,8 @@
     },
     "macOS": {
       "entitlements": "./entitlements.plist"
-    }
+    },
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "deep-link": {
@@ -73,6 +74,12 @@
           ],
           "appLink": false
         }
+      ]
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGOUJEQkM3NUVCMjAxMTIKUldRU0FiSmV4OXVicjg1U2JuL1pRdGlvWnhTbStucHF5aDVCYkMxZDFRQWRhRi93TGxlTTNqeDEK",
+      "endpoints": [
+        "https://github.com/SmileofHaven/Audion-Changes/releases/latest/download/latest.json"
       ]
     }
   }

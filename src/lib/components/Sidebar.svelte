@@ -54,6 +54,7 @@
     import { uiSlotManager } from "$lib/plugins/ui-slots";
 
     import { updates } from "$lib/stores/updates";
+    import { checkAndInstallUpdate, consumePendingUpdateNotes, supportsOta } from "$lib/stores/otaUpdate";
     import UpdatePopup from "./UpdatePopup.svelte";
     import SyncStatus from "./SyncStatus.svelte";
 
@@ -78,6 +79,7 @@
     let scanStatus = "Scanning...";
     let scanError: string | null = null;
     let showUpdatePopup = false;
+    let popupRelease: any = null;
 
     // Slot containers
     let slotTop: HTMLDivElement;
@@ -366,8 +368,22 @@
     }
 
     onMount(() => {
+        const pending = consumePendingUpdateNotes();
+        if (pending) {
+            popupRelease = {
+                tag_name: pending.version,
+                name: `Version ${pending.version}`,
+                body: pending.body ?? '',
+                published_at: pending.date ?? '',
+                assets: [],
+            };
+            showUpdatePopup = true;
+        } else if (supportsOta()) {
+            checkAndInstallUpdate();
+        } else {
+            updates.checkUpdate();
+        }
         loadPlaylists();
-        updates.checkUpdate();
 
         // Register UI slots
         if (slotTop) uiSlotManager.registerContainer("sidebar:top", slotTop);
@@ -391,7 +407,7 @@
                 <div
                     class="update-badge"
                     title="View update details"
-                    on:click={() => (showUpdatePopup = true)}
+                    on:click={() => { popupRelease = $updates.latestRelease; showUpdatePopup = true; }}
                     role="button"
                     tabindex="0"
                     on:keydown={(e) =>
@@ -805,11 +821,8 @@
     </div>
 </aside>
 
-{#if showUpdatePopup && $updates.latestRelease}
-    <UpdatePopup
-        release={$updates.latestRelease}
-        on:close={() => (showUpdatePopup = false)}
-    />
+{#if showUpdatePopup && popupRelease}
+    <UpdatePopup release={popupRelease} on:close={() => (showUpdatePopup = false)} />
 {/if}
 
 <style>
