@@ -37,6 +37,7 @@
     disconnectCustomServer,
   } from "$lib/stores/sync";
   import { nativeAudioStop, nativeAudioSetReplayGainEnabled, nativeAudioListDevices, nativeAudioGetDeviceInfo, nativeAudioSetOutputDevice, type DeviceList, type AudioDeviceInfo } from "$lib/services/native-audio";
+  import { showShortcutsHelp } from "$lib/stores/shortcuts";
   import Icon from "$lib/components/Icon.svelte";
 
   interface MigrationProgressUpdate {
@@ -971,6 +972,53 @@
             >
               <div class="toggle-handle"></div>
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Keyboard Shortcuts -->
+      <section class="settings-section" aria-labelledby="shortcuts-heading">
+        <h2 id="shortcuts-heading" class="section-label">{$_('settings.shortcuts', { default: 'Keyboard Shortcuts' })}</h2>
+        <div class="settings-card">
+          <div class="toggle-container">
+            <div class="toggle-info">
+              <span class="setting-title">{$_('settings.enableShortcuts', { default: 'Enable Keyboard Shortcuts' })}</span>
+              <span class="setting-description">{$_('settings.enableShortcutsDesc', { default: 'Use keyboard shortcuts to control playback and navigation' })}</span>
+            </div>
+            <button
+              class="toggle-btn"
+              class:active={$appSettings.shortcutsEnabled}
+              on:click={() => appSettings.setShortcutsEnabled(!$appSettings.shortcutsEnabled)}
+              role="switch"
+              aria-checked={$appSettings.shortcutsEnabled}
+              aria-label={$_('settings.toggleShortcuts', { default: 'Toggle Keyboard Shortcuts' })}
+            >
+              <div class="toggle-handle"></div>
+            </button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="inner-section">
+            <div class="card-title-group compact">
+              <h3 class="setting-title">{$_('settings.customizeShortcuts', { default: 'Customize Shortcuts' })}</h3>
+              <span class="setting-description">{$_('settings.customizeShortcutsDesc', { default: 'View and rebind keyboard shortcuts for playback, navigation, and more' })}</span>
+            </div>
+
+            <div class="button-group-row">
+              <button class="btn-outline-compact" on:click={() => showShortcutsHelp()} disabled={!$appSettings.shortcutsEnabled}>
+                {$_('settings.editShortcuts', { default: 'Edit Shortcuts' })}
+              </button>
+            </div>
+
+            <div class="shortcut-hint">
+              <span class="setting-description">{$_('settings.shortcutsHint', { default: 'Tip: you can also open this anytime by pressing' })}</span>
+              <span class="key-combo">
+                <kbd class="key">Shift</kbd>
+                <span class="key-plus">+</span>
+                <kbd class="key">/</kbd>
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -3055,6 +3103,44 @@
   .toggle-btn.active .toggle-handle {
     transform: translateX(22px);
     background-color: #000;
+  }
+
+  /* ─── Shortcut Hint ─── */
+
+  .shortcut-hint {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+  }
+
+  .key-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-highlight);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .key-plus {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
   }
 
   /* ─── Segmented Pill Control (3-segment) ─── */

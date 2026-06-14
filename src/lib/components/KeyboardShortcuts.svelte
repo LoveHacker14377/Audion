@@ -37,6 +37,7 @@
         matchBindings,
         type ShortcutBinding,
     } from "$lib/stores/shortcuts";
+    import { appSettings } from "$lib/stores/settings";
 
     // Volume step (5%)
     const VOLUME_STEP = 0.05;
@@ -76,14 +77,19 @@
 
         const { register, unregister } = globalShortcutPlugin;
 
+        // if shortcuts are disabled app-wide, desired set is empty . everything gets unregistered below
+        const shortcutsEnabled = get(appSettings).shortcutsEnabled;
+
         // desired set: media keys (always) + user-enabled globals
         const desired = new Map<string, string>(); // globalString -> action
-        for (const mk of MEDIA_KEYS) {
-            desired.set(mk.gs, mk.action);
-        }
-        for (const b of bindings) {
-            if (b.isGlobal && b.globalString) {
-                desired.set(b.globalString, b.action);
+        if (shortcutsEnabled) {
+            for (const mk of MEDIA_KEYS) {
+                desired.set(mk.gs, mk.action);
+            }
+            for (const b of bindings) {
+                if (b.isGlobal && b.globalString) {
+                    desired.set(b.globalString, b.action);
+                }
             }
         }
 
@@ -121,6 +127,7 @@
     }
 
     let unsubscribeBindings: () => void;
+    let unsubscribeSettings: () => void;
 
     onMount(async () => {
         await loadPlugin();
@@ -129,10 +136,20 @@
         unsubscribeBindings = shortcutBindings.subscribe(bindings => {
             syncGlobalShortcuts(bindings);
         });
+
+        // re-sync global shortcuts whenever the master enable/disable toggle changes
+        let lastShortcutsEnabled = get(appSettings).shortcutsEnabled;
+        unsubscribeSettings = appSettings.subscribe(settings => {
+            if (settings.shortcutsEnabled !== lastShortcutsEnabled) {
+                lastShortcutsEnabled = settings.shortcutsEnabled;
+                syncGlobalShortcuts(get(shortcutBindings));
+            }
+        });
     });
 
     onDestroy(async () => {
         unsubscribeBindings?.();
+        unsubscribeSettings?.();
 
         // unregister all globals on component teardown
         if (globalShortcutPlugin && registeredGlobals.size > 0) {
@@ -190,6 +207,9 @@
             }
             return;
         }
+
+        // master toggle: if keyboard shortcuts are disabled, do nothing else
+        if (!get(appSettings).shortcutsEnabled) return;
 
         // Skip shortcuts while typing in inputs, but still allow Escape to blur
         if (isInputElement(e.target)) {

@@ -25,6 +25,8 @@ export interface AppSettings {
     streamServerTracks: boolean;
     /** persisted keyboard shortcut bindings. null means use defaults. */
     keyboardBindings: ShortcutBinding[] | null;
+    /** master toggle for keyboard shortcuts (including showHelp / Shift+/) */
+    shortcutsEnabled: boolean;
 }
 
 const SETTINGS_STORAGE_KEY = 'audion_settings';
@@ -50,6 +52,7 @@ const defaultSettings: AppSettings = {
     outputDevice: null,
     streamServerTracks: true,
     keyboardBindings: null,
+    shortcutsEnabled: true,
 };
 
 // Load settings from localStorage
@@ -193,6 +196,14 @@ function createSettingsStore() {
         setKeyboardBindings(bindings: ShortcutBinding[] | null) {
             update(state => {
                 const newState = { ...state, keyboardBindings: bindings };
+                saveSettings(newState);
+                return newState;
+            });
+        },
+
+        setShortcutsEnabled(enabled: boolean) {
+            update(state => {
+                const newState = { ...state, shortcutsEnabled: enabled };
                 saveSettings(newState);
                 return newState;
             });
