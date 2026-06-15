@@ -53,6 +53,10 @@ ratio-metadata = "0.1"  # Add version as needed
 # Metadata Writing
 mp4ameta = "0.11"
 
+# image background colors
+color-thief = "0.2"
+image = "0.25"
+
 # SQLite database
 rusqlite = { version = "0.31", features = ["bundled"] }
 

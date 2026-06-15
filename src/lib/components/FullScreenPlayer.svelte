@@ -54,6 +54,7 @@
     stopSleepTimer,
   } from "$lib/stores/sleepTimer";
   import { goToAlbumDetail } from "$lib/stores/view";
+  import MeshGradientBg from "./MeshGradientBg.svelte";
 
   let showConnectPanel = false;
   let showMobileMenu = false;
@@ -392,20 +393,7 @@
     transition:fade={{ duration: isAndroid ? 180 : 300 }}
   >
     <!-- Animated blurred background -->
-    <div class="bg-canvas">
-      <div
-        class="bg-layer bg-layer-1"
-        style="background-image: url({albumArt || ''})"
-      ></div>
-      <div
-        class="bg-layer bg-layer-2"
-        style="background-image: url({albumArt || ''})"
-      ></div>
-      <div
-        class="bg-layer bg-layer-3"
-        style="background-image: url({albumArt || ''})"
-      ></div>
-    </div>
+    <MeshGradientBg lite={isAndroid && $isMobile} />
     <div class="backdrop-layer"></div>
 
     {#if $isMobile}
@@ -1280,66 +1268,6 @@
   }
 
   /* Animated blurred background */
-  .bg-canvas {
-    position: absolute;
-    inset: -50%;
-    width: 200%;
-    height: 200%;
-    z-index: 0;
-    pointer-events: none;
-    filter: blur(100px) saturate(2);
-    opacity: 0.7;
-    transition: opacity 0.5s ease;
-  }
-
-  .bg-layer {
-    position: absolute;
-    inset: 0;
-    background-size: cover;
-    background-position: center;
-    will-change: transform, opacity;
-  }
-
-  .bg-layer-1 {
-    opacity: 0.8;
-    animation: bg-pulse-1 12s infinite alternate ease-in-out;
-  }
-  .bg-layer-2 {
-    opacity: 0.5;
-    animation: bg-pulse-2 15s infinite alternate ease-in-out;
-    mix-blend-mode: soft-light;
-  }
-  .bg-layer-3 {
-    opacity: 0.4;
-    animation: bg-pulse-3 18s infinite alternate ease-in-out;
-    mix-blend-mode: overlay;
-  }
-
-  @keyframes bg-pulse-1 {
-    0% {
-      transform: translate(-10%, -10%) scale(1) rotate(0deg);
-    }
-    100% {
-      transform: translate(20%, 25%) scale(1.3) rotate(15deg);
-    }
-  }
-  @keyframes bg-pulse-2 {
-    0% {
-      transform: translate(15%, -15%) scale(1.2) rotate(0deg);
-    }
-    100% {
-      transform: translate(-25%, 20%) scale(1) rotate(-15deg);
-    }
-  }
-  @keyframes bg-pulse-3 {
-    0% {
-      transform: translate(-15%, 20%) scale(1) rotate(0deg);
-    }
-    100% {
-      transform: translate(15%, -25%) scale(1.4) rotate(20deg);
-    }
-  }
-
   .backdrop-layer {
     position: absolute;
     inset: 0;
@@ -2268,7 +2196,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .bg-layer,
     .desktop-lyric-line,
     .desktop-lyric-word,
     .lyric-word {
@@ -2278,26 +2205,6 @@
   }
 
   /* Android webview fallback: lighter composition to avoid transition glitches */
-  .fullscreen-player.android-lite .bg-canvas {
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    filter: blur(45px) saturate(1.2);
-    opacity: 0.45;
-    transform: translateZ(0);
-  }
-
-  .fullscreen-player.android-lite .bg-layer {
-    animation: none !important;
-    mix-blend-mode: normal !important;
-    will-change: auto;
-  }
-
-  .fullscreen-player.android-lite .bg-layer-2,
-  .fullscreen-player.android-lite .bg-layer-3 {
-    opacity: 0;
-  }
-
   .fullscreen-player.android-lite .marquee-container,
   .fullscreen-player.android-lite .desktop-lyrics-container,
   .fullscreen-player.android-lite .mobile-lyrics-wrapper .lyrics-container {

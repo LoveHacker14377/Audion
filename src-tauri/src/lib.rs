@@ -561,6 +561,7 @@ pub fn run() {
                     commands::covers::cleanup_orphaned_cover_files,
                     commands::covers::clear_base64_covers,
                     commands::covers::merge_duplicate_covers,
+                    commands::covers::extract_palette,
                     // Playlist commands
                     commands::create_playlist,
                     commands::get_playlists,
@@ -737,6 +738,7 @@ pub fn run() {
                     commands::covers::cleanup_orphaned_cover_files,
                     commands::covers::clear_base64_covers,
                     commands::covers::merge_duplicate_covers,
+                    commands::covers::extract_palette,
                     // Playlist commands
                     commands::create_playlist,
                     commands::get_playlists,

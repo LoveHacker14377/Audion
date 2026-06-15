@@ -995,3 +995,27 @@ pub async fn clear_base64_covers(db: State<'_, Database>) -> Result<usize, Strin
 
     Ok(total_cleared)
 }
+
+use color_thief::{get_palette, ColorFormat};
+
+#[tauri::command]
+pub fn extract_palette(image_bytes: Vec<u8>) -> Result<Vec<String>, String> {
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let img = img.thumbnail(100, 100);
+    let rgba = img.to_rgba8();
+
+    let palette = get_palette(rgba.as_raw(), ColorFormat::Rgba, 10, 8)
+        .map_err(|e| format!("{:?}", e))?;
+
+    let mut dark: Vec<(f32, String)> = palette
+        .iter()
+        .map(|c| {
+            let lum = (0.2126 * c.r as f32 + 0.7152 * c.g as f32 + 0.0722 * c.b as f32) / 255.0;
+            (lum, format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b))
+        })
+        .filter(|(lum, _)| *lum < 0.5)
+        .collect();
+
+    dark.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    Ok(dark.into_iter().map(|(_, hex)| hex).collect())
+}
