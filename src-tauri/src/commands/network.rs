@@ -6,12 +6,27 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// represents one field in a multipart/form-data body
+// Text fields: set value, leave filename/content_type/data_base64 as None
+// File fields: set filename, content_type, and data_base64 (base64-encoded bytes)
+#[derive(Debug, Deserialize)]
+pub struct FormPart {
+    pub name: String,
+    // for text parts
+    pub value: Option<String>,
+    // for file/blob parts
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+    pub data_base64: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ProxyFetchRequest {
     pub url: String,
     pub method: Option<String>,
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<String>,
+    pub form_data: Option<Vec<FormPart>>, // multipart/form-data parts
 }
 
 #[derive(Debug, Serialize)]
@@ -34,6 +49,8 @@ pub async fn proxy_fetch(request: ProxyFetchRequest) -> Result<ProxyFetchRespons
     let mut req_builder = client.request(method, &request.url);
 
     // Build a HeaderMap so custom headers override defaults
+    // do not set Content-Type here when sending multipart as reqwest sets it
+    // automatically with the correct boundary after .multipart is called
     let mut header_map = HeaderMap::new();
     header_map.insert("User-Agent",      HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
     header_map.insert("Accept",          HeaderValue::from_static("application/json, text/plain, */*"));
@@ -43,6 +60,13 @@ pub async fn proxy_fetch(request: ProxyFetchRequest) -> Result<ProxyFetchRespons
     // Custom headers override defaults (replaces existing keys)
     if let Some(headers) = request.headers {
         for (key, value) in headers {
+            // skip Content-Type when multipart is present as reqwest owns that header
+            if request.form_data.is_some() {
+                let lower = key.to_lowercase();
+                if lower == "content-type" {
+                    continue;
+                }
+            }
             if let (Ok(name), Ok(val)) = (
                 HeaderName::from_bytes(key.as_bytes()),
                 HeaderValue::from_str(&value),
@@ -54,8 +78,39 @@ pub async fn proxy_fetch(request: ProxyFetchRequest) -> Result<ProxyFetchRespons
 
     req_builder = req_builder.headers(header_map);
 
-    // Add body if present
-    if let Some(body) = request.body {
+    // multipart body takes priority over plain string body
+    if let Some(parts) = request.form_data {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+
+        let mut form = reqwest::multipart::Form::new();
+
+        for part in parts {
+            if let Some(data_b64) = part.data_base64 {
+                // File/blob part
+                let bytes = STANDARD
+                    .decode(&data_b64)
+                    .map_err(|e| format!("Invalid base64 in form part '{}': {}", part.name, e))?;
+
+                let mut mp = reqwest::multipart::Part::bytes(bytes);
+
+                if let Some(filename) = part.filename {
+                    mp = mp.file_name(filename);
+                }
+                if let Some(ct) = part.content_type {
+                    mp = mp.mime_str(&ct)
+                        .map_err(|e| format!("Invalid MIME type in part '{}': {}", part.name, e))?;
+                }
+
+                form = form.part(part.name, mp);
+            } else if let Some(value) = part.value {
+                // plain text part
+                form = form.text(part.name, value);
+            }
+            // if neither value nor data_base64 is set, skip the part
+        }
+
+        req_builder = req_builder.multipart(form);
+    } else if let Some(body) = request.body {
         req_builder = req_builder.body(body);
     }
 

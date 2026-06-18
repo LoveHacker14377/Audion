@@ -960,14 +960,65 @@ export class PluginRuntime {
 
     // Network API - CORS-free fetch (always available for plugins with network:fetch permission)
     if (this.hasPermission(pluginName, 'network:fetch')) {
-      api.fetch = async (url: string, options?: { method?: string; headers?: Record<string, string>; body?: string }) => {
+      api.fetch = async (
+        url: string,
+        options?: {
+          method?: string;
+          headers?: Record<string, string>;
+          body?: string | FormData;
+        }
+      ) => {
         try {
+          // serialize FormData into a flat list of parts for the Rust backend
+          // File/Blob entries are base64-encoded; text entries are passed as-is
+          let formDataParts: Array<{
+            name: string;
+            value?: string;
+            filename?: string;
+            content_type?: string;
+            data_base64?: string;
+          }> | null = null;
+
+          const rawFormData = options?.body instanceof FormData ? options.body : null;
+          if (rawFormData) {
+            formDataParts = await Promise.all(
+              Array.from(rawFormData.entries()).map(async ([name, value]: [string, FormDataEntryValue]) => {
+                if (value instanceof File) {
+                  const buffer = await value.arrayBuffer();
+                  const bytes = new Uint8Array(buffer);
+                  // btoa works on binary strings; convert Uint8Array -> binary string first
+                  const binary = bytes.reduce((acc, b) => acc + String.fromCharCode(b), '');
+                  return {
+                    name,
+                    filename: value.name,
+                    content_type: value.type || 'application/octet-stream',
+                    data_base64: btoa(binary),
+                  };
+                } else if ((value as any) instanceof Blob) {
+                  const blob = value as unknown as Blob;
+                  const buffer = await blob.arrayBuffer();
+                  const bytes = new Uint8Array(buffer);
+                  const binary = bytes.reduce((acc, b) => acc + String.fromCharCode(b), '');
+                  return {
+                    name,
+                    filename: 'blob',
+                    content_type: blob.type || 'application/octet-stream',
+                    data_base64: btoa(binary),
+                  };
+                } else {
+                  return { name, value };
+                }
+              })
+            );
+          }
+
           const result = await invoke<{ status: number; headers: Record<string, string>; body: string }>('proxy_fetch', {
             request: {
               url,
               method: options?.method || 'GET',
               headers: options?.headers || null,
-              body: options?.body || null
+              body: (typeof options?.body === 'string' ? options.body : null) || null,
+              form_data: formDataParts,
             }
           });
 
