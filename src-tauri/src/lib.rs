@@ -651,6 +651,7 @@ pub fn run() {
                     discord::discord_connect,
                     discord::discord_update_presence,
                     discord::discord_clear_presence,
+                    discord::discord_resolve_cover,
                     discord::discord_disconnect,
                     discord::discord_reconnect,
                     // =========================================================================

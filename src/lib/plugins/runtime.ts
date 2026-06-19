@@ -158,6 +158,30 @@ export type SearchSourceHandler = (
   onResult: (result: SearchResult) => void
 ) => void;
 
+// cover source types
+export interface CoverQuery {
+  title: string;
+  artist?: string;
+  album?: string;
+}
+
+export interface CoverResult {
+  sourceId: string;
+  status: 'success' | 'not_found' | 'error';
+  url?: string | null;
+  // optional priority hint
+  // lower = preferred. providers set this if they want to signal confidence
+  // the calling plugin decides what to do with it
+  priority?: number;
+  error?: Error;
+}
+
+// cover source handler must call onResult exactly once
+export type CoverSourceHandler = (
+  query: CoverQuery,
+  onResult: (result: CoverResult) => void
+) => void;
+
 export interface WasmPluginExports {
   init?: () => void;
   start?: () => void;
@@ -202,6 +226,10 @@ export class PluginRuntime {
   private searchSources: Map<string, SearchSourceHandler> = new Map();
   // track which plugin owns which source (for cleanup on unload)
   private searchSourceOwners: Map<string, string> = new Map(); // sourceId => pluginName
+
+  // cover sources: map of sourceId => handler function
+  private coverSources: Map<string, CoverSourceHandler> = new Map();
+  private coverSourceOwners: Map<string, string> = new Map(); // sourceId => pluginName
 
   // permission manager
   permissionManager: PluginPermissionManager;
@@ -958,6 +986,67 @@ export class PluginRuntime {
       }
     };
 
+    // cover fetch api => fan a cover query out to all registered cover providers
+    // providers register via api.covers.registerSource; callers use api.covers.query
+    api.covers = {
+      // register this plugin as a cover provider
+      // handler(query, onResult) must call onResult exactly once
+      registerSource: (sourceId: string, handler: CoverSourceHandler) => {
+        if (this.coverSources.has(sourceId)) {
+          console.warn(`[PluginRuntime] Cover source '${sourceId}' is already registered; overwriting (previous owner: '${this.coverSourceOwners.get(sourceId)}')`);
+        }
+        this.coverSources.set(sourceId, handler);
+        this.coverSourceOwners.set(sourceId, pluginName);
+        console.log(`[PluginRuntime] Registered cover source '${sourceId}' from plugin '${pluginName}'`);
+      },
+
+      // unregister this plugin's cover source
+      // only the owning plugin can remove its own source
+      unregisterSource: (sourceId: string) => {
+        if (this.coverSourceOwners.get(sourceId) !== pluginName) {
+          console.warn(`[PluginRuntime] Plugin '${pluginName}' tried to unregister cover source '${sourceId}' it does not own`);
+          return;
+        }
+        this.coverSources.delete(sourceId);
+        this.coverSourceOwners.delete(sourceId);
+        console.log(`[PluginRuntime] Unregistered cover source '${sourceId}' from plugin '${pluginName}'`);
+      },
+
+      // fan a cover query out to every registered provider in parallel
+      // onResult is called once per provider (status: success, not_found, or error)
+      // onAllDone is called once after every provider has reported back
+      // if no providers are registered, onAllDone is called immediately
+      query: (
+        query: CoverQuery,
+        onResult: (result: CoverResult) => void,
+        onAllDone: () => void
+      ) => {
+        if (this.coverSources.size === 0) {
+          console.warn(`[PluginRuntime] covers.query called by '${pluginName}' but no cover sources are registered`);
+          onAllDone();
+          return;
+        }
+
+        const pending = new Set(this.coverSources.keys());
+
+        for (const [sourceId, handler] of this.coverSources) {
+          const wrappedOnResult = (result: CoverResult) => {
+            result.sourceId = sourceId;
+            onResult(result);
+            pending.delete(sourceId);
+            if (pending.size === 0) onAllDone();
+          };
+
+          try {
+            handler(query, wrappedOnResult);
+          } catch (err) {
+            console.error(`[PluginRuntime] Cover source '${sourceId}' threw synchronously:`, err);
+            wrappedOnResult({ sourceId, status: 'error', error: err as Error });
+          }
+        }
+      }
+    };
+
     // Network API - CORS-free fetch (always available for plugins with network:fetch permission)
     if (this.hasPermission(pluginName, 'network:fetch')) {
       api.fetch = async (
@@ -1055,13 +1144,18 @@ export class PluginRuntime {
         }
       },
       updatePresence: async (data: {
-        song_title: string;
-        artist: string;
-        album?: string | null;
+        line1: string;
+        line2: string;
+        line3?: string | null;
+        app_name?: string | null;
+        status_display_type: string;
         cover_url?: string | null;
         current_time?: number;
         duration?: number;
         is_playing: boolean;
+        show_pause_icon?: boolean;
+        track_id?: number | null;
+        track_cover_path?: string | null;
       }) => {
         try {
           return await invoke('discord_update_presence', { data });
@@ -1092,6 +1186,14 @@ export class PluginRuntime {
         } catch (error) {
           console.error('[PluginRuntime] Discord reconnect failed:', error);
           throw error;
+        }
+      },
+      resolveCover: async (trackId: number, trackCoverPath: string): Promise<string | null> => {
+        try {
+          return await invoke('discord_resolve_cover', { trackId, trackCoverPath });
+        } catch (error) {
+          console.error('[PluginRuntime] Discord resolve cover failed:', error);
+          return null;
         }
       }
     };
@@ -1261,6 +1363,15 @@ export class PluginRuntime {
         }
       });
 
+      // unregister cover sources owned by this plugin
+      this.coverSourceOwners.forEach((owner, sourceId) => {
+        if (owner === name) {
+          this.coverSources.delete(sourceId);
+          this.coverSourceOwners.delete(sourceId);
+          console.log(`[PluginRuntime] Unregistered cover source '${sourceId}' (plugin '${name}' unloaded)`);
+        }
+      });
+
       // 6. Reset and clear rate limiters
       plugin.rateLimiters.api.reset();
       plugin.rateLimiters.storage.reset();
@@ -1412,6 +1523,37 @@ export class PluginRuntime {
           handler(query, wrappedOnResult);
         } catch (err) {
           console.error(`[PluginRuntime] Search source '${sourceId}' threw synchronously:`, err);
+          wrappedOnResult({ sourceId, status: 'error', error: err as Error });
+        }
+      }
+    });
+  }
+
+  // fan a cover query out to all registered cover sources
+  // returns a Promise that resolves with all results once every source has reported back
+  resolveCover(query: CoverQuery): Promise<CoverResult[]> {
+    return new Promise((resolve) => {
+      const collected: CoverResult[] = [];
+      const pending = new Set(this.coverSources.keys());
+
+      if (pending.size === 0) {
+        console.warn(`[PluginRuntime] resolveCover called but no cover sources are registered`);
+        resolve(collected);
+        return;
+      }
+
+      for (const [sourceId, handler] of this.coverSources) {
+        const wrappedOnResult = (result: CoverResult) => {
+          result.sourceId = sourceId;
+          collected.push(result);
+          pending.delete(sourceId);
+          if (pending.size === 0) resolve(collected);
+        };
+
+        try {
+          handler(query, wrappedOnResult);
+        } catch (err) {
+          console.error(`[PluginRuntime] Cover source '${sourceId}' threw synchronously:`, err);
           wrappedOnResult({ sourceId, status: 'error', error: err as Error });
         }
       }

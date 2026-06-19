@@ -379,6 +379,7 @@ export async function initAudioBackend(): Promise<void> {
 
     isPlaying.subscribe((playing) => {
         _syncTickers(playing, get(activeBackend));
+        pluginEvents.emit('playStateChange', { isPlaying: playing });
     });
 
     activeBackend.subscribe((backend) => {
@@ -1231,10 +1232,12 @@ export async function seek(position: number): Promise<void> {
     }
 
     try {
+        const dur = get(duration);
+        const targetSecs = position * dur;
+
         if (get(activeBackend) === 'html5') {
             html5Seek(position);
         } else if (get(activeBackend) === 'native') {
-            const targetSecs = position * get(duration);
             await nativeAudioSeek(position);
             // immediately snap reckoning to the target
             // backend confirms the actual keyframe position via StateChanged after this
@@ -1247,6 +1250,7 @@ export async function seek(position: number): Promise<void> {
         }
         updateMediaSessionPosition();
         broadcastState(true);
+        pluginEvents.emit('seeked', { currentTime: targetSecs, duration: dur });
     } catch (err) {
         console.error('[Player] Seek failed:', err);
     }

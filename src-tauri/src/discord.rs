@@ -40,6 +40,99 @@ fn sanitize_text(input: &str, fallback: &str) -> String {
     result
 }
 
+/// upload a local cover image file to catbox.moe and return the resulting URL
+async fn upload_cover_to_catbox(path: &str) -> Result<String, String> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| format!("Failed to read cover file '{}': {}", path, e))?;
+
+    let ext = path.rsplit('.').next().unwrap_or("jpg").to_lowercase();
+    let (mime, file_name) = match ext.as_str() {
+        "jpg" | "jpeg" => ("image/jpeg", "cover.jpg".to_string()),
+        "png"          => ("image/png",  "cover.png".to_string()),
+        "webp"         => ("image/webp", "cover.webp".to_string()),
+        _              => ("image/jpeg", "cover.jpg".to_string()),
+    };
+
+    let form = reqwest::multipart::Form::new()
+        .text("reqtype", "fileupload")
+        .part(
+            "fileToUpload",
+            reqwest::multipart::Part::bytes(bytes)
+                .file_name(file_name)
+                .mime_str(mime)
+                .map_err(|e| format!("Invalid MIME type: {}", e))?,
+        );
+
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (compatible; local/1.0)")
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let response = client
+        .post("https://catbox.moe/user/api.php")
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| {
+            let mut msg = format!("Catbox upload request failed: {}", e);
+            let mut source = std::error::Error::source(&e);
+            while let Some(cause) = source {
+                msg.push_str(&format!(" | caused by: {}", cause));
+                source = std::error::Error::source(cause);
+            }
+            msg
+        })?;
+
+    let url = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read catbox response: {}", e))?
+        .trim()
+        .to_string();
+
+    if url.starts_with("https://") {
+        Ok(url)
+    } else {
+        Err(format!("Catbox returned unexpected response: {}", url))
+    }
+}
+
+/// check DB cache for a previously uploaded cover URL,
+/// upload to catbox if not cached, persist the result, and return it
+/// used by both discord_resolve_cover and discord_update_presence
+async fn resolve_cover_cached(
+    db: &crate::db::Database,
+    track_id: i64,
+    cover_path: &str,
+) -> Option<String> {
+    let cached = {
+        let conn = db.conn.lock().ok()?;
+        crate::db::queries::get_track_by_id(&conn, track_id)
+            .ok()
+            .flatten()
+            .and_then(|t| t.cover_url)
+            .filter(|u| u.starts_with("https://"))
+    };
+
+    if let Some(url) = cached {
+        return Some(url);
+    }
+
+    match upload_cover_to_catbox(cover_path).await {
+        Ok(url) => {
+            if let Ok(conn) = db.conn.lock() {
+                if let Err(e) = crate::db::queries::update_track_cover_url(&conn, track_id, Some(&url)) {
+                    tracing::warn!("[Discord RPC] Failed to persist cover URL for track {}: {}", track_id, e);
+                }
+            }
+            Some(url)
+        }
+        Err(e) => {
+            tracing::warn!("[Discord RPC] Cover upload failed for track {}: {}", track_id, e);
+            None
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PresenceData {
     pub line1: String,
@@ -53,6 +146,22 @@ pub struct PresenceData {
     pub is_playing: bool,
     #[serde(default)]
     pub show_pause_icon: bool,
+    // local cover fields => used to upload cover art to catbox for discord display
+    // track_cover_path is the raw filesystem path (not an asset:// URL)
+    pub track_id: Option<i64>,
+    pub track_cover_path: Option<String>,
+}
+
+/// resolve and return the cover URL for a local track
+/// checks the DB cache first; if not present, uploads to catbox and persists the result
+/// called by the plugin when it needs the cover URL to enter the cover race on first play
+#[tauri::command]
+pub async fn discord_resolve_cover(
+    db: State<'_, crate::db::Database>,
+    track_id: i64,
+    track_cover_path: String,
+) -> Result<Option<String>, String> {
+    Ok(resolve_cover_cached(&db, track_id, &track_cover_path).await)
 }
 
 #[tauri::command]
@@ -81,10 +190,34 @@ pub fn discord_connect(state: State<DiscordState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn discord_update_presence(
-    state: State<DiscordState>,
+pub async fn discord_update_presence(
+    state: State<'_, DiscordState>,
+    db: State<'_, crate::db::Database>,
     data: PresenceData,
 ) -> Result<String, String> {
+
+    // -------------------------------------------------------------------------
+    // resolve cover URL
+    // priority:
+    // 1. data.cover_url is already a valid https URL => use it directly
+    // 2. track_id + track_cover_path provided => check DB cache, else upload
+    // 3. Nothing available => fall back to Audion logo in Discord
+    // -------------------------------------------------------------------------
+    let resolved_cover: Option<String> = if let Some(ref url) = data.cover_url {
+        if url.starts_with("https://") {
+            Some(url.clone())
+        } else {
+            None
+        }
+    } else if let (Some(track_id), Some(ref cover_path)) = (data.track_id, &data.track_cover_path) {
+        resolve_cover_cached(&db, track_id, cover_path).await
+    } else {
+        None
+    };
+
+    // -------------------------------------------------------------------------
+    // build and send discord activity
+    // -------------------------------------------------------------------------
     let mut client_guard = state
         .0
         .lock()
@@ -163,22 +296,13 @@ pub fn discord_update_presence(
             sanitize_text(&data.line1, "Unknown")
         };
 
-        if let Some(cover) = &data.cover_url {
-            if is_valid_url(cover) {
-                if data.is_playing || !data.show_pause_icon {
-                    assets = assets.large_image(cover).large_text(&large_text_content);
-                } else {
-                    assets = assets.large_image(cover).large_text("⏸ ");
-                }
+        if let Some(ref cover) = resolved_cover {
+            if data.is_playing || !data.show_pause_icon {
+                assets = assets.large_image(cover).large_text(&large_text_content);
             } else {
-                // Invalid URL → fallback to logo
-                assets = assets
-                    .large_image("audion_logo")
-                    .large_text(&large_text_content);
-                large_is_audion_logo = true;
+                assets = assets.large_image(cover).large_text("⏸ ");
             }
         } else {
-            // Cover failed → fallback
             assets = assets
                 .large_image("audion_logo")
                 .large_text(&large_text_content);
