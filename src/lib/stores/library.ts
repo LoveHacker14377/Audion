@@ -609,22 +609,12 @@ export async function loadLibrary(): Promise<void> {
     lastError.set(null);
 
     try {
-        console.log('[Library] loadLibrary START');
-
-        console.log('[Library] calling getLibrary()...');
-        const libraryPromise = getLibrary().then(r => { console.log('[Library] getLibrary() resolved'); return r; });
-
-        console.log('[Library] calling getTracksPaginated()...');
-        const tracksPromise = getTracksPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0).then(r => { console.log('[Library] getTracksPaginated() resolved'); return r; });
-
-        console.log('[Library] calling getAlbumsPaginated()...');
-        const albumsPromise = getAlbumsPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0).then(r => { console.log('[Library] getAlbumsPaginated() resolved'); return r; });
-
-        console.log('[Library] awaiting Promise.all...');
+        console.time('[Library] IPC load initial');
         const [library, initialTracks, initialAlbums] = await Promise.all([
-            libraryPromise, tracksPromise, albumsPromise
-        ]);
-        console.log(`[Library] Promise.all resolved — tracks: ${initialTracks.length}, albums: ${initialAlbums.length}, artists: ${library.artists.length}`);
+            getLibrary(),
+            getTracksPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0),
+            getAlbumsPaginated(CACHE_CONFIG.TRACK_BATCH_SIZE, 0)  // Paginated albums
+        ]);    
 
         console.timeEnd('[Library] IPC load initial');
 
@@ -782,12 +772,10 @@ export async function loadAlbumsAndArtists(): Promise<void> {
 // PLAYLISTS
 export async function loadPlaylists(): Promise<void> {
     try {
-        console.log('[Library] loadPlaylists START');
         const playlistList = await getPlaylists();
-        console.log(`[Library] loadPlaylists resolved — count: ${playlistList.length}`);
         playlists.set(playlistList);
     } catch (error) {
-        console.error('[Library] loadPlaylists ERROR:', error);
+        console.error('Failed to load playlists:', error);
     }
 }
 
