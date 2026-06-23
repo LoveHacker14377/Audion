@@ -1012,7 +1012,11 @@
             </div>
 
             <div class="shortcut-hint">
-              <span class="setting-description">{$_('settings.shortcutsHint', { default: 'Tip: you can also open this anytime by pressing' })}</span>
+              <span class="setting-description">
+                {$appSettings.shortcutsEnabled
+                  ? $_('settings.shortcutsHint', { default: 'Tip: you can also open this anytime by pressing' })
+                  : $_('settings.shortcutsDisabledHint', { default: 'Enable keyboard shortcuts to use Shift + / quick help' })}
++             </span>
               <span class="key-combo">
                 <kbd class="key">Shift</kbd>
                 <span class="key-plus">+</span>
