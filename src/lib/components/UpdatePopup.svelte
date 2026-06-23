@@ -2,13 +2,40 @@
     import { createEventDispatcher } from "svelte";
     import { openUrl } from "@tauri-apps/plugin-opener";
     import { marked } from "marked";
+    import { applyUpdateAndRelaunch } from "$lib/stores/otaUpdate";
 
     export let release: any = null;
+    /**
+     * when true, the update is already installed on disk and we just need a restart
+     * shows Restart Now / Later instead of download buttons
+     */
+    export let otaReady: boolean = false;
 
     const dispatch = createEventDispatcher();
 
+    let isRelaunching = false;
+
     function close() {
         dispatch("close");
+    }
+
+    async function handleRestartNow() {
+        isRelaunching = true;
+        try {
+            await applyUpdateAndRelaunch({
+                version: release?.tag_name ?? '',
+                body: release?.body ?? null,
+                date: release?.published_at ?? null,
+            });
+        } catch (e) {
+            console.error("Failed to relaunch:", e);
+            isRelaunching = false;
+        }
+    }
+
+    function handleLater() {
+        // update stays installed=> will apply on next natural startup.
+        close();
     }
 
     function formatDate(dateString: string) {
@@ -41,34 +68,44 @@
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div class="modal-overlay" on:click={close}>
+<div class="modal-overlay" on:click={otaReady ? undefined : close}>
     <div class="modal-content" on:click|stopPropagation>
         <div class="modal-header">
             <div class="header-info">
                 <h2>
-                    {release?.name || release?.tag_name || "Update Available"}
+                    {#if otaReady}
+                        Restart to update
+                    {:else}
+                        {release?.name || release?.tag_name || "Update Available"}
+                    {/if}
                 </h2>
                 <div class="meta">
                     <span class="tag">{release?.tag_name}</span>
-                    <span class="date">{formatDate(release?.published_at)}</span
-                    >
+                    {#if release?.published_at}
+                        <span class="date">{formatDate(release?.published_at)}</span>
+                    {/if}
+                    {#if otaReady}
+                        <span class="ota-badge">Installed · restart required</span>
+                    {/if}
                 </div>
             </div>
-            <button class="close-btn" on:click={close}>
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    width="24"
-                    height="24"
-                >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
+            {#if !otaReady}
+                <button class="close-btn" on:click={close}>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        width="24"
+                        height="24"
+                    >
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            {/if}
         </div>
 
         <div class="modal-body">
@@ -76,9 +113,35 @@
                 <div class="release-notes markdown-content">
                     {@html marked.parse(release.body)}
                 </div>
+            {:else}
+                <p class="no-notes">No release notes available.</p>
             {/if}
 
-            {#if release?.assets && release.assets.length > 0}
+            {#if otaReady}
+                <div class="ota-actions">
+                    <p class="ota-hint">
+                        The update has been installed in the background. Restart
+                        now to start using the new version, or keep listening and
+                        it will apply the next time you open Audion.
+                    </p>
+                    <div class="ota-buttons">
+                        <button
+                            class="btn-restart"
+                            on:click={handleRestartNow}
+                            disabled={isRelaunching}
+                        >
+                            {#if isRelaunching}
+                                Restarting…
+                            {:else}
+                                Restart Now
+                            {/if}
+                        </button>
+                        <button class="btn-later" on:click={handleLater}>
+                            Later
+                        </button>
+                    </div>
+                </div>
+            {:else if release?.assets && release.assets.length > 0}
                 <div class="assets-section">
                     <h3>Assets</h3>
                     <div class="assets-list">
@@ -354,4 +417,83 @@
         border-color: var(--accent-primary);
         color: white;
     }
+
+    .no-notes {
+        font-size: 0.875rem;
+        color: var(--text-subdued);
+        font-style: italic;
+        margin: 0 0 var(--spacing-md);
+    }
+
+    /* ── OTA restart mode ── */
+
+    .ota-badge {
+        background-color: color-mix(in srgb, var(--accent-primary), transparent 82%);
+        color: var(--accent-primary);
+        border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 65%);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .ota-actions {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+
+    .ota-hint {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    .ota-buttons {
+        display: flex;
+        gap: var(--spacing-sm);
+        flex-wrap: wrap;
+    }
+
+    .btn-restart {
+        flex: 1;
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #000;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.15s;
+    }
+
+    .btn-restart:hover:not(:disabled) {
+        background-color: var(--accent-hover);
+        transform: translateY(-1px);
+    }
+
+    .btn-restart:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .btn-later {
+        padding: 10px 20px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .btn-later:hover {
+        background-color: var(--bg-highlight);
+        color: var(--text-primary);
+    }
+
 </style>

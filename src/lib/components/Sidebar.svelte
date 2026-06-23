@@ -54,7 +54,7 @@
     import { uiSlotManager } from "$lib/plugins/ui-slots";
 
     import { updates } from "$lib/stores/updates";
-    import { checkAndInstallUpdate, consumePendingUpdateNotes, supportsOta } from "$lib/stores/otaUpdate";
+    import { checkAndInstallUpdate, consumePendingUpdateNotes, getUpdateReady, otaUpdateReady, supportsOta } from "$lib/stores/otaUpdate";
     import UpdatePopup from "./UpdatePopup.svelte";
     import SyncStatus from "./SyncStatus.svelte";
 
@@ -80,6 +80,7 @@
     let scanError: string | null = null;
     let showUpdatePopup = false;
     let popupRelease: any = null;
+    let popupOtaReady = false;
 
     // Slot containers
     let slotTop: HTMLDivElement;
@@ -370,16 +371,25 @@
     onMount(() => {
         const pending = consumePendingUpdateNotes();
         if (pending) {
+            // just relaunched after an OTA update => show what changed
             popupRelease = {
                 tag_name: pending.version,
                 name: `Version ${pending.version}`,
-                body: pending.body ?? '',
+                body: pending.body ?? null,
                 published_at: pending.date ?? '',
                 assets: [],
             };
+            popupOtaReady = false;
             showUpdatePopup = true;
         } else if (supportsOta()) {
-            checkAndInstallUpdate();
+            // restore store from localStorage in case we navigated away mid-session
+            const alreadyReady = getUpdateReady();
+            if (alreadyReady) {
+                otaUpdateReady.set(alreadyReady);
+            } else {
+                // background download => updates the store if something installs
+                checkAndInstallUpdate();
+            }
         } else {
             updates.checkUpdate();
         }
@@ -403,11 +413,32 @@
             <img src="/logo.png" alt="Audion Logo" width="32" height="32" />
             <span class="logo-text">Audion</span>
             <SyncStatus />
-            {#if $updates.hasUpdate}
+            {#if $otaUpdateReady}
+                <div
+                    class="update-badge restart-badge"
+                    title="Update installed · click to restart"
+                    on:click={() => {
+                        popupRelease = {
+                            tag_name: $otaUpdateReady?.version,
+                            name: `Version ${$otaUpdateReady?.version}`,
+                            body: $otaUpdateReady?.body ?? null,
+                            published_at: $otaUpdateReady?.date ?? '',
+                            assets: [],
+                        };
+                        popupOtaReady = true;
+                        showUpdatePopup = true;
+                    }}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => e.key === "Enter" && (showUpdatePopup = true)}
+                >
+                    Restart
+                </div>
+            {:else if $updates.hasUpdate}
                 <div
                     class="update-badge"
                     title="View update details"
-                    on:click={() => { popupRelease = $updates.latestRelease; showUpdatePopup = true; }}
+                    on:click={() => { popupRelease = $updates.latestRelease; popupOtaReady = false; showUpdatePopup = true; }}
                     role="button"
                     tabindex="0"
                     on:keydown={(e) =>
@@ -822,7 +853,7 @@
 </aside>
 
 {#if showUpdatePopup && popupRelease}
-    <UpdatePopup release={popupRelease} on:close={() => (showUpdatePopup = false)} />
+    <UpdatePopup release={popupRelease} otaReady={popupOtaReady} on:close={() => (showUpdatePopup = false)} />
 {/if}
 
 <style>
@@ -880,6 +911,17 @@
         color: var(--bg-base);
         transform: translateY(-1px);
         box-shadow: 0 2px 8px var(--accent-subtle);
+    }
+
+    .restart-badge {
+        background-color: color-mix(in srgb, var(--accent-primary), transparent 75%);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .restart-badge:hover {
+        background-color: var(--accent-primary);
+        color: var(--bg-base);
     }
 
     @keyframes glow {

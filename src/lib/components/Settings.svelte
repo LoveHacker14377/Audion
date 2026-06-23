@@ -4,6 +4,7 @@
   import { equalizer, EQ_PRESETS } from "$lib/stores/equalizer";
   import { _, locale } from "svelte-i18n";
   import { updates } from "$lib/stores/updates";
+  import { otaUpdateReady } from "$lib/stores/otaUpdate";
   import {
     resetDatabase,
     pickFolder,
@@ -60,6 +61,8 @@
 
   let customColorInput = "#1DB954";
   let showUpdatePopup = false;
+  let updatePopupOtaReady = false;
+  let updatePopupRelease: any = null;
 
   // Database reset state
   let showResetModal = false;
@@ -216,6 +219,11 @@
   let unlistenMerge: UnlistenFn | null = null;
 
   onMount(async () => {
+    // consumePendingUpdateNotes and checkAndInstallUpdate
+    // are intentionally called only from Sidebar, which is always mounted at startup
+    // settings subscribes to otaUpdateReady (a shared store) instead of
+    // reading localStorage directly, to avoid consuming the key here
+
     // Listen for migration events (used by sync)
     unlistenSync = await listen("migration-batch-ready", (event) => {
       const data = event.payload as { progress: MigrationProgressUpdate };
@@ -1620,8 +1628,29 @@
               <span class="setting-description">{$_('settings.modernPlayerDesc', { default: 'Modern player powered by Tauri and Svelte' })}</span>
             </div>
           </div>
-          {#if $updates.hasUpdate}
-            <button class="btn-green-compact" on:click={() => (showUpdatePopup = true)} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
+          {#if $otaUpdateReady}
+            <div class="restart-notice">
+              <div class="restart-notice-text">
+                <span class="setting-title" style="color: var(--accent-primary)">Restart required</span>
+                <span class="setting-description">Version {$otaUpdateReady.version} has been installed in the background.</span>
+              </div>
+              <button
+                class="btn-restart-compact"
+                on:click={() => {
+                  updatePopupRelease = {
+                    tag_name: $otaUpdateReady?.version,
+                    name: `Version ${$otaUpdateReady?.version}`,
+                    body: $otaUpdateReady?.body ?? null,
+                    published_at: $otaUpdateReady?.date ?? '',
+                    assets: [],
+                  };
+                  updatePopupOtaReady = true;
+                  showUpdatePopup = true;
+                }}
+              >Restart to Update</button>
+            </div>
+          {:else if $updates.hasUpdate}
+            <button class="btn-green-compact" on:click={() => { updatePopupRelease = $updates.latestRelease; updatePopupOtaReady = false; showUpdatePopup = true; }} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
           {/if}
         </div>
       </section>
@@ -1629,9 +1658,10 @@
   </div>
 </div>
 
-{#if showUpdatePopup && $updates.latestRelease}
+{#if showUpdatePopup && updatePopupRelease}
   <UpdatePopup
-    release={$updates.latestRelease}
+    release={updatePopupRelease}
+    otaReady={updatePopupOtaReady}
     on:close={() => (showUpdatePopup = false)}
   />
 {/if}
@@ -2209,6 +2239,46 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+  }
+
+  /* OTA restart notice in About section */
+  .restart-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: color-mix(in srgb, var(--accent-primary), transparent 88%);
+    border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 70%);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-xs);
+    flex-wrap: wrap;
+  }
+
+  .restart-notice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .btn-restart-compact {
+    padding: 8px 16px;
+    background-color: var(--accent-primary);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .btn-restart-compact:hover {
+    background-color: var(--accent-hover);
+    transform: translateY(-1px);
   }
 
   .app-logo-sm {
