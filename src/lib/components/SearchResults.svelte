@@ -41,6 +41,20 @@
     export let sectionOrder: SectionKey[];
     export let hiddenSections: Set<SectionKey>;
 
+    // per-section visible counts (reset when search results change)
+    let visibleTracks = 10;
+    let visibleAlbums = 6;
+    let visibleArtists = 6;
+    let visiblePlaylists = 6;
+
+    $: $searchResults, resetVisible();
+    function resetVisible() {
+        visibleTracks = 10;
+        visibleAlbums = 6;
+        visibleArtists = 6;
+        visiblePlaylists = 6;
+    }
+
     // Helper functions for playlist covers
     function initialsFromName(name: string) {
         if (!name) return "PL";
@@ -335,7 +349,7 @@
                             </button>
                         </h2>
                         <div class="tracks-list">
-                            {#each $searchResults.tracks.slice(0, 10) as track, index}
+                            {#each $searchResults.tracks.slice(0, visibleTracks) as track, index}
                                 {@const albumArt = getTrackArt(track)}
                                 <div
                                     class="track-item"
@@ -388,10 +402,10 @@
                                     </div>
                                 </div>
                             {/each}
-                            {#if $searchResults.tracks.length > 10}
-                                <p class="more-results">
-                                    And {$searchResults.tracks.length - 10} more tracks...
-                                </p>
+                            {#if $searchResults.tracks.length > visibleTracks}
+                                <button class="load-more" on:click={() => visibleTracks += 10}>
+                                    Load more ({$searchResults.tracks.length - visibleTracks} left)
+                                </button>
                             {/if}
                         </div>
                     </section>
@@ -405,7 +419,7 @@
                             </button>
                         </h2>
                         <div class="albums-grid">
-                            {#each $searchResults.albums.slice(0, 6) as album}
+                            {#each $searchResults.albums.slice(0, visibleAlbums) as album}
                                 {@const coverSrc = getAlbumCover(album)}
                                 <div
                                     class="album-card"
@@ -459,6 +473,11 @@
                                 </div>
                             {/each}
                         </div>
+                        {#if $searchResults.albums.length > visibleAlbums}
+                            <button class="load-more" on:click={() => visibleAlbums += 6}>
+                                Load more ({$searchResults.albums.length - visibleAlbums} left)
+                            </button>
+                        {/if}
                     </section>
 
                 {:else if key === "artists" && $searchResults.artists.length > 0}
@@ -470,7 +489,7 @@
                             </button>
                         </h2>
                         <div class="artists-grid">
-                            {#each $searchResults.artists.slice(0, 6) as artist}
+                            {#each $searchResults.artists.slice(0, visibleArtists) as artist}
                                 <button
                                     class="artist-card"
                                     on:click={() => handleArtistClick(artist.name)}
@@ -494,6 +513,11 @@
                                 </button>
                             {/each}
                         </div>
+                        {#if $searchResults.artists.length > visibleArtists}
+                            <button class="load-more" on:click={() => visibleArtists += 6}>
+                                Load more ({$searchResults.artists.length - visibleArtists} left)
+                            </button>
+                        {/if}
                     </section>
 
                 {:else if key === "playlists" && $searchResults.playlists?.length > 0}
@@ -505,7 +529,7 @@
                             </button>
                         </h2>
                         <div class="playlists-grid">
-                            {#each $searchResults.playlists.slice(0, 6) as playlist}
+                            {#each $searchResults.playlists.slice(0, visiblePlaylists) as playlist}
                                 {@const coverSrc = getPlaylistCover(playlist)}
                                 <button
                                     class="playlist-card"
@@ -527,6 +551,11 @@
                                 </button>
                             {/each}
                         </div>
+                        {#if $searchResults.playlists.length > visiblePlaylists}
+                            <button class="load-more" on:click={() => visiblePlaylists += 6}>
+                                Load more ({$searchResults.playlists.length - visiblePlaylists} left)
+                            </button>
+                        {/if}
                     </section>
                 {/if}
             {/if}
@@ -698,10 +727,19 @@
         color: var(--text-secondary);
     }
 
-    .more-results {
+    .load-more {
+        display: block;
+        background: none;
+        border: none;
+        padding: var(--spacing-sm);
         font-size: var(--font-size-base);
         color: var(--text-subdued);
-        padding: var(--spacing-sm);
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .load-more:hover {
+        color: var(--text-secondary);
     }
 
     /* Albums Grid */
