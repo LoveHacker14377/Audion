@@ -129,12 +129,22 @@
     let unsubscribeBindings: () => void;
     let unsubscribeSettings: () => void;
 
+    // serialize all syncGlobalShortcuts calls so overlapping invocations
+    // (from rapid binding/toggle changes) can't interleave their
+    // register/unregister awaits and corrupt `registeredGlobals`
+    let syncQueue: Promise<void> = Promise.resolve();
+    function queueSync(bindings: ShortcutBinding[]) {
+        syncQueue = syncQueue
+            .then(() => syncGlobalShortcuts(bindings))
+            .catch(err => console.warn("[Shortcuts] sync failed:", err));
+    }
+
     onMount(async () => {
         await loadPlugin();
 
         // re-sync global shortcuts whenever bindings change
         unsubscribeBindings = shortcutBindings.subscribe(bindings => {
-            syncGlobalShortcuts(bindings);
+            queueSync(bindings);
         });
 
         // re-sync global shortcuts whenever the master enable/disable toggle changes
@@ -142,7 +152,7 @@
         unsubscribeSettings = appSettings.subscribe(settings => {
             if (settings.shortcutsEnabled !== lastShortcutsEnabled) {
                 lastShortcutsEnabled = settings.shortcutsEnabled;
-                syncGlobalShortcuts(get(shortcutBindings));
+                queueSync(get(shortcutBindings));
             }
         });
     });
@@ -150,6 +160,9 @@
     onDestroy(async () => {
         unsubscribeBindings?.();
         unsubscribeSettings?.();
+
+        // make sure any in-flight sync finishes before we unregister everything
+        await syncQueue;
 
         // unregister all globals on component teardown
         if (globalShortcutPlugin && registeredGlobals.size > 0) {
