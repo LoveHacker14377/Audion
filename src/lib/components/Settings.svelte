@@ -1631,8 +1631,8 @@
           {#if $otaUpdateReady}
             <div class="restart-notice">
               <div class="restart-notice-text">
-                <span class="setting-title" style="color: var(--accent-primary)">Restart required</span>
-                <span class="setting-description">Version {$otaUpdateReady.version} has been installed in the background.</span>
+                <span class="setting-title" style="color: var(--accent-primary)">{$_('settings.restartRequired')}</span>
+                <span class="setting-description">{$_('settings.restartRequiredDesc', { values: { version: $otaUpdateReady.version } })}</span>
               </div>
               <button
                 class="btn-restart-compact"
@@ -1647,7 +1647,7 @@
                   updatePopupOtaReady = true;
                   showUpdatePopup = true;
                 }}
-              >Restart to Update</button>
+              >{$_('settings.restartToUpdate')}</button>
             </div>
           {:else if $updates.hasUpdate}
             <button class="btn-green-compact" on:click={() => { updatePopupRelease = $updates.latestRelease; updatePopupOtaReady = false; showUpdatePopup = true; }} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>

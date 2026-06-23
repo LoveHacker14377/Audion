@@ -432,7 +432,7 @@
                     tabindex="0"
                     on:keydown={(e) => e.key === "Enter" && (showUpdatePopup = true)}
                 >
-                    Restart
+                    {$_('sidebar.restart')}
                 </div>
             {:else if $updates.hasUpdate}
                 <div

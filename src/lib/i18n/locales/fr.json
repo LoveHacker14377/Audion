@@ -87,7 +87,9 @@
     "plugins": "Plugins",
     "community": "Communauté",
     "joinDiscord": "Rejoindre Discord",
-    "addMusicFolder": "Ajouter un dossier"
+    "resonate": "Playlists Resonate",
+    "addMusicFolder": "Ajouter un dossier",
+    "restart": "Redémarrer"
   },
   "settings": {
     "title": "Paramètres",
@@ -148,6 +150,8 @@
     "remove": "Supprimer",
     "discordButton": "Bouton Discord",
     "openDiscord": "Ouvrir Discord",
+    "resonateButton": "Bouton Resonate",
+    "openResonate": "Ouvrir Resonate",
     "appearance": "Apparence",
     "selectLanguage": "Langue",
     "themeMode": "Mode de thème",
@@ -178,6 +182,9 @@
     "about": "À propos",
     "modernPlayerDesc": "Lecteur moderne propulsé par Tauri et Svelte",
     "updateAvailable": "Mise à jour disponible",
+    "restartRequired": "Redémarrage requis",
+    "restartRequiredDesc": "La version {version} a été installée en arrière-plan.",
+    "restartToUpdate": "Redémarrer pour mettre à jour",
     "limitExceeded": "Limite de synchronisation dépassée",
     "limitExceededDesc": "Vous avez atteint la limite gratuite de 100 titres. Soutenez le développement pour une synchronisation illimitée !",
     "replayGain": "Replay Gain",
@@ -192,6 +199,15 @@
     "systemDefaultNamed": "Défaut du système ({name})",
     "defaultBadge": "Défaut",
     "outputDevices": "Périphériques de sortie"
+  },
+  "updatePopup": {
+    "restartToUpdate": "Redémarrer pour mettre à jour",
+    "installedRestartRequired": "Installé · redémarrage requis",
+    "otaHint": "La mise à jour a été installée en arrière-plan. Redémarrez maintenant pour utiliser la nouvelle version, ou continuez à écouter — elle s'appliquera au prochain lancement d'Audion.",
+    "restartNow": "Redémarrer maintenant",
+    "restarting": "Redémarrage…",
+    "later": "Plus tard",
+    "noReleaseNotes": "Aucune note de version disponible."
   },
   "pluginManager": {
     "title": "Marché des plugins",

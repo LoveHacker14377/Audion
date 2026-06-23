@@ -88,7 +88,8 @@
     "community": "Community",
     "joinDiscord": "Join Discord",
     "resonate": "Resonate Playlists",
-    "addMusicFolder": "Add Music Folder"
+    "addMusicFolder": "Add Music Folder",
+    "restart": "Restart"
   },
   "settings": {
     "title": "Settings",
@@ -189,6 +190,9 @@
     "about": "About",
     "modernPlayerDesc": "Modern player powered by Tauri and Svelte",
     "updateAvailable": "Update Available",
+    "restartRequired": "Restart required",
+    "restartRequiredDesc": "Version {version} has been installed in the background.",
+    "restartToUpdate": "Restart to Update",
     "limitExceeded": "Sync limit exceeded",
     "limitExceededDesc": "You've reached the free tier limit of 100 tracks. Support development to get unlimited sync!",
     "replayGain": "Replay Gain",
@@ -203,6 +207,15 @@
     "systemDefaultNamed": "System default ({name})",
     "defaultBadge": "Default",
     "outputDevices": "Output devices"
+  },
+  "updatePopup": {
+    "restartToUpdate": "Restart to update",
+    "installedRestartRequired": "Installed · restart required",
+    "otaHint": "The update has been installed in the background. Restart now to start using the new version, or keep listening and it will apply the next time you open Audion.",
+    "restartNow": "Restart Now",
+    "restarting": "Restarting…",
+    "later": "Later",
+    "noReleaseNotes": "No release notes available."
   },
   "pluginManager": {
     "title": "Plugin Marketplace",

@@ -3,6 +3,7 @@
     import { openUrl } from "@tauri-apps/plugin-opener";
     import { marked } from "marked";
     import { applyUpdateAndRelaunch } from "$lib/stores/otaUpdate";
+    import { _ } from "svelte-i18n";
 
     export let release: any = null;
     /**
@@ -74,7 +75,7 @@
             <div class="header-info">
                 <h2>
                     {#if otaReady}
-                        Restart to update
+                        {$_('updatePopup.restartToUpdate')}
                     {:else}
                         {release?.name || release?.tag_name || "Update Available"}
                     {/if}
@@ -85,7 +86,7 @@
                         <span class="date">{formatDate(release?.published_at)}</span>
                     {/if}
                     {#if otaReady}
-                        <span class="ota-badge">Installed · restart required</span>
+                        <span class="ota-badge">{$_('updatePopup.installedRestartRequired')}</span>
                     {/if}
                 </div>
             </div>
@@ -114,16 +115,12 @@
                     {@html marked.parse(release.body)}
                 </div>
             {:else}
-                <p class="no-notes">No release notes available.</p>
+                <p class="no-notes">{$_('updatePopup.noReleaseNotes')}</p>
             {/if}
 
             {#if otaReady}
                 <div class="ota-actions">
-                    <p class="ota-hint">
-                        The update has been installed in the background. Restart
-                        now to start using the new version, or keep listening and
-                        it will apply the next time you open Audion.
-                    </p>
+                    <p class="ota-hint">{$_('updatePopup.otaHint')}</p>
                     <div class="ota-buttons">
                         <button
                             class="btn-restart"
@@ -131,13 +128,13 @@
                             disabled={isRelaunching}
                         >
                             {#if isRelaunching}
-                                Restarting…
+                                {$_('updatePopup.restarting')}
                             {:else}
-                                Restart Now
+                                {$_('updatePopup.restartNow')}
                             {/if}
                         </button>
                         <button class="btn-later" on:click={handleLater}>
-                            Later
+                            {$_('updatePopup.later')}
                         </button>
                     </div>
                 </div>

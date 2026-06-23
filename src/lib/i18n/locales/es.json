@@ -87,7 +87,9 @@
     "plugins": "Complementos",
     "community": "Comunidad",
     "joinDiscord": "Únete a Discord",
-    "addMusicFolder": "Añadir carpeta de música"
+    "resonate": "Playlists de Resonate",
+    "addMusicFolder": "Añadir carpeta de música",
+    "restart": "Reiniciar"
   },
   "settings": {
     "title": "Ajustes",
@@ -148,6 +150,8 @@
     "remove": "Quitar",
     "discordButton": "Botón de Discord",
     "openDiscord": "Abrir Discord",
+    "resonateButton": "Botón de Resonate",
+    "openResonate": "Abrir Resonate",
     "appearance": "Apariencia",
     "selectLanguage": "Idioma",
     "themeMode": "Modo de tema",
@@ -178,6 +182,9 @@
     "about": "Acerca de",
     "modernPlayerDesc": "Reproductor moderno con Tauri y Svelte",
     "updateAvailable": "Actualización Disponible",
+    "restartRequired": "Reinicio requerido",
+    "restartRequiredDesc": "La versión {version} se ha instalado en segundo plano.",
+    "restartToUpdate": "Reiniciar para actualizar",
     "limitExceeded": "Límite de sincronización excedido",
     "limitExceededDesc": "Has alcanzado el límite gratuito de 100 pistas. ¡Apoya el desarrollo para obtener sincronización ilimitada!",
     "replayGain": "Replay Gain",
@@ -192,6 +199,15 @@
     "systemDefaultNamed": "Predeterminado del sistema ({name})",
     "defaultBadge": "Predeterminado",
     "outputDevices": "Dispositivos de salida"
+  },
+  "updatePopup": {
+    "restartToUpdate": "Reiniciar para actualizar",
+    "installedRestartRequired": "Instalado · reinicio requerido",
+    "otaHint": "La actualización se ha instalado en segundo plano. Reinicia ahora para empezar a usar la nueva versión, o sigue escuchando y se aplicará la próxima vez que abras Audion.",
+    "restartNow": "Reiniciar ahora",
+    "restarting": "Reiniciando…",
+    "later": "Más tarde",
+    "noReleaseNotes": "No hay notas de versión disponibles."
   },
   "pluginManager": {
     "title": "Mercado de Plugins",
