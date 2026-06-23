@@ -1347,30 +1347,42 @@ export class PluginRuntime {
       }
 
       // 5. Unregister stream resolvers owned by this plugin
+      const streamSourceTypesToRemove: string[] = [];
       this.streamResolverOwners.forEach((owner, sourceType) => {
         if (owner === name) {
-          this.streamResolvers.delete(sourceType);
-          this.streamResolverOwners.delete(sourceType);
+          streamSourceTypesToRemove.push(sourceType);
         }
       });
+      for (const sourceType of streamSourceTypesToRemove) {
+        this.streamResolvers.delete(sourceType);
+        this.streamResolverOwners.delete(sourceType);
+      }
 
       // unregister search sources owned by this plugin
+      const searchSourceIdsToRemove: string[] = [];
       this.searchSourceOwners.forEach((owner, sourceId) => {
         if (owner === name) {
-          this.searchSources.delete(sourceId);
-          this.searchSourceOwners.delete(sourceId);
-          console.log(`[PluginRuntime] Unregistered search source '${sourceId}' (plugin '${name}' unloaded)`);
+          searchSourceIdsToRemove.push(sourceId);
         }
       });
+      for (const sourceId of searchSourceIdsToRemove) {
+        this.searchSources.delete(sourceId);
+        this.searchSourceOwners.delete(sourceId);
+        console.log(`[PluginRuntime] Unregistered search source '${sourceId}' (plugin '${name}' unloaded)`);
+      }
 
       // unregister cover sources owned by this plugin
+      const coverSourceIdsToRemove: string[] = [];
       this.coverSourceOwners.forEach((owner, sourceId) => {
         if (owner === name) {
-          this.coverSources.delete(sourceId);
-          this.coverSourceOwners.delete(sourceId);
-          console.log(`[PluginRuntime] Unregistered cover source '${sourceId}' (plugin '${name}' unloaded)`);
+          coverSourceIdsToRemove.push(sourceId);
         }
       });
+      for (const sourceId of coverSourceIdsToRemove) {
+        this.coverSources.delete(sourceId);
+        this.coverSourceOwners.delete(sourceId);
+        console.log(`[PluginRuntime] Unregistered cover source '${sourceId}' (plugin '${name}' unloaded)`);
+      }
 
       // 6. Reset and clear rate limiters
       plugin.rateLimiters.api.reset();
