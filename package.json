@@ -17,6 +17,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "dashjs": "^4.7.4",
+    "dompurify": "^3.4.11",
     "marked": "^17.0.1",
     "svelte-i18n": "^4.0.1"
   },
@@ -33,6 +34,7 @@
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-os": "^2.3.2",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^25.0.10",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",

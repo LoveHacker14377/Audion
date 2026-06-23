@@ -2,8 +2,10 @@
     import { createEventDispatcher } from "svelte";
     import { openUrl } from "@tauri-apps/plugin-opener";
     import { marked } from "marked";
+    import DOMPurify from "dompurify";
     import { applyUpdateAndRelaunch } from "$lib/stores/otaUpdate";
     import { _ } from "svelte-i18n";
+    marked.use({ async: false });
 
     export let release: any = null;
     /**
@@ -112,7 +114,7 @@
         <div class="modal-body">
             {#if release?.body}
                 <div class="release-notes markdown-content">
-                    {@html marked.parse(release.body)}
+                    {@html DOMPurify.sanitize(marked.parse(release.body) as string)}
                 </div>
             {:else}
                 <p class="no-notes">{$_('updatePopup.noReleaseNotes')}</p>
