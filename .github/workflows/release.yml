@@ -56,6 +56,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup (Node, Rust, cache, deps)
         uses: ./.github/actions/setup
@@ -71,23 +72,27 @@ jobs:
       - name: Set version and prerelease flags
         id: info
         shell: pwsh
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           # Determine version and prerelease status
-          if ("${{ github.event_name }}" -eq "push") {
+          if ($env:GH_EVENT_NAME -eq "push") {
             $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
             $prerelease = $false
             $tagName = "v$version"
-          } elseif ("${{ inputs.release_type }}" -eq "beta") {
+          } elseif ($env:INPUT_RELEASE_TYPE -eq "beta") {
             $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version + "-beta"
             $prerelease = $true
             $tagName = "v$version"
-          } elseif ("${{ inputs.release_type }}" -eq "hotfix") {
-            $version = "${{ inputs.tag_name }}".TrimStart('v')
+          } elseif ($env:INPUT_RELEASE_TYPE -eq "hotfix") {
+            $version = $env:INPUT_TAG_NAME.TrimStart('v')
             $prerelease = $false
-            if ("${{ inputs.tag_name }}".StartsWith('v')) {
-              $tagName = "${{ inputs.tag_name }}"
+            if ($env:INPUT_TAG_NAME.StartsWith('v')) {
+              $tagName = $env:INPUT_TAG_NAME
             } else {
-              $tagName = "v${{ inputs.tag_name }}"
+              $tagName = "v$($env:INPUT_TAG_NAME)"
             }
           } else {
             $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
@@ -113,7 +118,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: ${{ inputs.overwrite }}
+          overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/release/bundle/msi/audion_*_windows.msi
             src-tauri/target/release/bundle/nsis/audion_*_windows.exe
@@ -156,6 +161,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup (Node, Rust, cache, deps)
         uses: ./.github/actions/setup
@@ -168,6 +175,7 @@ jobs:
             --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset" \
             npm run tauri build
         env:
+          # kept intentionally: linux OTA auto-update is planned
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
@@ -252,18 +260,22 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG_NAME=""
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$GH_EVENT_NAME" = "push" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
             PRERELEASE=false
-          elif [ "${{ inputs.release_type }}" = "beta" ]; then
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
             PRERELEASE=true
-          elif [ "${{ inputs.release_type }}" = "hotfix" ]; then
-            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
             PRERELEASE=false
-            TAG_NAME="${{ inputs.tag_name }}"
+            TAG_NAME="$INPUT_TAG_NAME"
             case "$TAG_NAME" in
               v*) ;;
               *) TAG_NAME="v$TAG_NAME" ;;
@@ -298,7 +310,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: ${{ inputs.overwrite }}
+          overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/release/bundle/deb/audion_*_linux.deb
             src-tauri/target/release/bundle/appimage/audion_*_linux.AppImage
@@ -332,21 +344,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set version and prerelease flags
         id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG_NAME=""
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$GH_EVENT_NAME" = "push" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
             PRERELEASE=false
-          elif [ "${{ inputs.release_type }}" = "beta" ]; then
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
             PRERELEASE=true
-          elif [ "${{ inputs.release_type }}" = "hotfix" ]; then
-            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
             PRERELEASE=false
-            TAG_NAME="${{ inputs.tag_name }}"
+            TAG_NAME="$INPUT_TAG_NAME"
             case "$TAG_NAME" in
               v*) ;;
               *) TAG_NAME="v$TAG_NAME" ;;
@@ -390,7 +408,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: ${{ inputs.overwrite }}
+          overwrite_files: ${{ inputs.overwrite }}
           files: audion_${{ steps.info.outputs.version }}_flatpak.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -417,6 +435,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup (Node, Rust, cache, deps)
         uses: ./.github/actions/setup
@@ -432,18 +452,22 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG_NAME=""
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$GH_EVENT_NAME" = "push" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
             PRERELEASE=false
-          elif [ "${{ inputs.release_type }}" = "beta" ]; then
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
             PRERELEASE=true
-          elif [ "${{ inputs.release_type }}" = "hotfix" ]; then
-            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
             PRERELEASE=false
-            TAG_NAME="${{ inputs.tag_name }}"
+            TAG_NAME="$INPUT_TAG_NAME"
             case "$TAG_NAME" in
               v*) ;;
               *) TAG_NAME="v$TAG_NAME" ;;
@@ -475,7 +499,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: ${{ inputs.overwrite }}
+          overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/audion_*_macos.dmg
             src-tauri/target/universal-apple-darwin/release/bundle/macos/audion_*_macos.app.tar.gz
@@ -506,21 +530,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set version and prerelease flags
         id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG_NAME=""
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$GH_EVENT_NAME" = "push" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
             PRERELEASE=false
-          elif [ "${{ inputs.release_type }}" = "beta" ]; then
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
             PRERELEASE=true
-          elif [ "${{ inputs.release_type }}" = "hotfix" ]; then
-            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
             PRERELEASE=false
-            TAG_NAME="${{ inputs.tag_name }}"
+            TAG_NAME="$INPUT_TAG_NAME"
             case "$TAG_NAME" in
               v*) ;;
               *) TAG_NAME="v$TAG_NAME" ;;
@@ -585,7 +615,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: true
+          overwrite_files: true
           files: latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -605,6 +635,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -687,18 +719,22 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
           TAG_NAME=""
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "$GH_EVENT_NAME" = "push" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
             PRERELEASE=false
-          elif [ "${{ inputs.release_type }}" = "beta" ]; then
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
             VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
             PRERELEASE=true
-          elif [ "${{ inputs.release_type }}" = "hotfix" ]; then
-            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
             PRERELEASE=false
-            TAG_NAME="${{ inputs.tag_name }}"
+            TAG_NAME="$INPUT_TAG_NAME"
             case "$TAG_NAME" in
               v*) ;;
               *) TAG_NAME="v$TAG_NAME" ;;
@@ -739,7 +775,7 @@ jobs:
           name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
           body_path: releasenote.md
           prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite: ${{ inputs.overwrite }}
+          overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/gen/android/app/build/outputs/apk/audion_*_android.apk
         env:
