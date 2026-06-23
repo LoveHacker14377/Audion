@@ -27,8 +27,15 @@ fn sanitize_text(input: &str, fallback: &str) -> String {
     }
 
     let mut result = if trimmed.len() > MAX_DISCORD_TEXT_LENGTH {
-        let truncate_at = MAX_DISCORD_TEXT_LENGTH - 3;
-        format!("{}...", &trimmed[..truncate_at])
+        let target = MAX_DISCORD_TEXT_LENGTH - 3;
+        // find the byte offset of the last char that starts at or before `target`
+        let cut = trimmed
+            .char_indices()
+            .map(|(i, _)| i)
+            .take_while(|&i| i <= target)
+            .last()
+            .unwrap_or(0);
+        format!("{}...", &trimmed[..cut])
     } else {
         trimmed.to_string()
     };
@@ -40,8 +47,18 @@ fn sanitize_text(input: &str, fallback: &str) -> String {
     result
 }
 
-/// upload a local cover image file to catbox.moe and return the resulting URL
 async fn upload_cover_to_catbox(path: &str) -> Result<String, String> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        upload_to_catbox(path),
+    )
+    .await
+    .map_err(|_| "Catbox upload timed out after 30s".to_string())
+    .and_then(|r| r)
+}
+
+/// upload a local cover image file to catbox.moe and return the resulting URL
+async fn upload_to_catbox(path: &str) -> Result<String, String> {
     let bytes = std::fs::read(path)
         .map_err(|e| format!("Failed to read cover file '{}': {}", path, e))?;
 
