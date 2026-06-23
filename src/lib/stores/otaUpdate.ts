@@ -45,7 +45,8 @@ export function getUpdateReady(): PendingUpdateNotes | null {
  * checks for an update and, if found, downloads + installs it in the
  * background, then prompts the user to restart
  *
- * Notes are only written to local storage after a successful downloadAndInstall
+ * Notes are only written to local storage after a successful
+ * downloadAndInstall, so a failed install never leaves stale notes
  *
  * no-ops (resolves immediately) on unsupported platforms
  *
@@ -85,14 +86,22 @@ export async function checkAndInstallUpdate(): Promise<PendingUpdateNotes | null
 
 /**
  * relaunches the app to apply the installed update
- * accepts the notes directly
+ * accepts the notes directly to avoid a redundant localStorage read
  */
 export async function applyUpdateAndRelaunch(notes: PendingUpdateNotes): Promise<void> {
     // stash notes so they can be shown as a "what's new" popup on next startup
     localStorage.setItem(PENDING_KEY, JSON.stringify(notes));
     localStorage.removeItem(READY_KEY);
     otaUpdateReady.set(null);
-    await relaunch();
+    try {
+        await relaunch();
+    } catch (e) {
+        // relaunch failed => restore state so the restart badge remains visible
+        localStorage.setItem(READY_KEY, JSON.stringify(notes));
+        localStorage.removeItem(PENDING_KEY);
+        otaUpdateReady.set(notes);
+        throw e;
+    }
 }
 
 /**
