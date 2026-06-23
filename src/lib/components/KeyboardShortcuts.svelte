@@ -128,6 +128,7 @@
 
     let unsubscribeBindings: () => void;
     let unsubscribeSettings: () => void;
+    let destroyed = false;
 
     // serialize all syncGlobalShortcuts calls so overlapping invocations
     // (from rapid binding/toggle changes) can't interleave their
@@ -141,6 +142,7 @@
 
     onMount(async () => {
         await loadPlugin();
+        if (destroyed) return;
 
         // re-sync global shortcuts whenever bindings change
         unsubscribeBindings = shortcutBindings.subscribe(bindings => {
@@ -158,6 +160,7 @@
     });
 
     onDestroy(async () => {
+        destroyed = true;
         unsubscribeBindings?.();
         unsubscribeSettings?.();
 
