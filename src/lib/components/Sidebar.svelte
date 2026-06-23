@@ -388,7 +388,11 @@
                 otaUpdateReady.set(alreadyReady);
             } else {
                 // background download => updates the store if something installs
-                checkAndInstallUpdate();
+                // On failure (null), fall back to the GitHub release badge path
+                // so the update is still surfaced
+                checkAndInstallUpdate().then((notes) => {
+                    if (!notes) updates.checkUpdate();
+                });
             }
         } else {
             updates.checkUpdate();
@@ -405,6 +409,17 @@
             uiSlotManager.unregisterContainer("sidebar:bottom");
         };
     });
+    function openOtaPopup() {
+        popupRelease = {
+            tag_name: $otaUpdateReady?.version,
+            name: `Version ${$otaUpdateReady?.version}`,
+            body: $otaUpdateReady?.body ?? null,
+            published_at: $otaUpdateReady?.date ?? '',
+            assets: [],
+        };
+        popupOtaReady = true;
+        showUpdatePopup = true;
+    }
 </script>
 
 <aside class="sidebar">
@@ -417,20 +432,10 @@
                 <div
                     class="update-badge restart-badge"
                     title="Update installed · click to restart"
-                    on:click={() => {
-                        popupRelease = {
-                            tag_name: $otaUpdateReady?.version,
-                            name: `Version ${$otaUpdateReady?.version}`,
-                            body: $otaUpdateReady?.body ?? null,
-                            published_at: $otaUpdateReady?.date ?? '',
-                            assets: [],
-                        };
-                        popupOtaReady = true;
-                        showUpdatePopup = true;
-                    }}
+                    on:click={openOtaPopup}
                     role="button"
                     tabindex="0"
-                    on:keydown={(e) => e.key === "Enter" && (showUpdatePopup = true)}
+                    on:keydown={(e) => e.key === "Enter" && openOtaPopup()}
                 >
                     {$_('sidebar.restart')}
                 </div>
