@@ -1234,9 +1234,11 @@ export async function seek(position: number): Promise<void> {
     try {
         const dur = get(duration);
         const targetSecs = position * dur;
+        let didSeek = false;
 
         if (get(activeBackend) === 'html5') {
             html5Seek(position);
+            didSeek = true;
         } else if (get(activeBackend) === 'native') {
             await nativeAudioSeek(position);
             // immediately snap reckoning to the target
@@ -1247,10 +1249,14 @@ export async function seek(position: number): Promise<void> {
                 _stopReckoning(targetSecs);
                 currentTime.set(targetSecs);
             }
+            didSeek = true;
         }
-        updateMediaSessionPosition();
-        broadcastState(true);
-        pluginEvents.emit('seeked', { currentTime: targetSecs, duration: dur });
+
+        if (didSeek) {
+            updateMediaSessionPosition();
+            broadcastState(true);
+            pluginEvents.emit('seeked', { currentTime: targetSecs, duration: dur });
+        }
     } catch (err) {
         console.error('[Player] Seek failed:', err);
     }
