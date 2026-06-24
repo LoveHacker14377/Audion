@@ -63,6 +63,9 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # Base64 encoding for album art
 base64 = "0.22"
 
+# compression
+zip = { version = "8.6.0", default-features = false }
+
 # HTTP client for API requests (rustls = pure-Rust TLS, no OpenSSL needed, works on Android)
 reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "stream", "rustls-tls", "gzip", "brotli", "multipart"] }
 futures = "0.3"

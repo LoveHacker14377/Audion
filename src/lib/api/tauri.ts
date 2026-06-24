@@ -83,6 +83,7 @@ export async function updateWindowsThumbarState(isPlaying: boolean): Promise<voi
 // Dynamic imports to avoid SSR issues
 let invokeFunc: typeof import('@tauri-apps/api/core').invoke | null = null;
 let openFunc: typeof import('@tauri-apps/plugin-dialog').open | null = null;
+let saveFunc: typeof import('@tauri-apps/plugin-dialog').save | null = null;
 let convertFileSrcFunc: typeof import('@tauri-apps/api/core').convertFileSrc | null = null;
 let listenFunc: typeof import('@tauri-apps/api/event').listen | null = null;
 
@@ -98,6 +99,7 @@ async function ensureTauriLoaded() {
     if (!openFunc) {
         const dialog = await import('@tauri-apps/plugin-dialog');
         openFunc = dialog.open;
+        saveFunc = dialog.save;
     }
     if (!listenFunc) {
         const event = await import('@tauri-apps/api/event');
@@ -486,6 +488,46 @@ export async function reorderPlaylistTracks(playlistId: number, fromIndex: numbe
     return await invoke('reorder_playlist_tracks', { playlistId, fromIndex, toIndex });
 }
 
+export interface ExportPlaylistResult {
+    track_count: number;
+    skipped_count: number;
+}
+
+export async function exportPlaylistZip(
+    playlistId: number,
+    playlistName = 'playlist',
+): Promise<ExportPlaylistResult | null> {
+    if (isAndroid()) {
+        // 1: show picker first => user chooses destination before compression starts
+        const uri = await saveFile({
+            platform: 'android',
+            defaultPath: `${playlistName}.zip`,
+            mimeType: 'application/zip',
+        });
+        if (!uri) return null;
+
+        // 2: compress into the app cache dir
+        const tempPath = await invoke<string>('get_export_temp_path', { name: `${playlistName}.zip` });
+        const result = await invoke<ExportPlaylistResult>('export_playlist_zip', { playlistId, destPath: tempPath });
+
+        // 3: copy finished zip to the user-picked URI (kotlin cleans up tempPath either way)
+        const ok = await commitAndroidSave(tempPath, uri);
+        if (!ok) return null;
+
+        return result;
+    }
+
+    // desktop: picker returns the real path, write directly there
+    const destPath = await saveFile({
+        platform: 'desktop',
+        title: 'Export playlist as ZIP',
+        defaultPath: `${playlistName}.zip`,
+        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+    });
+    if (!destPath) return null;
+    return await invoke('export_playlist_zip', { playlistId, destPath });
+}
+
 export async function beginFolderImport(folderPath: string): Promise<number> {
     return await invoke('begin_folder_import', { folderPath });
 }
@@ -613,6 +655,115 @@ async function _pickFolderAndroid(): Promise<string | null> {
 
 export async function pickFolder(): Promise<string | null> {
     return isAndroid() ? _pickFolderAndroid() : _pickFolderDesktop();
+}
+
+// save file dialog
+
+/**
+ * platform discriminated save-file options
+ *
+ * desktop: the OS picker returns a real filesystem path the caller writes to directly
+ *
+ * android: SAF does not expose a writable path.saveFile only shows the picker and
+ *   returns a content:// URI representing the user's chosen destination. caller
+ *   must then do the actual work (e.g. compress the zip) and call `ommitAndroidSave
+ *   to copy the finished file into that URI
+ *
+ * platform discriminant is required so TypeScript can enforce that
+ * mimeType is always provided on android at the call site
+ */
+export type SaveFileOptions =
+    | {
+          platform: 'desktop';
+          title?: string;
+          defaultPath?: string;
+          filters?: { name: string; extensions: string[] }[];
+      }
+    | {
+          platform: 'android';
+          /** suggested filename shown in the SAF picker */
+          defaultPath?: string;
+          /** MIME type shown to the SAF picker */
+          mimeType: string;
+      };
+
+async function _saveFileDesktop(
+    options: Extract<SaveFileOptions, { platform: 'desktop' }>,
+): Promise<string | null> {
+    await ensureTauriLoaded();
+    const selected = await saveFunc!({
+        title: options.title,
+        defaultPath: options.defaultPath,
+        filters: options.filters,
+    });
+    return selected ?? null;
+}
+
+function _saveFileAndroid(
+    options: Extract<SaveFileOptions, { platform: 'android' }>,
+): Promise<string | null> {
+    return new Promise((resolve) => {
+        const finish = (uri: string | null) => {
+            delete (window as any).__onAndroidFileSaved;
+            resolve(uri);
+        };
+
+        (window as any).__onAndroidFileSaved = (uri: string | null) => finish(uri);
+
+        const saver = (window as any).AndroidFileSaver;
+        if (saver?.saveFile) {
+            saver.saveFile(options.defaultPath ?? 'file', options.mimeType);
+            return;
+        }
+
+        // native bridge unavailable
+        delete (window as any).__onAndroidFileSaved;
+        resolve(null);
+    });
+}
+
+/**
+ * show the platform save-file picker and return the destination
+ *
+ *  desktop: returns the chosen filesystem path.write your file there directly
+ *  android: returns a content:// URI. show the picker first, do
+ *   (compression, rendering, etc) then call `commitAndroidSave(tempPath, uri)
+ *   to copy the finished file in
+ *
+ * returns null if the user cancelled
+ */
+export async function saveFile(options: SaveFileOptions): Promise<string | null> {
+    if (options.platform === 'android') {
+        return _saveFileAndroid(options);
+    }
+    return _saveFileDesktop(options);
+}
+
+/**
+ * android only => copy a finished temp file into the content:// URI returned by
+ * saveFile => call this after work is done (compression, rendering, etc)
+ * kotlin cleans up tempPath regardless of success or failure
+ *
+ * returns true on success, false if the copy failed
+ */
+export function commitAndroidSave(tempPath: string, uri: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const finish = (ok: boolean) => {
+            delete (window as any).__onAndroidFileCopied;
+            resolve(ok);
+        };
+
+        (window as any).__onAndroidFileCopied = (ok: boolean) => finish(ok);
+
+        const saver = (window as any).AndroidFileSaver;
+        if (saver?.copyTempToUri) {
+            saver.copyTempToUri(tempPath, uri);
+            return;
+        }
+
+        delete (window as any).__onAndroidFileCopied;
+        resolve(false);
+    });
 }
 
 // Ensure the correct path for downloaded files

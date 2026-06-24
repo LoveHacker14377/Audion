@@ -5,6 +5,7 @@
         getPlaylistTracks,
         deletePlaylist,
         renamePlaylist,
+        exportPlaylistZip,
         formatDuration,
     } from "$lib/api/tauri";
     import { confirm, prompt } from "$lib/stores/dialogs";
@@ -352,6 +353,36 @@
 
     // Reload when playlistId changes
     $: playlistId, loadPlaylistData();
+
+    let menuOpen = false;
+
+    function toggleMenu() {
+        menuOpen = !menuOpen;
+    }
+
+    function closeMenu() {
+        menuOpen = false;
+    }
+
+    async function handleExportZip() {
+        closeMenu();
+        if (!playlist) return;
+
+        try {
+            addToast("Exporting…", "info");
+
+            const result = await exportPlaylistZip(playlistId, playlist.name);
+            if (!result) return; // user cancelled
+
+            const skippedMsg = result.skipped_count > 0
+                ? ` (${result.skipped_count} streaming-only track${result.skipped_count > 1 ? "s" : ""} skipped)`
+                : "";
+
+            addToast(`Exported ${result.track_count} tracks${skippedMsg}`, "success");
+        } catch (e) {
+            addToast(`Export failed: ${e}`, "error");
+        }
+    }
 </script>
 
 <div class="playlist-detail">
@@ -367,18 +398,55 @@
             role="region"
             aria-label="Playlist header"
         >
-            <button class="back-btn" on:click={goToPlaylists} title="Close">
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="20"
-                    height="20"
-                >
-                    <path
-                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                    />
-                </svg>
-            </button>
+            <div class="header-actions">
+                <div class="menu-wrapper">
+                    <button class="back-btn" on:click={toggleMenu} title="More options">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                            <circle cx="12" cy="5" r="1.5"/>
+                            <circle cx="12" cy="12" r="1.5"/>
+                            <circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                    </button>
+
+                    {#if menuOpen}
+                        <div class="menu-backdrop" on:click={closeMenu}></div>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item" on:click={() => { closeMenu(); startEditing(); }}>
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                                </svg>
+                                Rename
+                            </button>
+                            <button class="dropdown-item" on:click={handleExportZip}>
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                                    <path d="M20 6h-2.18c.07-.44.18-.88.18-1a3 3 0 0 0-6 0c0 .12.11.56.18 1H10V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-1c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm8 15H4V8h16v12z"/>
+                                </svg>
+                                Export to ZIP
+                            </button>
+                            <div class="dropdown-separator"></div>
+                            <button class="dropdown-item danger" on:click={() => { closeMenu(); handleDelete(); }}>
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                                Delete Playlist
+                            </button>
+                        </div>
+                    {/if}
+                </div>
+
+                <button class="back-btn close-btn" on:click={goToPlaylists} title="Close">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="20"
+                        height="20"
+                    >
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                        />
+                    </svg>
+                </button>
+            </div>
             <div
                 class="playlist-cover"
                 on:mouseenter={() => (coverHovered = true)}
@@ -539,38 +607,6 @@
                         </button>
                     {/if}
 
-                    <button
-                        class="icon-btn"
-                        on:click={startEditing}
-                        title="Rename"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="20"
-                            height="20"
-                        >
-                            <path
-                                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                            />
-                        </svg>
-                    </button>
-                    <button
-                        class="icon-btn"
-                        on:click={handleDelete}
-                        title="Delete"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="20"
-                            height="20"
-                        >
-                            <path
-                                d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                            />
-                        </svg>
-                    </button>
                 </div>
             </div>
         </header>
@@ -659,10 +695,20 @@
         position: relative;
     }
 
-    .back-btn {
+    .header-actions {
         position: absolute;
         top: var(--spacing-md);
         right: var(--spacing-md);
+        display: flex;
+        gap: var(--spacing-xs);
+        z-index: 10;
+    }
+
+    .menu-wrapper {
+        position: relative;
+    }
+
+    .back-btn {
         width: 40px;
         height: 40px;
         border-radius: var(--radius-full);
@@ -673,7 +719,6 @@
         align-items: center;
         justify-content: center;
         transition: all var(--transition-fast);
-        z-index: 10;
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
@@ -708,6 +753,62 @@
 
     .back-btn:active {
         transform: scale(0.95);
+    }
+
+    .menu-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+    }
+
+    .dropdown-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 30;
+        min-width: 180px;
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-lg);
+        padding: var(--spacing-xs) 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        background: none;
+        border: none;
+        text-align: left;
+        cursor: pointer;
+        transition: background-color var(--transition-fast), color var(--transition-fast);
+        width: 100%;
+    }
+
+    .dropdown-item:hover {
+        background-color: var(--bg-elevated);
+        color: var(--text-primary);
+    }
+
+    .dropdown-item.danger {
+        color: var(--error-color, #f15e6c);
+    }
+
+    .dropdown-item.danger:hover {
+        background-color: rgba(241, 94, 108, 0.1);
+        color: var(--error-color, #f15e6c);
+    }
+
+    .dropdown-separator {
+        height: 1px;
+        background-color: var(--border-color);
+        margin: var(--spacing-xs) 0;
     }
 
     .playlist-cover {
@@ -910,7 +1011,7 @@
             gap: var(--spacing-md);
         }
 
-        .back-btn {
+        .header-actions {
             top: calc(var(--safe-area-top) + var(--spacing-sm));
             right: var(--spacing-sm);
         }

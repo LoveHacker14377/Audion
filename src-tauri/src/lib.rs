@@ -627,6 +627,8 @@ pub fn run() {
                     commands::rename_playlist,
                     commands::update_playlist_cover,
                     commands::reorder_playlist_tracks,
+                    commands::export_playlist_zip,
+                    commands::get_export_temp_path,
                     // Activity commands (liked tracks + play history)
                     commands::like_track,
                     commands::unlike_track,
@@ -810,6 +812,8 @@ pub fn run() {
                     commands::rename_playlist,
                     commands::update_playlist_cover,
                     commands::reorder_playlist_tracks,
+                    commands::export_playlist_zip,
+                    commands::get_export_temp_path,
                     // Activity commands (liked tracks + play history)
                     commands::like_track,
                     commands::unlike_track,
