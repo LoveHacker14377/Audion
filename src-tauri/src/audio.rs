@@ -2327,7 +2327,7 @@ impl PlaybackStateSync {
                 }
             };
 
-            loop {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { loop {
                 // block until a command, an audio-thread event, or a worker result arrives
                 crossbeam::select! {
                     recv(rx) -> msg => {
@@ -2338,22 +2338,32 @@ impl PlaybackStateSync {
 
                         // lazy engine init, only on the first command
                         if engine_opt.is_none() {
-                            match AudioEngine::new(&eq_settings, None) {
-                                Ok((e, evt_rx, open_rx, dl)) => {
-                                    event_rx = evt_rx;
-                                    open_result_rx = open_rx;
-                                    engine_opt = Some(e);
-                                    if let Ok(mut cached) = device_list_clone.lock() {
-                                        *cached = dl;
+                            let mut last_err = String::new();
+                            for attempt in 0..8u32 {
+                                match AudioEngine::new(&eq_settings, None) {
+                                    Ok((e, evt_rx, open_rx, dl)) => {
+                                        event_rx = evt_rx;
+                                        open_result_rx = open_rx;
+                                        engine_opt = Some(e);
+                                        if let Ok(mut cached) = device_list_clone.lock() {
+                                            *cached = dl;
+                                        }
+                                        last_err.clear();
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!("[AUDIO] Engine init attempt {} failed: {}", attempt + 1, e);
+                                        last_err = e;
+                                        std::thread::sleep(std::time::Duration::from_millis(250 * (1u64 << attempt.min(4))));
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!("[AUDIO] Engine init failed: {}", e);
-                                    emit(AudioEvent::Error { message: e });
-                                    continue;
-                                }
                             }
-                        }
+                            if !last_err.is_empty() {
+                                tracing::error!("[AUDIO] Engine init failed after retries: {}", last_err);
+                                emit(AudioEvent::Error { message: last_err });
+                                continue;
+                            }
+}
 
                         let engine = engine_opt.as_mut().unwrap();
 
@@ -2627,6 +2637,20 @@ impl PlaybackStateSync {
                             }
                         }
                     }
+                }
+            }})); // closes: loop, AssertUnwindSafe closure, catch_unwind
+
+            if let Err(payload) = result {
+                let msg = payload
+                    .downcast_ref::<&str>()
+                    .copied()
+                    .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
+                    .unwrap_or("(non-string panic payload)");
+                tracing::error!("[AUDIO] Command thread panicked: {}", msg);
+                if let Err(e) = app_handle.emit("audio://event", &AudioEvent::Error {
+                    message: format!("Audio engine crashed: {}", msg),
+                }) {
+                    tracing::warn!("[AUDIO] Failed to emit panic error event: {}", e);
                 }
             }
         });

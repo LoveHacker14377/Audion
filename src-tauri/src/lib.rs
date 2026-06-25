@@ -209,18 +209,13 @@ fn init_logging(log_dir: &PathBuf) {
         .init();
 }
 
-#[cfg(mobile)]
+#[cfg(target_os = "android")]
 fn init_logging(_log_dir: &PathBuf) {
-    use tracing_subscriber::{fmt, EnvFilter};
-
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,audion=info"));
-
-    fmt::Subscriber::builder()
-        .with_env_filter(filter)
-        .with_ansi(true)
-        .with_target(true)
-        .init();
+    android_logger::init_once(
+        android_logger::Config::default()
+            .with_max_level(log::LevelFilter::Debug)
+            .with_tag("audion"),
+    );
 }
 
 /// Remove log files in `log_dir` that are older than `keep_days` days.
