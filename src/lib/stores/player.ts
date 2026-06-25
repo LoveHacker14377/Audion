@@ -385,7 +385,8 @@ export async function initAudioBackend(): Promise<void> {
             } else if (event.type === 'DeviceListChanged') {
                 console.log('[Player] Device list updated');
             } else if (event.type === 'Error') {
-                console.error('[Player] Backend error:', event.data.message);
+                console.error('[Player] Backend error event:', JSON.stringify(event));
+                console.error('[Player] Backend error message:', event.data.message);
                 addToast(`Audio error: ${event.data.message}`, 'error');
                 // backend is now silent
                 // reset UI state so player doesn't show stale track info
@@ -955,7 +956,22 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                 if (nativeAudioUsed) {
                     html5Stop();
 
-                    await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
+                    console.log('[Player] Invoking nativeAudioPlay');
+                    console.log('[Player] audioPath:', audioPath);
+                    console.log('[Player] track.id:', track.id);
+                    console.log('[Player] track.source_type:', (track as any).source_type);
+                    console.log('[Player] track.local_src:', (track as any).local_src);
+                    console.log('[Player] track.path:', track.path);
+
+                    try {
+                        await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
+                        console.log('[Player] nativeAudioPlay resolved OK');
+                    } catch (nativeErr) {
+                        console.error('[Player] nativeAudioPlay rejected:', nativeErr);
+                        console.error('[Player] nativeAudioPlay error type:', typeof nativeErr);
+                        console.error('[Player] nativeAudioPlay error JSON:', JSON.stringify(nativeErr));
+                        throw nativeErr;
+                    }
 
                     const vol = sliderToAudioVolume(get(volume));
                     await nativeAudioSetVolume(vol);
@@ -965,7 +981,6 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                     }
 
                     _schedulePreload();
-
                     activeBackend.set('native');
                     console.log('[Player] Native playback started:', track.title);
                 } else {
@@ -993,7 +1008,9 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
     } catch (err) {
         console.error('[Player] Playback failed:', err);
-        addToast(`Playback failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+        console.error('[Player] Playback failed type:', typeof err);
+        console.error('[Player] Playback failed JSON:', JSON.stringify(err));
+        addToast(`Playback failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
 }
 
