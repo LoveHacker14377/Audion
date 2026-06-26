@@ -14,7 +14,18 @@
     "pinToTop": "Pin to Top",
     "unpinFromTop": "Unpin from Top",
     "goToArtist": "Go to Artist",
-    "goToAlbum": "Go to Album"
+    "goToAlbum": "Go to Album",
+    "addedToQueue": "Added to queue",
+    "deleteAlbum": "Delete Album",
+    "deletePlaylist": "Delete Playlist",
+    "rename": "Rename",
+    "changeCover": "Change Cover",
+    "configureDownloadLocation": "Please configure a download location in Settings first",
+    "artworkUpdated": {
+        "track": "Track artwork updated",
+    "album": "Album artwork updated",
+        "artist": "Artist artwork updated"
+        }
   },
   "trackList": {
     "title": "Title",

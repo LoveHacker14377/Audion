@@ -25,24 +25,19 @@
     toggleShuffle,
     cycleRepeat,
     volume,
-    addToQueue,
   } from "$lib/stores/player";
   import { isMobile } from "$lib/stores/mobile";
   import { lyricsVisible, toggleLyrics } from "$lib/stores/lyrics";
-  import { goToArtistDetail } from "$lib/stores/view";
+  import { goToArtistDetail, goToAlbumDetail } from "$lib/stores/view";
   import { lyricsData, activeLine } from "$lib/stores/lyrics";
-  // Only keep the used imports
   import {
     getTrackCoverSrc,
     formatDuration,
-    addTrackToPlaylist,
-    removeTrackFromPlaylist,
-    deleteTrack,
   } from "$lib/api/tauri";
   import { onMount, tick } from "svelte";
   import { likedTrackIds, toggleLike } from "$lib/stores/liked";
-  import { playlists, loadLibrary } from "$lib/stores/library";
-  import { confirm } from "$lib/stores/dialogs";
+  import { _ } from "svelte-i18n";
+  import { buildTrackContextMenu } from "$lib/menus/contextMenus";
   import { addToast } from "$lib/stores/toast";
   import QueuePanel from "./QueuePanel.svelte";
   import ConnectPanel from "./ConnectPanel.svelte";
@@ -54,7 +49,6 @@
     startSleepTimer,
     stopSleepTimer,
   } from "$lib/stores/sleepTimer";
-  import { goToAlbumDetail } from "$lib/stores/view";
   import MeshGradientBg from "./MeshGradientBg.svelte";
 
   let showConnectPanel = false;
@@ -248,7 +242,7 @@
   }
 
   // --- Context Menu Management ---
-  async function showTrackMenu(
+  function showTrackMenu(
     e: MouseEvent | PointerEvent,
     onlyAddToPlaylist = false,
   ) {
@@ -258,89 +252,19 @@
     e.preventDefault();
     e.stopPropagation();
 
-    const playlistItems = $playlists.map((playlist) => ({
-      label: playlist.name,
-      action: async () => {
-        try {
-          await addTrackToPlaylist(playlist.id, track.id);
-          addToast(`Added to ${playlist.name}`, "success");
-        } catch (error) {
-          console.error("Failed to add track to playlist:", error);
-          addToast("Failed to add to playlist", "error");
-        }
-      },
-    }));
-
-    const menuItems: any[] = [
-      {
-        label: "Add to Queue",
-        action: () => {
-          addToQueue([track]);
-          addToast("Added to queue", "success");
-        },
-      },
-      { type: "separator" },
-      {
-        label: "Add to Playlist",
-        submenu:
-          playlistItems.length > 0
-            ? playlistItems
-            : [
-                {
-                  label: "No playlists",
-                  action: () => {},
-                  disabled: true,
-                },
-              ],
-      },
-      { type: "separator" },
-      {
-        label: "Delete from Library",
-        danger: true,
-        action: async () => {
-          const confirmed = await confirm(
-            `Are you sure you want to delete "${track.title}" from your library?`,
-            {
-              title: "Delete Track",
-              confirmLabel: "Delete",
-              danger: true,
-            },
-          );
-
-          if (!confirmed) return;
-
-          try {
-            await deleteTrack(track.id);
-            await loadLibrary();
-            toggleFullScreen(); // Close player if track is deleted
-          } catch (error) {
-            console.error("Failed to delete track:", error);
-          }
-        },
-      },
-    ];
-
     contextMenu.set({
       visible: true,
       x: e.clientX,
       y: e.clientY,
-      items: onlyAddToPlaylist
-        ? [
-            {
-              label: "Add to Playlist",
-              submenu:
-                playlistItems.length > 0
-                  ? playlistItems
-                  : [
-                      {
-                        label: "No playlists",
-                        action: () => {},
-                        disabled: true,
-                      },
-                    ],
-            },
-          ]
-        : menuItems,
+      items: buildTrackContextMenu({
+        track,
+        trackIndex: 0,
+        sortedTracks: [],
+        isUnavailable: false,
+        variant: onlyAddToPlaylist ? 'playlist-only' : 'player',
+        onAfterDelete: toggleFullScreen,
+        t: $_,
+      }),
     });
   }
 
@@ -491,12 +415,13 @@
 
             <!-- Go to Artist -->
             {#if $currentTrack?.artist}
+              {@const artist = $currentTrack.artist}
               <button
                 class="sheet-item"
                 on:click={() => {
                   showMobileMenu = false;
                   toggleFullScreen();
-                  if ($currentTrack?.artist) goToArtistDetail($currentTrack.artist);
+                  goToArtistDetail(artist);
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
@@ -508,12 +433,13 @@
 
             <!-- Go to Album -->
             {#if $currentTrack?.album_id}
+              {@const albumId = $currentTrack.album_id}
               <button
                 class="sheet-item"
                 on:click={() => {
                   showMobileMenu = false;
                   toggleFullScreen();
-                  if ($currentTrack?.album_id) goToAlbumDetail($currentTrack.album_id);
+                  goToAlbumDetail(albumId);
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">

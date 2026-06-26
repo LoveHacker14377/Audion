@@ -8,14 +8,11 @@
         exportPlaylistZip,
         formatDuration,
     } from "$lib/api/tauri";
-    import { confirm, prompt } from "$lib/stores/dialogs";
-    import {
-        pinnedItems,
-        pinItem,
-        unpinItem,
-        isPinned,
-    } from "$lib/stores/pinned";
+    import { confirm } from "$lib/stores/dialogs";
+    import { pinnedItems } from "$lib/stores/pinned";
     import { contextMenu } from "$lib/stores/ui";
+    import { buildPlaylistContextMenu } from "$lib/menus/contextMenus";
+    import { _ } from "svelte-i18n";
     import { playTracks, addToQueue } from "$lib/stores/player";
     import { goToPlaylists, goToTracksMultiSelect } from "$lib/stores/view";
     import { loadPlaylists, playlists, playlistPendingTracks, drainPendingTracks } from "$lib/stores/library";
@@ -279,71 +276,21 @@
     function handleHeaderContextMenu(e: MouseEvent) {
         e.preventDefault();
         if (!playlist) return;
-        const pinned = isPinned("playlist", playlist.id, $pinnedItems);
-
         contextMenu.set({
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: [
-                {
-                    label: "Play",
-                    action: handlePlayAll,
-                    disabled: tracks.length === 0,
-                },
-                {
-                    label: "Add to Queue",
-                    action: () => {
-                        if (tracks.length > 0) addToQueue(tracks);
-                    },
-                    disabled: tracks.length === 0,
-                },
-                { type: "separator" },
-                {
-                    label: pinned ? "Unpin from Top" : "Pin to Top",
-                    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2L4.5 9L9 9L9 22L15 22L15 9L19.5 9L12 2Z"/></svg>`,
-                    action: () => {
-                        if (pinned) {
-                            unpinItem("playlist", playlist!.id);
-                        } else {
-                            pinItem("playlist", playlist!.id);
-                        }
-                    },
-                },
-                { type: "separator" },
-                {
-                    label: "Rename",
-                    action: startEditing,
-                },
-                {
-                    label: "Change Cover",
-                    submenu: [
-                        {
-                            label: "From File",
-                            action: () => coverInput?.click(),
-                        },
-                        {
-                            label: "From URL",
-                            action: async () => {
-                                const url = await prompt("Enter image URL:", {
-                                    title: "Change Cover",
-                                    placeholder:
-                                        "https://example.com/image.jpg",
-                                });
-                                if (url && url.trim()) {
-                                    setPlaylistCover(playlist!.id, url.trim());
-                                }
-                            },
-                        },
-                    ],
-                },
-                { type: "separator" },
-                {
-                    label: "Delete Playlist",
-                    danger: true,
-                    action: handleDelete,
-                },
-            ],
+            items: buildPlaylistContextMenu({
+                playlist,
+                tracks,
+                variant: "detail",
+                onPlay: handlePlayAll,
+                onAddToQueue: () => { if (tracks.length > 0) addToQueue(tracks); },
+                onRename: startEditing,
+                onDelete: handleDelete,
+                coverInput,
+                t: $_,
+            }),
         });
     }
 

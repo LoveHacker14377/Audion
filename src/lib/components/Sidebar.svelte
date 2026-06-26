@@ -30,6 +30,7 @@
         toggleSettings as toggleSettingsUI,
         contextMenu,
     } from "$lib/stores/ui";
+    import { buildPlaylistContextMenu } from "$lib/menus/contextMenus";
     import { appSettings } from "$lib/stores/settings";
     import { likedCount } from "$lib/stores/liked";
     import {
@@ -39,11 +40,10 @@
         deletePlaylist,
         type Playlist,
         getPlaylistTracks,
-        renamePlaylist,
     } from "$lib/api/tauri";
-    import { playlistCovers, setPlaylistCover } from "$lib/stores/playlistCovers";
+    import { playlistCovers } from "$lib/stores/playlistCovers";
     import { progressiveScan } from "$lib/stores/progressiveScan";
-    import { confirm, prompt } from "$lib/stores/dialogs";
+    import { confirm } from "$lib/stores/dialogs";
     import {
         playTracks,
         addToQueue,
@@ -73,8 +73,6 @@
     import { currentPlaylistId } from "$lib/stores/player";
     import {
         pinnedItems,
-        pinItem,
-        unpinItem,
         isPinned,
     } from "$lib/stores/pinned";
     import { setCustomArtwork } from "$lib/stores/customArtwork";
@@ -305,87 +303,19 @@
 
     function handlePlaylistContextMenu(e: MouseEvent, playlist: Playlist) {
         e.preventDefault();
-        const pinned = isPinned("playlist", playlist.id, $pinnedItems);
         contextMenu.set({
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: [
-                {
-                    label: "Play",
-                    action: () => handlePlayPlaylist(playlist.id),
-                },
-                {
-                    label: "Add to Queue",
-                    action: () => handleAddToQueue(playlist.id),
-                },
-                {
-                    label: pinned ? "Unpin from Top" : "Pin to Top",
-                    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2L4.5 9L9 9L9 22L15 22L15 9L19.5 9L12 2Z"/></svg>`,
-                    action: () => {
-                        if (pinned) {
-                            unpinItem("playlist", playlist.id);
-                        } else {
-                            pinItem("playlist", playlist.id);
-                        }
-                    },
-                },
-                { type: "separator" },
-                {
-                    label: "Rename",
-                    action: async () => {
-                        const newName = await prompt("Enter new name:", {
-                            initialValue: playlist.name,
-                            title: "Rename Playlist",
-                        });
-                        if (
-                            newName &&
-                            newName.trim() &&
-                            newName !== playlist.name
-                        ) {
-                            try {
-                                await renamePlaylist(
-                                    playlist.id,
-                                    newName.trim(),
-                                );
-                                await loadPlaylists();
-                            } catch (error) {
-                                console.error(
-                                    "Failed to rename playlist:",
-                                    error,
-                                );
-                            }
-                        }
-                    },
-                },
-                {
-                    label: "Change Cover",
-                    action: () => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.onchange = (e) => {
-                            const file = (e.target as HTMLInputElement)
-                                .files?.[0];
-                            if (file) {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    const result = reader.result as string;
-                                    setPlaylistCover(playlist.id, result);
-                                };
-                                reader.readAsDataURL(file);
-                            }
-                        };
-                        input.click();
-                    },
-                },
-                { type: "separator" },
-                {
-                    label: "Delete Playlist",
-                    action: () =>
-                        handleDeletePlaylist(playlist.id, playlist.name),
-                },
-            ],
+            items: buildPlaylistContextMenu({
+                playlist,
+                variant: "sidebar",
+                onPlay: () => handlePlayPlaylist(playlist.id),
+                onAddToQueue: () => handleAddToQueue(playlist.id),
+                // no onRename: factory falls back to inline prompt + renamePlaylist
+                onDelete: () => handleDeletePlaylist(playlist.id, playlist.name),
+                t: $_,
+            }),
         });
     }
 

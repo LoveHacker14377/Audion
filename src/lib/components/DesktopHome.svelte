@@ -3,7 +3,6 @@
     import { formatDuration, type Track, type Album, type Playlist, getPlaylistTracks, getTracksByAlbum } from "$lib/api/tauri";
     import {
         playTracks,
-        addToQueue,
         currentAlbumId,
         currentTrackId,
         currentPlaylistId,
@@ -36,6 +35,7 @@
     import { pinnedItems, isPinned } from "$lib/stores/pinned";
     import { playlistCovers } from "$lib/stores/playlistCovers";
     import { homeLayout, toggleSection, reorderSection } from "$lib/stores/homeLayout";
+    import { buildAlbumContextMenu, buildTrackContextMenu, isTrackUnavailable } from "$lib/menus/contextMenus";
 
     let homeEl: HTMLDivElement;
     let scrollRestored = false;
@@ -325,17 +325,14 @@
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: [
-                { label: "Play", action: () => playAlbum(album) },
-                {
-                    label: "Go to Album",
-                    action: () => goToAlbumDetail(album.id),
-                },
-                {
-                    label: "Go to Artist",
-                    action: () => goToArtistDetail(album.artist || ""),
-                },
-            ],
+            items: buildAlbumContextMenu({
+                album,
+                showPlay: true,
+                showGoToArtist: true,
+                showPin: false,
+                onPlay: playAlbum,
+                t: $_,
+            }),
         });
     }
 
@@ -424,22 +421,14 @@
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: [
-                { label: $_('contextMenu.play'), action: () => playTracks(trackList, index) },
-                { label: $_('contextMenu.addToQueue'), action: () => addToQueue([track]) },
-                { type: "separator" },
-                {
-                    label: $_('contextMenu.goToArtist'),
-                    action: () => goToArtistDetail(track.artist || ""),
-                },
-                {
-                    label: $_('contextMenu.goToAlbum'),
-                    action: () => {
-                        if (track.album_id) goToAlbumDetail(track.album_id);
-                    },
-                    disabled: !track.album_id,
-                },
-            ],
+            items: buildTrackContextMenu({
+                track,
+                trackIndex: index,
+                sortedTracks: trackList,
+                isUnavailable: isTrackUnavailable(track),
+                variant: "home",
+                t: $_,
+            }),
         });
     }
 </script>
