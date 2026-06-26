@@ -1,7 +1,10 @@
 <script lang="ts">
     import { getLikedTracks, type Track } from "$lib/api/tauri";
     import { likedTrackIds } from "$lib/stores/liked";
-    import { playTracks, shuffle } from "$lib/stores/player";
+    import { playTracks, shuffle, addToQueue } from "$lib/stores/player";
+    import { contextMenu } from "$lib/stores/ui";
+    import { buildLikedSongsContextMenu } from "$lib/menus/contextMenus";
+    import { _ } from "svelte-i18n";
     import TrackList from "./TrackList.svelte";
 
     let tracks: Track[] = [];
@@ -40,6 +43,24 @@
             playTracks(tracks, randomIndex);
         }
     }
+
+    function handleHeaderContextMenu(e: MouseEvent) {
+        e.preventDefault();
+        contextMenu.set({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items: buildLikedSongsContextMenu({
+                tracks,
+                onPlay: handlePlayAll,
+                onAddToQueue: () => {
+                    if (tracks.length > 0) addToQueue(tracks);
+                },
+                t: $_,
+            }),
+        });
+    }
+
     function handleScroll(e: Event) {
         scrollTop = (e.target as HTMLElement).scrollTop;
     }
@@ -47,11 +68,13 @@
 
 <div class="liked-songs-view">
     <!-- Header -->
-    <div
+    <header
         class="liked-header"
         class:is-small={isHeaderSmall}
         style:opacity={headerOpacity}
         style:transform="translateY({headerTranslateY}px) scale({headerScale})"
+        on:contextmenu={handleHeaderContextMenu}
+        aria-label="Liked Songs header"
     >
         <div class="liked-gradient-bg">
             <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
@@ -67,7 +90,7 @@
                 <span class="liked-count">{tracks.length} songs</span>
             </div>
         </div>
-    </div>
+    </header>
 
     <!-- Controls -->
     <div class="liked-controls">
@@ -171,13 +194,13 @@
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         transform-origin: center top;
         z-index: 10;
-        pointer-events: none;
+        pointer-events: auto;
     }
 
     .liked-header.is-small {
         padding-top: 15px;
         padding-bottom: 5px;
-        pointer-events: none;
+        pointer-events: auto;
     }
 
     .liked-gradient-bg {

@@ -36,6 +36,7 @@ import { addToast } from '$lib/stores/toast';
 import { confirm, prompt } from '$lib/stores/dialogs';
 import { canDownload, downloadTrack, needsDownloadLocation } from '$lib/services/downloadService';
 import { pluginStore } from '$lib/stores/plugin-store';
+import { likedTrackIds, isLiked, toggleLike, unlikeAll } from '$lib/stores/liked';
 
 // shared availability helper ===========================================================================
 
@@ -283,6 +284,18 @@ export interface ArtistMenuOptions<A extends Artist | { name: string } = Artist>
     t: Tfn;
 }
 
+export interface LikedSongsMenuOptions {
+    /**
+     * needed to disable Play / Add to Queue / Unlike All when there are no
+     * liked tracks
+     */
+    tracks: Track[];
+    onPlay?: () => void;
+    onAddToQueue?: () => void;
+    /** called after Unlike All completes (e.g. to show a toast or refresh) */
+    onAfterUnlikeAll?: () => void;
+    t: Tfn;
+}
 export interface PlaylistMenuOptions {
     playlist: Playlist;
     /**
@@ -349,9 +362,15 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
         }
     });
 
+    // like/unlike => same item everywhere, label/action flip on current state
+    // read fresh at build time (isLiked wraps get() internally), not subscribed
+    const likeItem: ContextMenuItem = isLiked(track.id)
+        ? { label: t('contextMenu.unlike'), action: () => toggleLike(track.id) }
+        : { label: t('contextMenu.like'), action: () => toggleLike(track.id) };
+
     // playlist-only (FullscreenPlayer mobile long-press) ===============================
     if (variant === 'playlist-only') {
-        return [addToPlaylistItem];
+        return [likeItem, addToPlaylistItem];
     }
 
     // home (DesktopHome cards)===========================================================
@@ -366,6 +385,7 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
                     addToast(t('contextMenu.addedToQueue'), 'success');
                 },
             },
+            likeItem,
             SEP,
             {
                 label: t('contextMenu.goToArtist'),
@@ -390,6 +410,7 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
                     addToast(t('contextMenu.addedToQueue'), 'success');
                 },
             },
+            likeItem,
             SEP,
             addToPlaylistItem,
             SEP,
@@ -430,6 +451,7 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
                 addToast(t('contextMenu.addedToQueue'), 'success');
             },
         },
+        likeItem,
         SEP,
         {
             label: t('contextMenu.download'),
@@ -665,6 +687,38 @@ export function buildPlaylistContextMenu(opts: PlaylistMenuOptions): ContextMenu
             label: t('contextMenu.deletePlaylist'),
             danger: true,
             action: onDelete,
+        },
+    ];
+}
+
+// liked songs
+export function buildLikedSongsContextMenu(opts: LikedSongsMenuOptions): ContextMenuItem[] {
+    const { tracks, onPlay, onAddToQueue, t } = opts;
+    const isEmpty = tracks.length === 0;
+
+    return [
+        { label: t('contextMenu.play'), action: onPlay, disabled: isEmpty },
+        { label: t('contextMenu.addToQueue'), action: onAddToQueue, disabled: isEmpty },
+        SEP,
+        {
+            label: t('contextMenu.unlikeAll'),
+            danger: true,
+            disabled: isEmpty,
+            action: async () => {
+                const ok = await confirm(
+                    `Are you sure you want to unlike all ${tracks.length} liked song${tracks.length === 1 ? '' : 's'}? This cannot be undone.`,
+                    { title: 'Unlike All', confirmLabel: 'Unlike All', danger: true },
+                );
+                if (!ok) return;
+                const failedCount = await unlikeAll();
+                if (failedCount > 0) {
+                    addToast(
+                        `Unliked all but ${failedCount} track${failedCount === 1 ? '' : 's'} (failed to sync)`,
+                        'error',
+                    );
+                }
+                opts.onAfterUnlikeAll?.();
+            },
         },
     ];
 }
