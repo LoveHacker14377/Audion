@@ -1,8 +1,9 @@
 <script lang="ts">
-    import { getLikedTracks, type Track } from "$lib/api/tauri";
+    import { getLikedTracks, exportLikedSongsZip, type Track } from "$lib/api/tauri";
     import { likedTrackIds } from "$lib/stores/liked";
     import { playTracks, shuffle, addToQueue } from "$lib/stores/player";
     import { contextMenu } from "$lib/stores/ui";
+    import { addToast } from "$lib/stores/toast";
     import { buildLikedSongsContextMenu } from "$lib/menus/contextMenus";
     import { _ } from "svelte-i18n";
     import TrackList from "./TrackList.svelte";
@@ -44,6 +45,23 @@
         }
     }
 
+    async function handleExportZip() {
+        if (tracks.length === 0) return;
+        try {
+            const result = await exportLikedSongsZip();
+            if (!result) return; // user cancelled picker
+            const { track_count, skipped_count } = result;
+            const msg =
+                skipped_count > 0
+                    ? `Exported ${track_count - skipped_count} of ${track_count} tracks (${skipped_count} streaming-only skipped)`
+                    : `Exported ${track_count} tracks`;
+            addToast(msg, "success");
+        } catch (err) {
+            console.error("[LikedSongs] exportZip failed:", err);
+            addToast("Export failed", "error");
+        }
+    }
+
     function handleHeaderContextMenu(e: MouseEvent) {
         e.preventDefault();
         contextMenu.set({
@@ -56,6 +74,7 @@
                 onAddToQueue: () => {
                     if (tracks.length > 0) addToQueue(tracks);
                 },
+                onExportZip: handleExportZip,
                 t: $_,
             }),
         });

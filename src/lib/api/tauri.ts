@@ -493,22 +493,32 @@ export interface ExportPlaylistResult {
     skipped_count: number;
 }
 
-export async function exportPlaylistZip(
-    playlistId: number,
-    playlistName = 'playlist',
+/**
+ * shared picker + invoke logic for ZIP exports
+ *
+ * @param defaultName  suggested filename shown in the save dialog (e.g. My Playlist.zip)
+ * @param title        desktop dialog title
+ * @param cmd          tauri command to invoke (e.g. export_playlist_zip)
+ * @param cmdArgs      extra args forwarded to the command alongside destPath
+ */
+async function exportZip(
+    defaultName: string,
+    title: string,
+    cmd: string,
+    cmdArgs: Record<string, unknown> = {},
 ): Promise<ExportPlaylistResult | null> {
     if (isAndroid()) {
         // 1: show picker first => user chooses destination before compression starts
         const uri = await saveFile({
             platform: 'android',
-            defaultPath: `${playlistName}.zip`,
+            defaultPath: defaultName,
             mimeType: 'application/zip',
         });
         if (!uri) return null;
 
         // 2: compress into the app cache dir
-        const tempPath = await invoke<string>('get_export_temp_path', { name: `${playlistName}.zip` });
-        const result = await invoke<ExportPlaylistResult>('export_playlist_zip', { playlistId, destPath: tempPath });
+        const tempPath = await invoke<string>('get_export_temp_path', { name: defaultName });
+        const result = await invoke<ExportPlaylistResult>(cmd, { ...cmdArgs, destPath: tempPath });
 
         // 3: copy finished zip to the user-picked URI (kotlin cleans up tempPath either way)
         const ok = await commitAndroidSave(tempPath, uri);
@@ -520,12 +530,32 @@ export async function exportPlaylistZip(
     // desktop: picker returns the real path, write directly there
     const destPath = await saveFile({
         platform: 'desktop',
-        title: 'Export playlist as ZIP',
-        defaultPath: `${playlistName}.zip`,
+        title,
+        defaultPath: defaultName,
         filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
     });
     if (!destPath) return null;
-    return await invoke('export_playlist_zip', { playlistId, destPath });
+    return await invoke(cmd, { ...cmdArgs, destPath });
+}
+
+export async function exportPlaylistZip(
+    playlistId: number,
+    playlistName = 'playlist',
+): Promise<ExportPlaylistResult | null> {
+    return exportZip(
+        `${playlistName}.zip`,
+        'Export playlist as ZIP',
+        'export_playlist_zip',
+        { playlistId },
+    );
+}
+
+export async function exportLikedSongsZip(): Promise<ExportPlaylistResult | null> {
+    return exportZip(
+        'Liked Songs.zip',
+        'Export Liked Songs as ZIP',
+        'export_liked_songs_zip',
+    );
 }
 
 export async function beginFolderImport(folderPath: string): Promise<number> {

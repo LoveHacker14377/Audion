@@ -221,6 +221,85 @@ fn write_zip(
     Ok(ExportSummary { track_count, skipped_count })
 }
 
+// liked songs: load tracks (call with lock held) ================================================
+
+fn load_liked_tracks(conn: &Connection) -> Result<Vec<TrackEntry>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT t.id, t.path, t.title, t.artist, t.album,
+                    t.track_number, t.disc_number, t.duration,
+                    t.format, t.bitrate, t.source_type,
+                    t.local_src, t.date_added
+             FROM liked_tracks lt
+             JOIN tracks t ON t.id = lt.track_id
+             ORDER BY lt.liked_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut seen_names: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
+
+    let entries = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<i32>>(5)?,
+                row.get::<_, Option<i32>>(6)?,
+                row.get::<_, Option<i32>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<i32>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .map(|row| -> Result<TrackEntry, String> {
+            let (id, path, title, artist, album, track_number, disc_number,
+                 duration, format, bitrate, source_type, local_src, date_added) =
+                row.map_err(|e| e.to_string())?;
+
+            let candidate = local_src.as_deref().unwrap_or(&path);
+            let abs_path = PathBuf::from(candidate);
+            let local_path = if abs_path.exists() { Some(abs_path) } else { None };
+
+            let zip_path = local_path.as_ref().map(|p| {
+                let raw = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| format!("track_{id}.bin"));
+                dedupe_name(&raw, &mut seen_names)
+            });
+
+            Ok(TrackEntry {
+                export: ExportTrack {
+                    id, title, artist, album, track_number, disc_number,
+                    duration, format, bitrate, source_type, date_added,
+                    zip_path,
+                },
+                local_path,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(entries)
+}
+
+// liked songs: public entry point (call from spawn_blocking) ====================================
+
+pub fn build_liked_songs_zip(
+    conn: &Connection,
+    dest: &Path,
+) -> Result<ExportSummary, String> {
+    let entries = load_liked_tracks(conn)?;
+    // playlist_id 0 = synthetic; cover_url/created_at not applicable
+    write_zip(0, "Liked Songs".to_owned(), None, None, entries, dest)
+}
+
 // public entry point (call from spawn_blocking) =========================================================
 pub fn build_playlist_zip(
     conn: &Connection,
@@ -270,4 +349,25 @@ pub async fn get_export_temp_path(
         .map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
     Ok(cache_dir.join(&name).to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub async fn export_liked_songs_zip(
+    dest_path: String,
+    db: tauri::State<'_, crate::db::Database>,
+) -> Result<serde_json::Value, String> {
+    let dest = PathBuf::from(dest_path);
+    let conn_arc = db.conn.clone();
+
+    let summary = tokio::task::spawn_blocking(move || {
+        let conn = conn_arc.lock().map_err(|e| e.to_string())?;
+        build_liked_songs_zip(&conn, &dest)
+    })
+    .await
+    .map_err(|e| format!("Export task panicked: {e}"))??;
+
+    Ok(serde_json::json!({
+        "track_count": summary.track_count,
+        "skipped_count": summary.skipped_count,
+    }))
 }

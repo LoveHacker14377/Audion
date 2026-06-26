@@ -294,6 +294,8 @@ export interface LikedSongsMenuOptions {
     onAddToQueue?: () => void;
     /** called after Unlike All completes (e.g. to show a toast or refresh) */
     onAfterUnlikeAll?: () => void;
+    /** called to export all liked songs as a ZIP archive */
+    onExportZip?: () => void;
     t: Tfn;
 }
 export interface PlaylistMenuOptions {
@@ -699,6 +701,12 @@ export function buildLikedSongsContextMenu(opts: LikedSongsMenuOptions): Context
     return [
         { label: t('contextMenu.play'), action: onPlay, disabled: isEmpty },
         { label: t('contextMenu.addToQueue'), action: onAddToQueue, disabled: isEmpty },
+        SEP,
+        {
+            label: t('contextMenu.exportToZip'),
+            disabled: isEmpty,
+            action: () => opts.onExportZip?.(),
+        },
         SEP,
         {
             label: t('contextMenu.unlikeAll'),
