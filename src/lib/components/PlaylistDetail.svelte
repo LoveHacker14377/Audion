@@ -288,6 +288,7 @@
                 onAddToQueue: () => { if (tracks.length > 0) addToQueue(tracks); },
                 onRename: startEditing,
                 onDelete: handleDelete,
+                onExportZip: handleExportZip,
                 coverInput,
                 t: $_,
             }),
@@ -321,11 +322,12 @@
             const result = await exportPlaylistZip(playlistId, playlist.name);
             if (!result) return; // user cancelled
 
-            const skippedMsg = result.skipped_count > 0
-                ? ` (${result.skipped_count} streaming-only track${result.skipped_count > 1 ? "s" : ""} skipped)`
+            const skipped_count = result.skipped_count;
+            const exported = result.track_count - skipped_count;
+            const skippedMsg = skipped_count > 0
+                ? ` (${skipped_count} streaming-only track${skipped_count === 1 ? "" : "s"} skipped)`
                 : "";
-
-            addToast(`Exported ${result.track_count} tracks${skippedMsg}`, "success");
+            addToast(`Exported ${exported} track${exported === 1 ? "" : "s"}${skippedMsg}`, "success");
         } catch (e) {
             addToast(`Export failed: ${e}`, "error");
         }
@@ -362,20 +364,20 @@
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                 </svg>
-                                Rename
+                                {$_('contextMenu.rename')}
                             </button>
                             <button class="dropdown-item" on:click={handleExportZip}>
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                                     <path d="M20 6h-2.18c.07-.44.18-.88.18-1a3 3 0 0 0-6 0c0 .12.11.56.18 1H10V4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8-1c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm8 15H4V8h16v12z"/>
                                 </svg>
-                                Export to ZIP
+                                {$_('contextMenu.exportToZip')}
                             </button>
                             <div class="dropdown-separator"></div>
                             <button class="dropdown-item danger" on:click={() => { closeMenu(); handleDelete(); }}>
                                 <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                                 </svg>
-                                Delete Playlist
+                                {$_('contextMenu.deletePlaylist')}
                             </button>
                         </div>
                     {/if}

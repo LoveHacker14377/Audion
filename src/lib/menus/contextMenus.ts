@@ -324,6 +324,8 @@ export interface PlaylistMenuOptions {
      */
     onRename?: () => void;
     onDelete?: () => void;
+    /** called to export the playlist as a ZIP archive (detail variant only) */
+    onExportZip?: () => void;
     /** pass a bound <input> element from the template (PlaylistDetail only) */
     coverInput?: HTMLInputElement | null;
     t: Tfn;
@@ -644,6 +646,7 @@ export function buildPlaylistContextMenu(opts: PlaylistMenuOptions): ContextMenu
         onAddToQueue,
         onRename,
         onDelete,
+        onExportZip,
         coverInput = null,
         t,
     } = opts;
@@ -680,6 +683,14 @@ export function buildPlaylistContextMenu(opts: PlaylistMenuOptions): ContextMenu
         { label: t('contextMenu.play'), action: onPlay, disabled: isEmpty },
         { label: t('contextMenu.addToQueue'), action: onAddToQueue, disabled: isEmpty },
         SEP,
+        ...(onExportZip ? [
+            {
+                label: t('contextMenu.exportToZip'),
+                disabled: isEmpty,
+                action: onExportZip,
+            },
+            SEP,
+        ] : []),
         buildPinItem(t, 'playlist', playlist.id),
         SEP,
         renameItem,

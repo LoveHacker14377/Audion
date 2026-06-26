@@ -48,17 +48,18 @@
     async function handleExportZip() {
         if (tracks.length === 0) return;
         try {
+            addToast("Exporting…", "info");
             const result = await exportLikedSongsZip();
             if (!result) return; // user cancelled picker
             const { track_count, skipped_count } = result;
-            const msg =
-                skipped_count > 0
-                    ? `Exported ${track_count - skipped_count} of ${track_count} tracks (${skipped_count} streaming-only skipped)`
-                    : `Exported ${track_count} tracks`;
-            addToast(msg, "success");
+            const exported = track_count - skipped_count;
+            const skippedMsg = skipped_count > 0
+                ? ` (${skipped_count} streaming-only track${skipped_count === 1 ? "" : "s"} skipped)`
+                : "";
+            addToast(`Exported ${exported} track${exported === 1 ? "" : "s"}${skippedMsg}`, "success");
         } catch (err) {
             console.error("[LikedSongs] exportZip failed:", err);
-            addToast("Export failed", "error");
+            addToast(`Export failed: ${err}`, "error");
         }
     }
 

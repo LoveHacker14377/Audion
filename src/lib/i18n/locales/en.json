@@ -19,6 +19,7 @@
     "like": "Like",
     "unlike": "Unlike",
     "unlikeAll": "Unlike All",
+    "exportToZip": "Export to Zip",
     "deleteAlbum": "Delete Album",
     "deletePlaylist": "Delete Playlist",
     "rename": "Rename",
