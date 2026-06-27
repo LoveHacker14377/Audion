@@ -11,12 +11,13 @@
     ensureAudioPermission,
     openAppSettings,
     initPlatformDetection,
+    listen,
   } from "$lib/api/tauri";
   import { initMobileDetection, isMobile } from "$lib/stores/mobile";
   import { mobileSearchOpen } from "$lib/stores/mobile";
   import { initAndroidNotification } from "$lib/services/android-notification";
   import { loadLikedTracks } from "$lib/stores/liked";
-  import { goBack, navigationHistory } from "$lib/stores/view";
+  import { goBack, goToArtistDetail, navigationHistory } from "$lib/stores/view";
   import {
     isFullScreen,
     isQueueVisible,
@@ -105,6 +106,11 @@
 
     initMobileDetection();
     await initAudioBackend();
+
+    // tray artist click => focus window + navigate to artist detail
+    listen<string>("tray://go-to-artist", ({ payload: artist }) => {
+      if (artist) goToArtistDetail(artist);
+    }).catch(() => { });
 
     // Load liked tracks from database
     loadLikedTracks();

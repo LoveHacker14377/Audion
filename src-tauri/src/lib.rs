@@ -28,8 +28,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Listener, Manager, WindowEvent};
 #[cfg(desktop)]
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    menu::{CheckMenuItem, IconMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, TrayIcon, TrayIconBuilder},
 };
 
 // =============================================================================
@@ -76,6 +76,24 @@ fn ota_confirm_exit(window: tauri::Window) {
         gate.confirmed.store(true, Ordering::SeqCst);
     }
     let _ = window.close();
+}    
+// TRAY STATE
+// holds handles to the menu items that need dynamic updates:
+// 1) now_playing_title / now_playing_artist  => updated by smtc_set_metadata
+// 2) play_pause                              => updated by smtc_set_playback
+// 3) shuffle / repeat                        => updated by tray_update_toggles
+// the TrayIcon itself is kept alive here (dropping it removes the tray icon)
+// =============================================================================
+#[cfg(desktop)]
+pub struct TrayState {
+    pub _tray: TrayIcon,
+    pub now_playing_title: MenuItem<tauri::Wry>,
+    pub now_playing_artist: MenuItem<tauri::Wry>,
+    pub play_pause: MenuItem<tauri::Wry>,
+    pub shuffle: CheckMenuItem<tauri::Wry>,
+    pub repeat: MenuItem<tauri::Wry>,
+    // last known artist name, used by the artist menu item click handler
+    pub current_artist: std::sync::Mutex<String>,
 }
 
 /// Handle a deep link URL — extract tokens, store them, fetch profile, trigger sync.
@@ -275,6 +293,61 @@ fn init_panic_hook() {
         // Give the non-blocking writer time to flush before the process dies.
         std::thread::sleep(std::time::Duration::from_millis(300));
     }));
+}
+
+// =============================================================================
+// TRAY COMMANDS
+// called from player.ts to keep tray menu items in sync with playback state
+// =============================================================================
+
+/// update the play/pause menu item label and the now-playing title/artist lines
+/// called from player.ts at the same sites that call smtc_set_playback and smtc_set_metadata
+#[tauri::command]
+#[cfg(desktop)]
+fn tray_update_playback(
+    app: tauri::AppHandle,
+    is_playing: bool,
+    title: Option<String>,
+    artist: Option<String>,
+) {
+    let state = app.state::<TrayState>();
+    let label = if is_playing { "⏸  Pause" } else { "▶  Play" };
+    if let Err(e) = state.play_pause.set_text(label) {
+        tracing::warn!("[Tray] Failed to update play/pause label: {}", e);
+    }
+    if let Some(t) = title {
+        let _ = state.now_playing_title.set_text(if t.is_empty() { "—".into() } else { t });
+    }
+    if let Some(a) = artist {
+        let _ = state.now_playing_artist.set_text(if a.is_empty() { "—".into() } else { a.clone() });
+        if let Ok(mut guard) = state.current_artist.lock() {
+            *guard = a;
+        }
+    }
+}
+
+/// update the shuffle and repeat menu items
+/// called from player.ts via store subscriptions on shuffle / repeat
+#[tauri::command]
+#[cfg(desktop)]
+fn tray_update_toggles(
+    app: tauri::AppHandle,
+    shuffle: bool,
+    // none | one | all
+    repeat: String,
+) {
+    let state = app.state::<TrayState>();
+    if let Err(e) = state.shuffle.set_checked(shuffle) {
+        tracing::warn!("[Tray] Failed to update shuffle checkmark: {}", e);
+    }
+    let repeat_label = match repeat.as_str() {
+        "all" => "🔁  Repeat: All",
+        "one" => "🔁  Repeat: One",
+        _     => "🔁  Repeat: Off",
+    };
+    if let Err(e) = state.repeat.set_text(repeat_label) {
+        tracing::warn!("[Tray] Failed to update repeat label: {}", e);
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -551,33 +624,132 @@ pub fn run() {
             // =============================================================================
             // SYSTEM TRAY SETUP (desktop only)
             // =============================================================================
+            // menu layout:
+            //   [icon] Now Playing             <= focuses window on click
+            //   <title>                        <= focuses window on click
+            //   <artist>                       <= focuses window + navigates to artist
+            //   __________________________________
+            //   ⏮ Previous
+            //   ⏸ Play / Pause
+            //   ⏭ Next
+            //   ____________________________________
+            //   🔀 Shuffle
+            //   🔁 Repeat: Off / All / One
+            //   ____________________________________
+            //   Quit
+            // =============================================================================
             #[cfg(desktop)]
             {
-                let show_i = MenuItem::with_id(app, "show", "Show Audion", true, None::<&str>)?;
+                let icon_img = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png")).unwrap();
+
+                // static header (clicking focuses the window, reuses show handler) =================================
+                let header_i = IconMenuItem::with_id(
+                    app, "show", "Now Playing", true,
+                    Some(icon_img.clone()), None::<&str>,
+                )?;
+
+                // track info (dynamic) =====================================
+                let title_i  = MenuItem::with_id(app, "now_playing_title",  "—", true, None::<&str>)?;
+                let artist_i = MenuItem::with_id(app, "now_playing_artist", "—", true, None::<&str>)?;
+
+                let sep1 = PredefinedMenuItem::separator(app)?;
+
+                // transport =================================
+                let prev_i  = MenuItem::with_id(app, "previous",  "⏮  Previous", true, None::<&str>)?;
+                let pp_i    = MenuItem::with_id(app, "play_pause", "⏸  Pause",    true, None::<&str>)?;
+                let next_i  = MenuItem::with_id(app, "next",       "⏭  Next",     true, None::<&str>)?;
+
+                let sep2 = PredefinedMenuItem::separator(app)?;
+
+                // toggles ==========================
+                let shuffle_i = CheckMenuItem::with_id(app, "shuffle", "🔀  Shuffle", true, false, None::<&str>)?;
+                let repeat_i  = MenuItem::with_id(app, "repeat", "🔁  Repeat: Off", true, None::<&str>)?;
+
+                let sep3 = PredefinedMenuItem::separator(app)?;
+
                 let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
-                let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png")).unwrap();
+                let menu = Menu::with_items(app, &[
+                    &header_i,
+                    &title_i,
+                    &artist_i,
+                    &sep1,
+                    &prev_i,
+                    &pp_i,
+                    &next_i,
+                    &sep2,
+                    &shuffle_i,
+                    &repeat_i,
+                    &sep3,
+                    &quit_i,
+                ])?;
 
-                let _tray = TrayIconBuilder::new()
-                    .icon(icon)
+                let tray = TrayIconBuilder::new()
+                    .icon(icon_img)
                     .tooltip("Audion")
                     .menu(&menu)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                window.show().ok();
-                                window.unminimize().ok();
-                                window.set_focus().ok();
+                    .on_menu_event(|app, event| {
+                        match event.id.as_ref() {
+                            // Now Playing header => focus window
+                            "show" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    window.show().ok();
+                                    window.unminimize().ok();
+                                    window.set_focus().ok();
+                                }
                             }
+                            // track title => focus window and togglefullscreen
+                            "now_playing_title" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    window.show().ok();
+                                    window.unminimize().ok();
+                                    window.set_focus().ok();
+                                }
+                                let _ = app.emit("tray://open-fullscreen", ());
+                            }
+                            // artist name => focus window + navigate to artist
+                            "now_playing_artist" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    window.show().ok();
+                                    window.unminimize().ok();
+                                    window.set_focus().ok();
+                                }
+                                let artist = app
+                                    .state::<TrayState>()
+                                    .current_artist
+                                    .lock()
+                                    .map(|g| g.clone())
+                                    .unwrap_or_default();
+                                if !artist.is_empty() {
+                                    let _ = app.emit("tray://go-to-artist", artist);
+                                }
+                            }
+                            // transport => reuse smtc://event
+                            "previous" => {
+                                let _ = app.emit("smtc://event", serde_json::json!({ "type": "Previous" }));
+                            }
+                            "play_pause" => {
+                                let _ = app.emit("smtc://event", serde_json::json!({ "type": "Toggle" }));
+                            }
+                            "next" => {
+                                let _ = app.emit("smtc://event", serde_json::json!({ "type": "Next" }));
+                            }
+                            "shuffle" => {
+                                let _ = app.emit("tray://toggle-shuffle", ());
+                            }
+                            "repeat" => {
+                                let _ = app.emit("tray://toggle-repeat", ());
+                            }
+                            "quit" => {
+                                app.exit(0);
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     })
                     .on_tray_icon_event(|tray, event| {
-                        if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: MouseButton::Left, ..
+                        } = event {
                             let app = tray.app_handle();
                             if let Some(window) = app.get_webview_window("main") {
                                 window.show().ok();
@@ -586,7 +758,19 @@ pub fn run() {
                             }
                         }
                     })
+                    .show_menu_on_left_click(false)
                     .build(app)?;
+
+                app.manage(TrayState {
+                    _tray: tray,
+                    now_playing_title: title_i,
+                    now_playing_artist: artist_i,
+                    play_pause: pp_i,
+                    shuffle: shuffle_i,
+                    repeat: repeat_i,
+                    current_artist: std::sync::Mutex::new(String::new()),
+                });
+
                 tracing::info!("System tray initialized");
             }
 
@@ -773,9 +957,13 @@ pub fn run() {
                     audio::audio_get_stream_url,
                     windows_thumbar::windows_init_thumbar,
                     windows_thumbar::windows_update_thumbar_state,
+                    windows_thumbar::windows_set_taskbar_progress,
+                    windows_thumbar::windows_clear_taskbar_progress,
                     smtc::smtc_set_metadata,
                     smtc::smtc_set_playback,
                     smtc::smtc_set_volume,
+                    tray_update_playback,
+                    tray_update_toggles,
                     commands::proxy_fetch_bytes,
                     commands::save_image_to_gallery,
                     // Window close-to-tray and minimize-to-tray commands

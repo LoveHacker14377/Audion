@@ -24,6 +24,7 @@ import { pluginStore } from '$lib/stores/plugin-store';
 import { recordTrackPlay } from '$lib/stores/activity';
 import { submitListenbrainzListen } from '$lib/api/tauri';
 import { activeRemoteDevice } from '$lib/stores/websocket';
+import { isFullScreen, toggleFullScreen } from '$lib/stores/ui';
 
 // =============================================================================
 // NATIVE AUDIO BACKEND
@@ -474,6 +475,45 @@ export async function initAudioBackend(): Promise<void> {
         }
     }
 
+    // =============================================================================
+    // TRAY TOGGLE SYNC
+    // keep the tray shuffle/repeat checkmarks in sync with the store values.
+    // same debounce-free pattern used by the volume subscriber above —
+    // the invoke is best-effort (non-fatal) so desktop-only; no-ops on mobile.
+    // =============================================================================
+    shuffle.subscribe((val) => {
+        invoke('tray_update_toggles', { shuffle: val, repeat: get(repeat) }).catch(() => { });
+    });
+    repeat.subscribe((val) => {
+        invoke('tray_update_toggles', { shuffle: get(shuffle), repeat: val }).catch(() => { });
+    });
+
+    // tray://toggle-shuffle / tray://toggle-repeat are emitted by the tray
+    // on_menu_event when the user clicks the checkboxes. route them through
+    // the same functions the keyboard shortcuts and remote commands already use,
+    // so all state transitions happen in one place.
+    listen<void>('tray://toggle-shuffle', () => {
+        toggleShuffle();
+    }).catch(() => { });
+
+    listen<void>('tray://toggle-repeat', () => {
+        // cycle none -> all -> one -> none, matching the in-app repeat button
+        const current = get(repeat);
+        const next = current === 'none' ? 'all' : current === 'all' ? 'one' : 'none';
+        repeat.set(next);
+        if (get(activeBackend) === 'native') {
+            nativeAudioSetRepeatOne(next === 'one').catch(console.error);
+        }
+    }).catch(() => { });
+
+    // emitted when the user clicks the track title in the tray menu
+    // (lib.rs already focuses the window before emitting this)
+    listen<void>('tray://open-fullscreen', () => {
+        if (!get(isFullScreen)) {
+            toggleFullScreen();
+        }
+    }).catch(() => { });
+
     // Subscribe to WebSocket messages
     wsStore.onMessage((type, payload) => {
         switch (type) {
@@ -895,6 +935,28 @@ export async function updateSmtcMetadata(track: Track): Promise<void> {
     } catch (err) {
         console.error('[SMTC] set_metadata failed:', err);
     }
+    // keep tray now playing labels in sync
+    invoke('tray_update_playback', {
+        isPlaying: get(isPlaying),
+        title: track.title || 'Unknown Title',
+        artist: track.artist || 'Unknown Artist',
+    }).catch(() => { });
+}
+
+// WINDOWS ONLY.windows taskbar icon progress overlay. value is 0-1 fraction played;
+// is_paused swaps the green fill for the yellowish paused color
+function _pushTaskbarProgress(): void {
+    const dur = get(duration);
+    const cur = get(currentTime);
+    const value = dur > 0 ? Math.max(0, Math.min(1, cur / dur)) : 0;
+    invoke('windows_set_taskbar_progress', { value, isPaused: !get(isPlaying) }).catch(() => { });
+}
+
+let _taskbarProgressInterval: ReturnType<typeof setInterval> | null = null;
+
+function _startTaskbarProgressInterval(): void {
+    if (_taskbarProgressInterval !== null) return;
+    _taskbarProgressInterval = setInterval(_pushTaskbarProgress, 1000);
 }
 
 export function updateSmtcPlaybackState(state: 'playing' | 'paused' | 'none'): void {
@@ -902,6 +964,21 @@ export function updateSmtcPlaybackState(state: 'playing' | 'paused' | 'none'): v
         status: state === 'none' ? 'stopped' : state,
         positionSecs: get(currentTime),
     }).catch(() => { /* no-op if SMTC unavailable, e.g. init failed on this platform */ });
+    // keep tray play/pause label in sync
+    // title/artist are set by updateSmtcMetadata
+    invoke('tray_update_playback', {
+        isPlaying: state === 'playing',
+        title: null,
+        artist: null,
+    }).catch(() => { });
+
+    // taskbar icon progress overlay
+    if (state === 'none') {
+        invoke('windows_clear_taskbar_progress', {}).catch(() => { });
+    } else {
+        _pushTaskbarProgress();
+        _startTaskbarProgressInterval();
+    }
 }
 
 // Play a specific track

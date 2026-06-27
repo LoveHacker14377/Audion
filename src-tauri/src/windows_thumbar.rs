@@ -17,6 +17,7 @@ mod windows_impl {
     use windows::Win32::UI::Shell::{
         ITaskbarList3, TaskbarList, THBN_CLICKED, THUMBBUTTON, THUMBBUTTONFLAGS, THUMBBUTTONMASK,
         THBF_ENABLED, THB_FLAGS, THB_ICON, THB_TOOLTIP,
+        TBPF_NOPROGRESS, TBPF_NORMAL, TBPF_PAUSED,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         CallWindowProcW, CreateIconIndirect, DefWindowProcW, GetWindowLongPtrW,
@@ -279,6 +280,27 @@ mod windows_impl {
             .map_err(|e| format!("ThumbBarUpdateButtons failed: {e}"))
     }
 
+    // taskbar icon progress overlay
+    // value is 0.0-1.0
+    // is_paused switches the green fill to the amber paused color
+    fn set_progress(hwnd: HWND, value: f64, is_paused: bool) -> Result<(), String> {
+        let taskbar = taskbar_list()?;
+
+        let state = if is_paused { TBPF_PAUSED } else { TBPF_NORMAL };
+        unsafe { taskbar.SetProgressState(hwnd, state) }
+            .map_err(|e| format!("SetProgressState failed: {e}"))?;
+
+        let completed = (value.clamp(0.0, 1.0) * 100.0).round() as u64;
+        unsafe { taskbar.SetProgressValue(hwnd, completed, 100) }
+            .map_err(|e| format!("SetProgressValue failed: {e}"))
+    }
+
+    fn clear_progress(hwnd: HWND) -> Result<(), String> {
+        let taskbar = taskbar_list()?;
+        unsafe { taskbar.SetProgressState(hwnd, TBPF_NOPROGRESS) }
+            .map_err(|e| format!("SetProgressState failed: {e}"))
+    }
+
     fn window_hwnd(window: &WebviewWindow) -> Result<*mut c_void, String> {
         let handle = window
             .window_handle()
@@ -387,6 +409,24 @@ mod windows_impl {
         let hwnd_raw = window_hwnd(&window)?;
         update_play_pause_button(HWND(hwnd_raw), is_playing)
     }
+
+    pub(crate) fn set_taskbar_progress(app: &AppHandle, value: f64, is_paused: bool) -> Result<(), String> {
+        let Some(window) = app.get_webview_window("main") else {
+            return Ok(());
+        };
+
+        let hwnd_raw = window_hwnd(&window)?;
+        set_progress(HWND(hwnd_raw), value, is_paused)
+    }
+
+    pub(crate) fn clear_taskbar_progress(app: &AppHandle) -> Result<(), String> {
+        let Some(window) = app.get_webview_window("main") else {
+            return Ok(());
+        };
+
+        let hwnd_raw = window_hwnd(&window)?;
+        clear_progress(HWND(hwnd_raw))
+    }
 }
 
 #[tauri::command]
@@ -414,6 +454,38 @@ pub fn windows_update_thumbar_state(app: AppHandle, is_playing: bool) -> Result<
     {
         let _ = app;
         let _ = is_playing;
+        Ok(())
+    }
+}
+
+// value is 0.0-1.0 fraction of the track played
+// is_paused => overlay to the amber paused color. called from player.ts's position
+// ticker (throttled). instant on play/pause/seek/track-change
+#[tauri::command]
+pub fn windows_set_taskbar_progress(app: AppHandle, value: f64, is_paused: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_impl::set_taskbar_progress(&app, value, is_paused)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, value, is_paused);
+        Ok(())
+    }
+}
+
+// called on stop / queue end so the icon doesn't keep showing a stale bar
+#[tauri::command]
+pub fn windows_clear_taskbar_progress(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_impl::clear_taskbar_progress(&app)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
         Ok(())
     }
 }
