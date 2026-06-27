@@ -7,6 +7,8 @@ mod db;
 mod discord;
 #[cfg(desktop)]
 mod windows_thumbar;
+#[cfg(desktop)]
+mod smtc;
 mod scanner;
 mod security;
 mod sync;
@@ -410,6 +412,20 @@ pub fn run() {
                 app.manage(audio::PlaybackStateSync::new(app.handle().clone()));
             }
 
+            // SMTC / OS media controls init (desktop only)
+            // =============================================================================
+            // driven entirely by player.ts over invoke/listen, regardless
+            // of whether native or html5 playback is active
+            // needs the main window's HWND
+            // on windows, so state is registered now but init (which grabs the handle)
+            // runs later in setup(), after the window is confirmed to exist
+            // =============================================================================
+            #[cfg(desktop)]
+            {
+                tracing::info!("Registering SMTC state");
+                app.manage(smtc::SmtcState::uninitialized());
+            }
+
             // =============================================================================
             // SYNC STATE INITIALIZATION
             // =============================================================================
@@ -523,6 +539,12 @@ pub fn run() {
                     .ok();
                 } else {
                     tracing::warn!("Main webview window not found during setup");
+                }
+
+                // SMTC init needs a real HWND on windows, so this runs only after
+                // the main window block above has confirmed the window exists
+                if let Err(e) = smtc::init(app.handle().clone()) {
+                    tracing::warn!("SMTC initialization failed (non-fatal): {}", e);
                 }
             }
 
@@ -751,6 +773,9 @@ pub fn run() {
                     audio::audio_get_stream_url,
                     windows_thumbar::windows_init_thumbar,
                     windows_thumbar::windows_update_thumbar_state,
+                    smtc::smtc_set_metadata,
+                    smtc::smtc_set_playback,
+                    smtc::smtc_set_volume,
                     commands::proxy_fetch_bytes,
                     commands::save_image_to_gallery,
                     // Window close-to-tray and minimize-to-tray commands

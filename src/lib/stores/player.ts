@@ -355,6 +355,7 @@ export async function initAudioBackend(): Promise<void> {
             if (get(activeBackend) === 'html5') {
                 isPlaying.set(playing);
                 updateMediaSessionPlaybackState(playing ? 'playing' : 'paused');
+                updateSmtcPlaybackState(playing ? 'playing' : 'paused');
             }
         },
     });
@@ -381,6 +382,7 @@ export async function initAudioBackend(): Promise<void> {
                     // repeat-one loop
                     isPlaying.set(true);
                     updateMediaSessionPlaybackState('playing');
+                    updateSmtcPlaybackState('playing');
                 }
             } else if (event.type === 'DeviceListChanged') {
                 console.log('[Player] Device list updated');
@@ -395,6 +397,7 @@ export async function initAudioBackend(): Promise<void> {
                 isPlaying.set(false);
                 activeBackend.set('none');
                 updateMediaSessionPlaybackState('paused');
+                updateSmtcPlaybackState('paused');
             }
         }).catch(err => {
             console.error('[Player] Failed to register audio event listener:', err);
@@ -489,6 +492,7 @@ export async function initAudioBackend(): Promise<void> {
 
 
     await initWindowsThumbarIntegration();
+    await initSmtcIntegration();
 }
 
 function handleRemotePlayerState(payload: any) {
@@ -594,6 +598,10 @@ export function cleanupPlayer(): void {
     duration.set(0);
 
     updateMediaSessionPlaybackState('none');
+    updateSmtcPlaybackState('none');
+    _unlistenSmtc?.();
+    _unlistenSmtc = null;
+    smtcInitialized = false;
     if ('mediaSession' in navigator) {
         try { navigator.mediaSession.metadata = null; } catch (_) { /* ignore */ }
     }
@@ -791,6 +799,111 @@ function updateMediaSessionPosition(): void {
     }
 }
 
+// SMTC (Windows/Linux/macOS native os media controls, via souvlaki)
+// driven purely by the same call sites that already
+// keep MediaSession in sync, so backend independent
+
+let smtcInitialized = false;
+let _unlistenSmtc: (() => void) | null = null;
+
+async function initSmtcIntegration(): Promise<void> {
+    if (smtcInitialized) return;
+
+    try {
+        _unlistenSmtc = await listen<{ type: string; data?: any }>('smtc://event', ({ payload }) => {
+            switch (payload.type) {
+                case 'Play':
+                    void resume();
+                    break;
+                case 'Pause':
+                    void pause();
+                    break;
+                case 'Toggle':
+                    void togglePlay();
+                    break;
+                case 'Next':
+                    nextTrack();
+                    break;
+                case 'Previous':
+                    void previousTrack();
+                    break;
+                case 'Stop':
+                    void pause();
+                    break;
+                case 'SeekForward':
+                    _smtcSeekRelative(10);
+                    break;
+                case 'SeekBackward':
+                    _smtcSeekRelative(-10);
+                    break;
+                case 'SeekByForward':
+                    _smtcSeekRelative(payload.data.secs);
+                    break;
+                case 'SeekByBackward':
+                    _smtcSeekRelative(-payload.data.secs);
+                    break;
+                case 'SetPosition': {
+                    const dur = get(duration);
+                    if (dur > 0) void seek(payload.data.secs / dur);
+                    break;
+                }
+                case 'SetVolume':
+                    void _smtcApplyVolume(payload.data.level);
+                    break;
+            }
+        });
+        smtcInitialized = true;
+        console.log('[Player] SMTC integration initialized');
+    } catch (err) {
+        console.warn('[Player] SMTC init failed:', err);
+    }
+}
+
+function _smtcSeekRelative(deltaSecs: number): void {
+    const dur = get(duration);
+    if (dur <= 0) return;
+    const targetSecs = Math.max(0, Math.min(dur, get(currentTime) + deltaSecs));
+    void seek(targetSecs / dur);
+}
+
+// MPRIS only: the desktop's own volume slider for this player was moved
+// apply it the same way the in-app slider would, then ack back to souvlaki
+// (smtc_set_volume)
+// refer to SmtcEvent::SetVolume doc comment in smtc.rs for why the ack matters
+async function _smtcApplyVolume(level: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(1, level));
+    await setVolume(clamped); // updates the volume store the ui slider reads from
+    try {
+        await invoke('smtc_set_volume', { level: clamped });
+    } catch (err) {
+        console.debug('[SMTC] set_volume ack failed:', err);
+    }
+}
+
+export async function updateSmtcMetadata(track: Track): Promise<void> {
+    // raw source only => never a webview asset:// URL here. smtc.rs does the
+    // platform specific file:// / percent-encoding conversion on its side
+    const rawCover = track.track_cover_path || track.cover_url || null;
+    try {
+        await invoke('smtc_set_metadata', {
+            title: track.title || 'Unknown Title',
+            artist: track.artist || 'Unknown Artist',
+            album: track.album || null,
+            durationSecs: get(duration) || null,
+            coverUrl: rawCover,
+        });
+    } catch (err) {
+        console.error('[SMTC] set_metadata failed:', err);
+    }
+}
+
+export function updateSmtcPlaybackState(state: 'playing' | 'paused' | 'none'): void {
+    invoke('smtc_set_playback', {
+        status: state === 'none' ? 'stopped' : state,
+        positionSecs: get(currentTime),
+    }).catch(() => { /* no-op if SMTC unavailable, e.g. init failed on this platform */ });
+}
+
 // Play a specific track
 export async function playTrack(track: Track, skipLocalSrc = false, startTime = 0): Promise<void> {
     const previousTrackObj = get(currentTrack);
@@ -837,6 +950,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
     console.log('[Player] Preparing MediaSession metadata for:', trackForPlugins.title);
     await updateMediaSessionMetadata(trackForPlugins);
+    await updateSmtcMetadata(trackForPlugins);
 
     if (!track.track_cover_path && !track.cover_url) {
         fetchTrackCover(track).then(async (newCoverUrl) => {
@@ -855,6 +969,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                 if (current && current.id === track.id) {
                     currentTrack.update(t => t ? { ...t, cover_url: newCoverUrl } : t);
                     updateMediaSessionMetadata({ ...track, cover_url: newCoverUrl }).catch(() => { });
+                    updateSmtcMetadata({ ...track, cover_url: newCoverUrl }).catch(() => { });
                 }
             }
         }).catch(err => {
@@ -1004,6 +1119,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
         updateMediaSessionPlaybackState('playing');
         updateMediaSessionPosition();
+        updateSmtcPlaybackState('playing');
         broadcastState(true);
 
     } catch (err) {
@@ -1101,6 +1217,7 @@ export async function pause(): Promise<void> {
         }
         isPlaying.set(false);
         updateMediaSessionPlaybackState('paused');
+        updateSmtcPlaybackState('paused');
         broadcastState(true);
     } catch (err) {
         console.error('[Player] Pause failed:', err);
@@ -1134,6 +1251,7 @@ export async function resume(): Promise<void> {
             updateMediaSessionPlaybackState('playing');
             _startReckoning(_reckoningOffset);
         }
+        updateSmtcPlaybackState('playing');
         updateMediaSessionPosition();
         broadcastState(true);
     } catch (err) {
@@ -1328,6 +1446,7 @@ export async function seek(position: number): Promise<void> {
 
         if (didSeek) {
             updateMediaSessionPosition();
+            updateSmtcPlaybackState(get(isPlaying) ? 'playing' : 'paused');
             broadcastState(true);
             pluginEvents.emit('seeked', { currentTime: targetSecs, duration: dur });
         }
@@ -1502,6 +1621,8 @@ async function _advanceUiToTrack(track: Track): Promise<void> {
     await updateMediaSessionMetadata(trackForPlugins);
     updateMediaSessionPlaybackState('playing');
     updateMediaSessionPosition();
+    await updateSmtcMetadata(trackForPlugins);
+    updateSmtcPlaybackState('playing');
     broadcastState(true);
 
     _schedulePreload();

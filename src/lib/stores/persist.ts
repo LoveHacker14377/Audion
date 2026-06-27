@@ -6,6 +6,7 @@ import {
     playbackContext, currentTime, duration, type PlaybackContext
 } from './player';
 import { lyricsVisible } from './lyrics';
+import { updateSmtcMetadata, updateSmtcPlaybackState } from './player';
 import type { Track } from '$lib/api/tauri';
 
 const STORAGE_KEY = 'rlist_player_state';
@@ -161,6 +162,13 @@ export function initializeFromPersistedState(): void {
         // Restore duration
         if (state.duration > 0) {
             duration.set(state.duration);
+        }
+
+        // push restored metadata into SMTC so OS media controls show the
+        // last playing track
+        if (trackToRestore) {
+            updateSmtcMetadata(trackToRestore).catch(() => { });
+            updateSmtcPlaybackState('paused');
         }
     }
 }
