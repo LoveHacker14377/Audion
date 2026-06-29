@@ -110,6 +110,22 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         }
     };
 
+    // audion://play/<track_id> => emitted by jump list entries
+    let path = url.path().trim_start_matches('/');
+    if path.starts_with("play/") {
+        let track_id = path.trim_start_matches("play/");
+        tracing::info!("Deep link: play track id={}", track_id);
+        let _ = app_handle.emit("app://play-track", track_id.to_string());
+        // focus the window so the user sees playback start (desktop only)
+        #[cfg(not(target_os = "android"))]
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        return;
+    }
+
     if url.path() != "/auth/callback" && url.path() != "auth/callback" {
         tracing::info!(
             "Deep link is not an auth callback, ignoring: {}",
@@ -434,6 +450,18 @@ pub fn run() {
 
     builder
         .setup(|app| {
+            // set AppUserModelID before any UI or jump list manipulation
+            #[cfg(target_os = "windows")]
+            {
+                use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+                use windows::core::HSTRING;
+                if let Err(e) = unsafe {
+                    SetCurrentProcessExplicitAppUserModelID(&HSTRING::from("com.audion.app"))
+                } {
+                    tracing::warn!("[App] SetCurrentProcessExplicitAppUserModelID failed: {:?}", e);
+                }
+            }
+
             // Get app data directory and create database
             let app_dir = app
                 .path()
@@ -959,6 +987,8 @@ pub fn run() {
                     windows_thumbar::windows_update_thumbar_state,
                     windows_thumbar::windows_set_taskbar_progress,
                     windows_thumbar::windows_clear_taskbar_progress,
+                    windows_thumbar::windows_update_jump_list,
+                    windows_thumbar::windows_clear_jump_list,
                     smtc::smtc_set_metadata,
                     smtc::smtc_set_playback,
                     smtc::smtc_set_volume,

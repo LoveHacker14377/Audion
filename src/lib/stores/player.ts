@@ -682,6 +682,45 @@ async function initWindowsThumbarIntegration(): Promise<void> {
 
         windowsThumbarInitialized = true;
         await updateWindowsThumbarState(get(isPlaying));
+
+        // queue and queuindex stores are subscribed so the list updates when the track changes or
+        // when tracks are added/removed from the queue
+        const syncJumpList = () => {
+            const $queue = get(queue);
+            const currentIdx = get(queueIndex);
+            const nextItems = $queue
+                .slice(currentIdx + 1, currentIdx + 6)
+                .map((t) => ({
+                    track_id: t.id,
+                    title: t.title ?? 'Unknown Title',
+                    artist: t.artist ?? null,
+                    path: t.path,
+                }));
+            if (nextItems.length > 0) {
+                invoke('windows_update_jump_list', { tracks: nextItems })
+                    .then(() => console.log('[JumpList] Updated with', nextItems))
+                    .catch((e) => console.error('[JumpList] update failed:', e));
+            } else {
+                invoke('windows_clear_jump_list')
+                    .then(() => console.log('[JumpList] Cleared'))
+                    .catch((e) => console.error('[JumpList] clear failed:', e));
+            }
+        };
+        queue.subscribe(syncJumpList);
+        queueIndex.subscribe(syncJumpList);
+
+        // listen for audion://play/<id> deep links routed from lib.rs
+        await listen<string>('app://play-track', ({ payload }) => {
+            const trackId = Number(payload);
+            if (!trackId || isNaN(trackId)) return;
+            const track = getTrackByIdSync(trackId);
+            if (track) {
+                void playTrack(track);
+            } else {
+                console.warn('[Player] jump list play-track: id not found in library:', trackId);
+            }
+        });
+
         console.log('[Player] Windows taskbar thumbar initialized');
     } catch (err) {
         console.warn('[Player] Windows thumbar init failed:', err);
