@@ -4,7 +4,29 @@
   import { equalizer, EQ_PRESETS } from "$lib/stores/equalizer";
   import { _, locale } from "svelte-i18n";
   import { updates } from "$lib/stores/updates";
-  import { otaUpdateReady } from "$lib/stores/otaUpdate";
+  import {
+    otaState,
+    otaEnabled,
+    isOtaEnabled,
+    setOtaEnabled,
+    supportsOta,
+    startOtaDownload,
+    installOtaNow,
+    deferOtaInstallToClose,
+    skipOtaVersion,
+    type PendingUpdateNotes,
+  } from "$lib/stores/otaUpdate";
+
+  function otaNotesToRelease(notes: PendingUpdateNotes | null) {
+    if (!notes) return null;
+    return {
+      tag_name: notes.version,
+      name: `Version ${notes.version}`,
+      body: notes.body ?? null,
+      published_at: notes.date ?? "",
+      assets: [],
+    };
+  }
   import {
     resetDatabase,
     pickFolder,
@@ -61,7 +83,7 @@
 
   let customColorInput = "#1DB954";
   let showUpdatePopup = false;
-  let updatePopupOtaReady = false;
+  let updatePopupMode: "github" | "ota" = "github";
   let updatePopupRelease: any = null;
 
   // Database reset state
@@ -1628,29 +1650,54 @@
               <span class="setting-description">{$_('settings.modernPlayerDesc', { default: 'Modern player powered by Tauri and Svelte' })}</span>
             </div>
           </div>
-          {#if $otaUpdateReady}
+          {#if $otaState.phase === "ready"}
             <div class="restart-notice">
               <div class="restart-notice-text">
                 <span class="setting-title" style="color: var(--accent-primary)">{$_('settings.restartRequired')}</span>
-                <span class="setting-description">{$_('settings.restartRequiredDesc', { values: { version: $otaUpdateReady.version } })}</span>
+                <span class="setting-description">{$_('settings.restartRequiredDesc', { values: { version: $otaState.notes?.version ?? '' } })}</span>
               </div>
               <button
                 class="btn-restart-compact"
                 on:click={() => {
-                  updatePopupRelease = {
-                    tag_name: $otaUpdateReady?.version,
-                    name: `Version ${$otaUpdateReady?.version}`,
-                    body: $otaUpdateReady?.body ?? null,
-                    published_at: $otaUpdateReady?.date ?? '',
-                    assets: [],
-                  };
-                  updatePopupOtaReady = true;
+                  updatePopupRelease = otaNotesToRelease($otaState.notes);
+                  updatePopupMode = "ota";
                   showUpdatePopup = true;
                 }}
               >{$_('settings.restartToUpdate')}</button>
             </div>
+          {:else if $otaState.phase === "downloading"}
+            <div class="restart-notice">
+              <div class="restart-notice-text">
+                <span class="setting-title">{$_('updatePopup.downloading', { default: 'Downloading update…' })}</span>
+                <span class="setting-description">{$otaState.progress}%</span>
+              </div>
+            </div>
+          {:else if $otaState.phase === "available"}
+            <button
+              class="btn-green-compact"
+              on:click={() => {
+                updatePopupRelease = otaNotesToRelease($otaState.notes);
+                updatePopupMode = "ota";
+                showUpdatePopup = true;
+              }}
+              style="margin-top: var(--spacing-sm)"
+            >{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
           {:else if $updates.hasUpdate}
-            <button class="btn-green-compact" on:click={() => { updatePopupRelease = $updates.latestRelease; updatePopupOtaReady = false; showUpdatePopup = true; }} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
+            <button class="btn-green-compact" on:click={() => { updatePopupRelease = $updates.latestRelease; updatePopupMode = "github"; showUpdatePopup = true; }} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
+          {/if}
+
+          {#if supportsOta()}
+            <div class="ota-toggle-row">
+              <div class="restart-notice-text">
+                <span class="setting-title">{$_('settings.otaEnabled', { default: 'Automatic updates' })}</span>
+                <span class="setting-description">{$_('settings.otaEnabledDesc', { default: 'Download and install updates in-app instead of via GitHub releases' })}</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={$otaEnabled}
+                on:change={(e) => setOtaEnabled((e.target as HTMLInputElement).checked)}
+              />
+            </div>
           {/if}
         </div>
       </section>
@@ -1661,8 +1708,14 @@
 {#if showUpdatePopup && updatePopupRelease}
   <UpdatePopup
     release={updatePopupRelease}
-    otaReady={updatePopupOtaReady}
+    mode={updatePopupMode}
+    otaPhase={$otaState.phase === "downloading" || $otaState.phase === "ready" ? $otaState.phase : "available"}
+    otaProgress={$otaState.progress}
     on:close={() => (showUpdatePopup = false)}
+    on:download={() => startOtaDownload()}
+    on:skip={() => { skipOtaVersion(); showUpdatePopup = false; }}
+    on:restart={() => installOtaNow()}
+    on:later={() => deferOtaInstallToClose()}
   />
 {/if}
 

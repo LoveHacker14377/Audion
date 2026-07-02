@@ -54,7 +54,19 @@
     import { uiSlotManager } from "$lib/plugins/ui-slots";
 
     import { updates } from "$lib/stores/updates";
-    import { checkAndInstallUpdate, consumePendingUpdateNotes, getUpdateReady, otaUpdateReady, supportsOta } from "$lib/stores/otaUpdate";
+    import {
+        checkForOtaUpdate,
+        consumePendingUpdateNotes,
+        otaState,
+        isOtaEnabled,
+        supportsOta,
+        startOtaDownload,
+        installOtaNow,
+        deferOtaInstallToClose,
+        skipOtaVersion,
+        registerOtaExitHandler,
+        type PendingUpdateNotes,
+    } from "$lib/stores/otaUpdate";
     import UpdatePopup from "./UpdatePopup.svelte";
     import SyncStatus from "./SyncStatus.svelte";
 
@@ -80,7 +92,33 @@
     let scanError: string | null = null;
     let showUpdatePopup = false;
     let popupRelease: any = null;
-    let popupOtaReady = false;
+    let popupMode: "github" | "ota" = "github";
+    let lastOtaPhase = "idle";
+
+    function otaNotesToRelease(notes: PendingUpdateNotes | null) {
+        if (!notes) return null;
+        return {
+            tag_name: notes.version,
+            name: `Version ${notes.version}`,
+            body: notes.body ?? null,
+            published_at: notes.date ?? "",
+            assets: [],
+        };
+    }
+
+    // auto (re)open the popup on: first detecting an update
+    // and when a background download finishes
+    $: {
+        const phase = $otaState.phase;
+        if (phase !== lastOtaPhase) {
+            if (phase === "available" || phase === "ready") {
+                popupMode = "ota";
+                popupRelease = otaNotesToRelease($otaState.notes);
+                showUpdatePopup = true;
+            }
+            lastOtaPhase = phase;
+        }
+    }
 
     // Slot containers
     let slotTop: HTMLDivElement;
@@ -372,32 +410,26 @@
         const pending = consumePendingUpdateNotes();
         if (pending) {
             // just relaunched after an OTA update => show what changed
-            popupRelease = {
-                tag_name: pending.version,
-                name: `Version ${pending.version}`,
-                body: pending.body ?? null,
-                published_at: pending.date ?? '',
-                assets: [],
-            };
-            popupOtaReady = false;
+            // plain notes only, no ota action buttons
+            popupMode = "github";
+            popupRelease = otaNotesToRelease(pending);
             showUpdatePopup = true;
-        } else if (supportsOta()) {
-            // restore store from localStorage in case we navigated away mid-session
-            const alreadyReady = getUpdateReady();
-            if (alreadyReady) {
-                otaUpdateReady.set(alreadyReady);
-            } else {
-                // background download => updates the store if something installs
-                // On failure (null), fall back to the GitHub release badge path
-                // so the update is still surfaced
-                checkAndInstallUpdate().then((notes) => {
-                    if (!notes) updates.checkUpdate();
-                });
-            }
+        } else if (isOtaEnabled() && supportsOta()) {
+            checkForOtaUpdate();
         } else {
+            // OTA disabled or unsupported platform => fall back to the
+            // normal gitHub release
             updates.checkUpdate();
         }
         loadPlaylists();
+
+        // listen for the OS close-request
+        // install to app-close
+        // refer otaupdates.ts for details
+        let unlistenOtaExit: (() => void) | undefined;
+        registerOtaExitHandler().then((unlisten) => {
+            unlistenOtaExit = unlisten;
+        });
 
         // Register UI slots
         if (slotTop) uiSlotManager.registerContainer("sidebar:top", slotTop);
@@ -407,18 +439,40 @@
         return () => {
             uiSlotManager.unregisterContainer("sidebar:top");
             uiSlotManager.unregisterContainer("sidebar:bottom");
+            unlistenOtaExit?.();
         };
     });
     function openOtaPopup() {
-        popupRelease = {
-            tag_name: $otaUpdateReady?.version,
-            name: `Version ${$otaUpdateReady?.version}`,
-            body: $otaUpdateReady?.body ?? null,
-            published_at: $otaUpdateReady?.date ?? '',
-            assets: [],
-        };
-        popupOtaReady = true;
+        popupMode = "ota";
+        popupRelease = otaNotesToRelease($otaState.notes);
         showUpdatePopup = true;
+    }
+
+    function openGithubPopup() {
+        popupMode = "github";
+        popupRelease = $updates.latestRelease;
+        showUpdatePopup = true;
+    }
+
+    function handlePopupClose() {
+        showUpdatePopup = false;
+    }
+
+    function handlePopupDownload() {
+        startOtaDownload();
+    }
+
+    function handlePopupSkip() {
+        skipOtaVersion();
+        showUpdatePopup = false;
+    }
+
+    function handlePopupRestart() {
+        installOtaNow();
+    }
+
+    function handlePopupLater() {
+        deferOtaInstallToClose();
     }
 </script>
 
@@ -428,7 +482,7 @@
             <img src="/logo.png" alt="Audion Logo" width="32" height="32" />
             <span class="logo-text">Audion</span>
             <SyncStatus />
-            {#if $otaUpdateReady}
+            {#if $otaState.phase === "ready"}
                 <div
                     class="update-badge restart-badge"
                     title="Update installed · click to restart"
@@ -439,15 +493,37 @@
                 >
                     {$_('sidebar.restart')}
                 </div>
+            {:else if $otaState.phase === "downloading"}
+                <div
+                    class="update-badge"
+                    title="Downloading update · click for details"
+                    on:click={openOtaPopup}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => e.key === "Enter" && openOtaPopup()}
+                >
+                    {$otaState.progress}%
+                </div>
+            {:else if $otaState.phase === "available"}
+                <div
+                    class="update-badge"
+                    title="View update details"
+                    on:click={openOtaPopup}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => e.key === "Enter" && openOtaPopup()}
+                >
+                    Update
+                </div>
             {:else if $updates.hasUpdate}
                 <div
                     class="update-badge"
                     title="View update details"
-                    on:click={() => { popupRelease = $updates.latestRelease; popupOtaReady = false; showUpdatePopup = true; }}
+                    on:click={openGithubPopup}
                     role="button"
                     tabindex="0"
                     on:keydown={(e) =>
-                        e.key === "Enter" && (showUpdatePopup = true)}
+                        e.key === "Enter" && openGithubPopup()}
                 >
                     Update
                 </div>
@@ -858,7 +934,19 @@
 </aside>
 
 {#if showUpdatePopup && popupRelease}
-    <UpdatePopup release={popupRelease} otaReady={popupOtaReady} on:close={() => (showUpdatePopup = false)} />
+    <UpdatePopup
+        release={popupRelease}
+        mode={popupMode}
+        otaPhase={$otaState.phase === "downloading" || $otaState.phase === "ready"
+            ? $otaState.phase
+            : "available"}
+        otaProgress={$otaState.progress}
+        on:close={handlePopupClose}
+        on:download={handlePopupDownload}
+        on:skip={handlePopupSkip}
+        on:restart={handlePopupRestart}
+        on:later={handlePopupLater}
+    />
 {/if}
 
 <style>

@@ -3,41 +3,51 @@
     import { openUrl } from "@tauri-apps/plugin-opener";
     import { marked } from "marked";
     import DOMPurify from "dompurify";
-    import { applyUpdateAndRelaunch } from "$lib/stores/otaUpdate";
     import { _ } from "svelte-i18n";
     marked.use({ async: false });
 
     export let release: any = null;
+
     /**
-     * when true, the update is already installed on disk and we just need a restart
-     * shows Restart Now / Later instead of download buttons
+     * github  => plain release notes + asset download links
+     * ota     => notes + skip/download/progress/restart-later
      */
-    export let otaReady: boolean = false;
+    export let mode: "github" | "ota" = "github";
+
+    /**
+     * only used when mode === ota:
+     *  available   => notes + Skip this version + Download
+     *  downloading => notes + progress bar (no buttons, close still allowed)
+     *  ready       => notes + Restart Now / Later / Skip this version
+     */
+    export let otaPhase: "available" | "downloading" | "ready" = "available";
+    export let otaProgress: number = 0;
 
     const dispatch = createEventDispatcher();
 
-    let isRelaunching = false;
+    let isBusy = false; // guards restart-now button while install() is in flight
 
     function close() {
         dispatch("close");
     }
 
+    function handleDownload() {
+        dispatch("download");
+    }
+
+    function handleSkip() {
+        dispatch("skip");
+    }
+
     async function handleRestartNow() {
-        isRelaunching = true;
-        try {
-            await applyUpdateAndRelaunch({
-                version: release?.tag_name ?? '',
-                body: release?.body ?? null,
-                date: release?.published_at ?? null,
-            });
-        } catch (e) {
-            console.error("Failed to relaunch:", e);
-            isRelaunching = false;
-        }
+        isBusy = true;
+        dispatch("restart");
+        // caller resets state on failure; on success the app is expected to
+        // relaunch out from under us, so no need to reset isBusy here
     }
 
     function handleLater() {
-        // update stays installed=> will apply on next natural startup.
+        dispatch("later");
         close();
     }
 
@@ -68,15 +78,18 @@
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
+
+    // cross-button is always available except mid-install
+    $: canClose = !(mode === "ota" && isBusy);
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
-<div class="modal-overlay" on:click={otaReady ? undefined : close}>
+<div class="modal-overlay" on:click={canClose ? close : undefined}>
     <div class="modal-content" on:click|stopPropagation>
         <div class="modal-header">
             <div class="header-info">
                 <h2>
-                    {#if otaReady}
+                    {#if mode === "ota" && otaPhase === "ready"}
                         {$_('updatePopup.restartToUpdate')}
                     {:else}
                         {release?.name || release?.tag_name || "Update Available"}
@@ -87,12 +100,14 @@
                     {#if release?.published_at}
                         <span class="date">{formatDate(release?.published_at)}</span>
                     {/if}
-                    {#if otaReady}
+                    {#if mode === "ota" && otaPhase === "ready"}
                         <span class="ota-badge">{$_('updatePopup.installedRestartRequired')}</span>
+                    {:else if mode === "ota" && otaPhase === "downloading"}
+                        <span class="ota-badge">{$_('updatePopup.downloading')}</span>
                     {/if}
                 </div>
             </div>
-            {#if !otaReady}
+            {#if canClose}
                 <button class="close-btn" on:click={close}>
                     <svg
                         viewBox="0 0 24 24"
@@ -120,26 +135,49 @@
                 <p class="no-notes">{$_('updatePopup.noReleaseNotes')}</p>
             {/if}
 
-            {#if otaReady}
-                <div class="ota-actions">
-                    <p class="ota-hint">{$_('updatePopup.otaHint')}</p>
-                    <div class="ota-buttons">
-                        <button
-                            class="btn-restart"
-                            on:click={handleRestartNow}
-                            disabled={isRelaunching}
-                        >
-                            {#if isRelaunching}
-                                {$_('updatePopup.restarting')}
-                            {:else}
-                                {$_('updatePopup.restartNow')}
-                            {/if}
-                        </button>
-                        <button class="btn-later" on:click={handleLater}>
-                            {$_('updatePopup.later')}
-                        </button>
+            {#if mode === "ota"}
+                {#if otaPhase === "available"}
+                    <div class="ota-actions">
+                        <div class="ota-buttons">
+                            <button class="btn-restart" on:click={handleDownload}>
+                                {$_('updatePopup.download')}
+                            </button>
+                            <button class="btn-later" on:click={handleSkip}>
+                                {$_('updatePopup.skipVersion')}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                {:else if otaPhase === "downloading"}
+                    <div class="ota-actions">
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width: {otaProgress}%"></div>
+                        </div>
+                        <p class="ota-hint">{otaProgress}%</p>
+                    </div>
+                {:else if otaPhase === "ready"}
+                    <div class="ota-actions">
+                        <p class="ota-hint">{$_('updatePopup.otaHint')}</p>
+                        <div class="ota-buttons">
+                            <button
+                                class="btn-restart"
+                                on:click={handleRestartNow}
+                                disabled={isBusy}
+                            >
+                                {#if isBusy}
+                                    {$_('updatePopup.restarting')}
+                                {:else}
+                                    {$_('updatePopup.restartNow')}
+                                {/if}
+                            </button>
+                            <button class="btn-later" on:click={handleLater} disabled={isBusy}>
+                                {$_('updatePopup.later')}
+                            </button>
+                            <button class="btn-skip" on:click={handleSkip} disabled={isBusy}>
+                                {$_('updatePopup.skipVersion')}
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             {:else if release?.assets && release.assets.length > 0}
                 <div class="assets-section">
                     <h3>Assets</h3>
@@ -424,7 +462,7 @@
         margin: 0 0 var(--spacing-md);
     }
 
-    /* ── OTA restart mode ── */
+    /* ── OTA mode ── */
 
     .ota-badge {
         background-color: color-mix(in srgb, var(--accent-primary), transparent 82%);
@@ -490,9 +528,50 @@
         transition: background-color 0.2s, color 0.2s;
     }
 
-    .btn-later:hover {
+    .btn-later:hover:not(:disabled) {
         background-color: var(--bg-highlight);
         color: var(--text-primary);
+    }
+
+    .btn-later:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-skip {
+        padding: 10px 20px;
+        background: transparent;
+        color: var(--text-subdued);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .btn-skip:hover:not(:disabled) {
+        background-color: var(--bg-highlight);
+        color: var(--text-primary);
+    }
+
+    .btn-skip:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .progress-track {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background-color: var(--bg-highlight);
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background-color: var(--accent-primary);
+        transition: width 0.2s ease;
     }
 
 </style>

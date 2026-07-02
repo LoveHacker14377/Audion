@@ -22,12 +22,59 @@ mod audio;
 
 use db::Database;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Listener, Manager, WindowEvent};
 #[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
+
+// =============================================================================
+// OTA install on close exit gate
+// =============================================================================
+// by default a window close request is NOT intercepted
+// only when the frontend explicitly arms intercept 
+// Later on a downloaded OTA update) do we hold the close open, notify the
+// frontend via OTA_BEFORE_EXIT_EVENT, and wait for ota_confirm_exit before
+// letting the window actually close
+// =============================================================================
+struct OtaExitGate {
+    /// frontend wants us to gate the next close request (set via ota_set_close_intercept)
+    intercept: AtomicBool,
+    /// have we already emitted OTA_BEFORE_EXIT_EVENT for the close request currently being held
+    notified: AtomicBool,
+    /// frontend finished its install-on-close work; let the next close through
+    confirmed: AtomicBool,
+}
+
+/// event emitted to the frontend when the OS requests the window close and we
+/// need it to run any deferred OTA install (see otaUpdate.ts::registerOtaExitHandler)
+const OTA_BEFORE_EXIT_EVENT: &str = "ota://before-exit";
+
+/// called by the frontend (deferOtaInstallToClose) when the user picks
+/// later , on a downloaded update, or to clear the gate
+/// (e.g. after restarting immediately, skipping the version, or disabling OTA)
+#[tauri::command]
+fn ota_set_close_intercept(window: tauri::Window, enabled: bool) {
+    if let Some(gate) = window.app_handle().try_state::<OtaExitGate>() {
+        gate.intercept.store(enabled, Ordering::SeqCst);
+        if !enabled {
+            gate.notified.store(false, Ordering::SeqCst);
+            gate.confirmed.store(false, Ordering::SeqCst);
+        }
+    }
+}
+
+/// called by the frontend once it has finished any deferred install-on-close
+/// arms the gate and actually goes through this time
+#[tauri::command]
+fn ota_confirm_exit(window: tauri::Window) {
+    if let Some(gate) = window.app_handle().try_state::<OtaExitGate>() {
+        gate.confirmed.store(true, Ordering::SeqCst);
+    }
+    let _ = window.close();
+}
 
 /// Handle a deep link URL — extract tokens, store them, fetch profile, trigger sync.
 /// Called from both the deep-link event listener (macOS) and the single-instance
@@ -343,6 +390,14 @@ pub fn run() {
 
             app.manage(database.clone());
             app.manage(commands::listenbrainz::ListenBrainzState::new());
+
+            // OTA install-on-close gate => starts un-armed; see ota_set_close_intercept
+            #[cfg(desktop)]
+            app.manage(OtaExitGate {
+                intercept: AtomicBool::new(false),
+                notified: AtomicBool::new(false),
+                confirmed: AtomicBool::new(false),
+            });
 
             // Initialize Discord RPC state (desktop only)
             #[cfg(desktop)]
@@ -703,6 +758,9 @@ pub fn run() {
                     commands::window::set_close_to_tray,
                     commands::window::get_minimize_to_tray,
                     commands::window::set_minimize_to_tray,
+                    // OTA install-on-close
+                    ota_set_close_intercept,
+                    ota_confirm_exit,
                 ]
             }
             #[cfg(mobile)]
@@ -872,6 +930,22 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                     tracing::info!("Window hidden to tray");
+                    return;
+                }
+
+                // real quit path
+                // only intercept if the frontend explicitly
+                // armed the gate (user picked Later on a downloaded OTA
+                // update)
+                let gate = window.app_handle().state::<OtaExitGate>();
+                if !gate.intercept.load(Ordering::SeqCst) || gate.confirmed.load(Ordering::SeqCst) {
+                    return;
+                }
+
+                api.prevent_close();
+                if !gate.notified.swap(true, Ordering::SeqCst) {
+                    tracing::info!("Close requested, notifying frontend for OTA install-on-close");
+                    let _ = window.emit(OTA_BEFORE_EXIT_EVENT, ());
                 }
             }
         })
