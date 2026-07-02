@@ -1643,6 +1643,27 @@
       <section class="settings-section" aria-labelledby="about-heading">
         <h2 id="about-heading" class="section-label">{$_('settings.about', { default: 'About' })}</h2>
         <div class="settings-card">
+          {#if supportsOta()}
+            <div class="toggle-container">
+              <div class="toggle-info">
+                <span class="setting-title">{$_('settings.otaEnabled', { default: 'Automatic updates' })}</span>
+                <span class="setting-description">{$_('settings.otaEnabledDesc', { default: 'Download and install updates in-app instead of via GitHub releases' })}</span>
+              </div>
+              <button
+                class="toggle-btn"
+                class:active={$otaEnabled}
+                on:click={() => setOtaEnabled(!$otaEnabled)}
+                role="switch"
+                aria-checked={$otaEnabled}
+                aria-label={$_('settings.otaEnabled', { default: 'Automatic updates' })}
+              >
+                <div class="toggle-handle"></div>
+              </button>
+            </div>
+
+            <div class="divider"></div>
+          {/if}
+
           <div class="about-row">
             <div class="app-logo-sm">Audion</div>
             <div class="about-details">
@@ -1684,20 +1705,6 @@
             >{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
           {:else if $updates.hasUpdate}
             <button class="btn-green-compact" on:click={() => { updatePopupRelease = $updates.latestRelease; updatePopupMode = "github"; showUpdatePopup = true; }} style="margin-top: var(--spacing-sm)">{$_('settings.updateAvailable', { default: 'Update Available' })}</button>
-          {/if}
-
-          {#if supportsOta()}
-            <div class="ota-toggle-row">
-              <div class="restart-notice-text">
-                <span class="setting-title">{$_('settings.otaEnabled', { default: 'Automatic updates' })}</span>
-                <span class="setting-description">{$_('settings.otaEnabledDesc', { default: 'Download and install updates in-app instead of via GitHub releases' })}</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={$otaEnabled}
-                on:change={(e) => setOtaEnabled((e.target as HTMLInputElement).checked)}
-              />
-            </div>
           {/if}
         </div>
       </section>
