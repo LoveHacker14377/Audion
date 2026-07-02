@@ -1,0 +1,61 @@
+name: 'Update Manifest'
+description: 'Merge one platform entry into the release latest.json (updater manifest)'
+
+inputs:
+  version:
+    description: 'Version string, no leading v (e.g. 1.2.3)'
+    required: true
+  tag_name:
+    description: 'Release tag (e.g. v1.2.3)'
+    required: true
+  platform_key:
+    description: 'Key(s) in latest.json platforms object, comma-separated (e.g. "darwin-x86_64,darwin-aarch64")'
+    required: true
+  sig_path:
+    description: 'Path to the .sig file for this platform'
+    required: true
+  artifact_url:
+    description: 'Download URL for the platform artifact (must match the .sig)'
+    required: true
+  github_token:
+    description: 'Token for gh CLI'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Merge platform entry into latest.json
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        set -e
+        TAG="${{ inputs.tag_name }}"
+        VER="${{ inputs.version }}"
+        SIG=$(cat "${{ inputs.sig_path }}")
+        URL="${{ inputs.artifact_url }}"
+
+        # Pull down whatever manifest currently exists on the release, if any.
+        rm -f latest.json
+        gh release download "$TAG" --pattern latest.json --dir . --clobber 2>/dev/null || true
+
+        if [ ! -f latest.json ]; then
+          NOTES=$(jq -Rs . < releasenote.md 2>/dev/null || echo '""')
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          jq -n --arg version "$TAG" --argjson notes "$NOTES" --arg pub_date "$PUB_DATE" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {}}' > latest.json
+        fi
+
+        # Fold in this platform's signature/url for every key it applies to
+        # (macOS needs both darwin-x86_64 and darwin-aarch64 pointed at the same universal binary).
+        IFS=',' read -ra KEYS <<< "${{ inputs.platform_key }}"
+        for KEY in "${KEYS[@]}"; do
+          jq --arg key "$KEY" --arg sig "$SIG" --arg url "$URL" \
+            '.platforms[$key] = {signature: $sig, url: $url}' latest.json > tmp.json && mv tmp.json latest.json
+        done
+
+        echo "--- latest.json after merging ${{ inputs.platform_key }} ---"
+        cat latest.json
+
+        gh release upload "$TAG" latest.json --clobber --repo "$GH_REPO"

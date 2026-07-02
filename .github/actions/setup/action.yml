@@ -33,7 +33,7 @@ runs:
       run: npm install
 
     - name: Install Linux system dependencies (if on Linux)
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && inputs.platform == 'linux'
       shell: bash
       run: |
         sudo apt-get update
@@ -62,7 +62,7 @@ runs:
         fi
 
     - name: Configure Linux headless display environment (if on Linux)
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && inputs.platform == 'linux'
       shell: bash
       run: |
         {

@@ -20,18 +20,31 @@ on:
         description: 'Tag name to update (required for hotfix, e.g., v1.2.3)'
         required: false
         type: string
-      platform:
-        description: 'Platform to build'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - windows
-          - linux
-          - flatpak
-          - macos
-          - android
-          - all
+      build_windows:
+        description: 'Build Windows'
+        required: false
+        default: true
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: false
+        default: true
+        type: boolean
+      build_flatpak:
+        description: 'Build Flatpak'
+        required: false
+        default: true
+        type: boolean
+      build_macos:
+        description: 'Build macOS'
+        required: false
+        default: true
+        type: boolean
+      build_android:
+        description: 'Build Android'
+        required: false
+        default: true
+        type: boolean
       overwrite:
         description: 'Overwrite existing assets (only for hotfix)'
         required: false
@@ -43,19 +56,75 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Windows Build
+  # Create GitHub Release (pre-creates tag + release so parallel jobs never race)
   # ---------------------------------------------------------------------------
-  release-windows:
-    runs-on: windows-latest
-    if: |
-      github.event_name == 'push' ||
-      inputs.platform == 'windows' ||
-      inputs.platform == 'all'
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      tag_name: ${{ steps.info.outputs.tag_name }}
+      prerelease: ${{ steps.info.outputs.prerelease }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set version and prerelease flags
+        id: info
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+          GH_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          TAG_NAME=""
+          if [ "$GH_EVENT_NAME" = "push" ]; then
+            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+            PRERELEASE=false
+          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
+            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
+            PRERELEASE=true
+          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
+            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
+            PRERELEASE=false
+            TAG_NAME="$INPUT_TAG_NAME"
+            case "$TAG_NAME" in
+              v*) ;;
+              *) TAG_NAME="v$TAG_NAME" ;;
+            esac
+          else
+            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+            PRERELEASE=false
+          fi
+          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag_name }}
+          name: ${{ steps.info.outputs.tag_name }}
+          body_path: releasenote.md
+          prerelease: ${{ steps.info.outputs.prerelease }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Windows Build
+  # ---------------------------------------------------------------------------
+  release-windows:
+    runs-on: windows-latest
+    needs: create-release
+    if: |
+      github.event_name == 'push' || inputs.build_windows == true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
           persist-credentials: false
 
       - name: Setup (Node, Rust, cache, deps)
@@ -72,36 +141,10 @@ jobs:
       - name: Set version and prerelease flags
         id: info
         shell: pwsh
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
-          # Determine version and prerelease status
-          if ($env:GH_EVENT_NAME -eq "push") {
-            $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-            $prerelease = $false
-            $tagName = "v$version"
-          } elseif ($env:INPUT_RELEASE_TYPE -eq "beta") {
-            $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version + "-beta"
-            $prerelease = $true
-            $tagName = "v$version"
-          } elseif ($env:INPUT_RELEASE_TYPE -eq "hotfix") {
-            $version = $env:INPUT_TAG_NAME.TrimStart('v')
-            $prerelease = $false
-            if ($env:INPUT_TAG_NAME.StartsWith('v')) {
-              $tagName = $env:INPUT_TAG_NAME
-            } else {
-              $tagName = "v$($env:INPUT_TAG_NAME)"
-            }
-          } else {
-            $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-            $prerelease = $false
-            $tagName = "v$version"
-          }
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          echo "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
-          echo "tag_name=$tagName" >> $env:GITHUB_OUTPUT
+          echo "version=${{ needs.create-release.outputs.version }}" >> $env:GITHUB_OUTPUT
+          echo "prerelease=${{ needs.create-release.outputs.prerelease }}" >> $env:GITHUB_OUTPUT
+          echo "tag_name=${{ needs.create-release.outputs.tag_name }}" >> $env:GITHUB_OUTPUT
 
       - name: Rename artifacts
         shell: pwsh
@@ -114,10 +157,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
+          tag_name: ${{ steps.info.outputs.tag_name }}
           overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/release/bundle/msi/audion_*_windows.msi
@@ -153,11 +193,9 @@ jobs:
 # ---------------------------------------------------------------------------
   release-linux:
     runs-on: ubuntu-22.04        # ← 22.04, NOT 24.04 (older glibc = broader compat)
-    needs: release-windows
+    needs: create-release
     if: |
-      always() &&
-      (github.event_name == 'push' || inputs.platform == 'linux' || inputs.platform == 'all') &&
-      (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped')
+      github.event_name == 'push' || inputs.build_linux == true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -175,7 +213,6 @@ jobs:
             --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset" \
             npm run tauri build
         env:
-          # kept intentionally: linux OTA auto-update is planned
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
@@ -260,60 +297,51 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
-          TAG_NAME=""
-          if [ "$GH_EVENT_NAME" = "push" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
-            PRERELEASE=true
-          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
-            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
-            PRERELEASE=false
-            TAG_NAME="$INPUT_TAG_NAME"
-            case "$TAG_NAME" in
-              v*) ;;
-              *) TAG_NAME="v$TAG_NAME" ;;
-            esac
-          else
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          fi
-          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=${{ needs.create-release.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "prerelease=${{ needs.create-release.outputs.prerelease }}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ needs.create-release.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
-      - name: Rename artifacts
+      - name: Rename and repackage artifacts
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           VER="${{ steps.info.outputs.version }}"
+          BUNDLE="src-tauri/target/release/bundle"
+
           # Rename DEB
-          DEB_FILE=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
+          DEB_FILE=$(find "${BUNDLE}/deb" -name "*.deb" | head -1)
           if [ -n "$DEB_FILE" ]; then
-            mv "$DEB_FILE" "src-tauri/target/release/bundle/deb/audion_${VER}_linux.deb"
+            mv "$DEB_FILE" "${BUNDLE}/deb/audion_${VER}_linux.deb"
           fi
-          # Rename Patched AppImage
-          if [ -f src-tauri/target/release/bundle/appimage/audion-patched.AppImage ]; then
-            mv src-tauri/target/release/bundle/appimage/audion-patched.AppImage \
-               src-tauri/target/release/bundle/appimage/audion_${VER}_linux.AppImage
-          fi
+
+          # Rename patched AppImage
+          mv "${BUNDLE}/appimage/audion-patched.AppImage" \
+             "${BUNDLE}/appimage/audion_${VER}_linux.AppImage"
+
+          # Re-tar and re-sign from the patched AppImage.
+          # createUpdaterArtifacts produced a .tar.gz during build but wrapped
+          # the unpatched binary — discard it and regenerate from the patched one.
+          rm -f "${BUNDLE}"/appimage/*.AppImage.tar.gz \
+                "${BUNDLE}"/appimage/*.AppImage.tar.gz.sig
+          tar -czf "${BUNDLE}/appimage/audion_${VER}_linux.AppImage.tar.gz" \
+            -C "${BUNDLE}/appimage" "audion_${VER}_linux.AppImage"
+          npm run tauri -- signer sign \
+            "${BUNDLE}/appimage/audion_${VER}_linux.AppImage.tar.gz" \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
+          tag_name: ${{ steps.info.outputs.tag_name }}
           overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/release/bundle/deb/audion_*_linux.deb
             src-tauri/target/release/bundle/appimage/audion_*_linux.AppImage
+            src-tauri/target/release/bundle/appimage/audion_*_linux.AppImage.tar.gz
+            src-tauri/target/release/bundle/appimage/audion_*_linux.AppImage.tar.gz.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -336,11 +364,9 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
       options: --privileged
-    needs: release-linux
+    needs: create-release
     if: |
-      always() &&
-      (github.event_name == 'push' || inputs.platform == 'flatpak' || inputs.platform == 'all') &&
-      (needs.release-linux.result == 'success' || needs.release-linux.result == 'skipped')
+      github.event_name == 'push' || inputs.build_flatpak == true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -349,34 +375,10 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
-          TAG_NAME=""
-          if [ "$GH_EVENT_NAME" = "push" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
-            PRERELEASE=true
-          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
-            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
-            PRERELEASE=false
-            TAG_NAME="$INPUT_TAG_NAME"
-            case "$TAG_NAME" in
-              v*) ;;
-              *) TAG_NAME="v$TAG_NAME" ;;
-            esac
-          else
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          fi
-          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=${{ needs.create-release.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "prerelease=${{ needs.create-release.outputs.prerelease }}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ needs.create-release.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Configure Flathub remote (system scope)
         run: |
@@ -404,10 +406,7 @@ jobs:
       - name: Upload Flatpak to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
+          tag_name: ${{ steps.info.outputs.tag_name }}
           overwrite_files: ${{ inputs.overwrite }}
           files: audion_${{ steps.info.outputs.version }}_flatpak.flatpak
         env:
@@ -427,11 +426,9 @@ jobs:
   # ---------------------------------------------------------------------------
   release-macos:
     runs-on: macos-latest
-    needs: [release-windows, release-linux, release-flatpak]
+    needs: create-release
     if: |
-      always() &&
-      (github.event_name == 'push' || inputs.platform == 'macos' || inputs.platform == 'all') &&
-      (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped')
+      github.event_name == 'push' || inputs.build_macos == true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -452,34 +449,10 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
-          TAG_NAME=""
-          if [ "$GH_EVENT_NAME" = "push" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
-            PRERELEASE=true
-          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
-            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
-            PRERELEASE=false
-            TAG_NAME="$INPUT_TAG_NAME"
-            case "$TAG_NAME" in
-              v*) ;;
-              *) TAG_NAME="v$TAG_NAME" ;;
-            esac
-          else
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          fi
-          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=${{ needs.create-release.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "prerelease=${{ needs.create-release.outputs.prerelease }}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ needs.create-release.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Rename artifacts
         run: |
@@ -495,10 +468,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
+          tag_name: ${{ steps.info.outputs.tag_name }}
           overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/audion_*_macos.dmg
@@ -517,119 +487,117 @@ jobs:
           curl -H "Content-Type: application/json" -X POST -d "{\"embeds\": [{\"title\": \"🍎 macOS build v$VERSION\", \"description\": \"macOS release has been ${{ github.event_name == 'push' && 'created' || 'updated' }}\", \"color\": 1947988, \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v$VERSION\"}]}" "$DISCORD_WEBHOOK_URL"
 
   # ---------------------------------------------------------------------------
-  # Updater Manifest (latest.json) — Windows + macOS only for now
+  # Updater Manifest (latest.json) — one job per platform, each merges its own
+  # entry into the shared manifest under a concurrency lock. no job waits on
+  # the others to build; they only queue briefly to take turns writing
   # ---------------------------------------------------------------------------
-  release-updater-manifest:
+  update-manifest-windows:
     runs-on: ubuntu-latest
-    needs: [release-windows, release-macos]
-    if: |
-      always() &&
-      (github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'macos' || inputs.platform == 'all') &&
-      needs.release-windows.result == 'success' &&
-      needs.release-macos.result == 'success'
+    needs: [create-release, release-windows]
+    if: needs.release-windows.result == 'success'
+    concurrency:
+      group: manifest-${{ needs.create-release.outputs.tag_name }}
+      cancel-in-progress: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Set version and prerelease flags
-        id: info
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
-        run: |
-          TAG_NAME=""
-          if [ "$GH_EVENT_NAME" = "push" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
-            PRERELEASE=true
-          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
-            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
-            PRERELEASE=false
-            TAG_NAME="$INPUT_TAG_NAME"
-            case "$TAG_NAME" in
-              v*) ;;
-              *) TAG_NAME="v$TAG_NAME" ;;
-            esac
-          else
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          fi
-          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Download .sig files from release
+      - name: Download .sig file from release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          VER="${{ steps.info.outputs.version }}"
-          TAG="v${VER}"
+          VER="${{ needs.create-release.outputs.version }}"
+          TAG="${{ needs.create-release.outputs.tag_name }}"
           gh release download "$TAG" --repo "${{ github.repository }}" \
-            --pattern "audion_${VER}_windows.exe.sig" \
-            --pattern "audion_${VER}_macos.app.tar.gz.sig" \
-            --dir sigs
+            --pattern "audion_${VER}_windows.exe.sig" --dir sigs --clobber
 
-      - name: Generate latest.json
-        run: |
-          VER="${{ steps.info.outputs.version }}"
-          TAG="v${VER}"
-          REPO="${{ github.repository }}"
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          NOTES=$(jq -Rs . < releasenote.md)
-
-          WIN_SIG=$(cat "sigs/audion_${VER}_windows.exe.sig")
-          MAC_SIG=$(cat "sigs/audion_${VER}_macos.app.tar.gz.sig")
-
-          jq -n \
-            --arg version "$TAG" \
-            --arg notes "$NOTES" \
-            --arg pub_date "$PUB_DATE" \
-            --arg win_sig "$WIN_SIG" \
-            --arg win_url "https://github.com/${REPO}/releases/download/${TAG}/audion_${VER}_windows.exe" \
-            --arg mac_sig "$MAC_SIG" \
-            --arg mac_url "https://github.com/${REPO}/releases/download/${TAG}/audion_${VER}_macos.app.tar.gz" \
-            '{
-              version: $version,
-              notes: ($notes | fromjson),
-              pub_date: $pub_date,
-              platforms: {
-                "windows-x86_64": { signature: $win_sig, url: $win_url },
-                "darwin-x86_64": { signature: $mac_sig, url: $mac_url },
-                "darwin-aarch64": { signature: $mac_sig, url: $mac_url }
-              }
-            }' > latest.json
-
-          cat latest.json
-
-      - name: Upload latest.json to GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Merge into latest.json
+        uses: ./.github/actions/update-manifest
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
-          overwrite_files: true
-          files: latest.json
+          version: ${{ needs.create-release.outputs.version }}
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          platform_key: windows-x86_64
+          sig_path: sigs/audion_${{ needs.create-release.outputs.version }}_windows.exe.sig
+          artifact_url: https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.tag_name }}/audion_${{ needs.create-release.outputs.version }}_windows.exe
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-manifest-macos:
+    runs-on: ubuntu-latest
+    needs: [create-release, release-macos]
+    if: needs.release-macos.result == 'success'
+    concurrency:
+      group: manifest-${{ needs.create-release.outputs.tag_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download .sig file from release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VER="${{ needs.create-release.outputs.version }}"
+          TAG="${{ needs.create-release.outputs.tag_name }}"
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "audion_${VER}_macos.app.tar.gz.sig" --dir sigs --clobber
+
+      - name: Merge into latest.json
+        uses: ./.github/actions/update-manifest
+        with:
+          version: ${{ needs.create-release.outputs.version }}
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          platform_key: darwin-x86_64,darwin-aarch64
+          sig_path: sigs/audion_${{ needs.create-release.outputs.version }}_macos.app.tar.gz.sig
+          artifact_url: https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.tag_name }}/audion_${{ needs.create-release.outputs.version }}_macos.app.tar.gz
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-manifest-linux:
+    runs-on: ubuntu-latest
+    needs: [create-release, release-linux]
+    if: needs.release-linux.result == 'success'
+    concurrency:
+      group: manifest-${{ needs.create-release.outputs.tag_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download .sig file from release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VER="${{ needs.create-release.outputs.version }}"
+          TAG="${{ needs.create-release.outputs.tag_name }}"
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "audion_${VER}_linux.AppImage.tar.gz.sig" --dir sigs --clobber
+
+      - name: Merge into latest.json
+        uses: ./.github/actions/update-manifest
+        with:
+          version: ${{ needs.create-release.outputs.version }}
+          tag_name: ${{ needs.create-release.outputs.tag_name }}
+          platform_key: linux-x86_64
+          sig_path: sigs/audion_${{ needs.create-release.outputs.version }}_linux.AppImage.tar.gz.sig
+          artifact_url: https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.tag_name }}/audion_${{ needs.create-release.outputs.version }}_linux.AppImage.tar.gz
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
   # Android Build
   # ---------------------------------------------------------------------------
   release-android:
     runs-on: ubuntu-latest
-    needs: [release-windows, release-linux, release-macos]
+    needs: create-release
     if: |
-      always() &&
-      (github.event_name == 'push' || inputs.platform == 'android' || inputs.platform == 'all') &&
-      (needs.release-windows.result == 'success' || needs.release-windows.result == 'skipped')
+      github.event_name == 'push' || inputs.build_android == true
     env:
       GRADLE_OPTS: -Xmx4096m
     steps:
@@ -676,7 +644,7 @@ jobs:
           # NDK r23+ moved libc++_shared.so out of sysroot/usr/lib/<abi>/
           # It now lives under toolchains/llvm/prebuilt/<host>/lib/ per target triple
           TOOLCHAIN="${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64"
-          JNI_DIR="src-tauri/gen/android/app/src/main/jniLibs"
+          JNI_DIR="src-tauri/gen/android/app/src/jniLibs"
           declare -A ABI_TRIPLE=(
             [arm64-v8a]=aarch64-linux-android
             [armeabi-v7a]=arm-linux-androideabi
@@ -719,34 +687,10 @@ jobs:
 
       - name: Set version and prerelease flags
         id: info
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
-          INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
-          GH_EVENT_NAME: ${{ github.event_name }}
         run: |
-          TAG_NAME=""
-          if [ "$GH_EVENT_NAME" = "push" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          elif [ "$INPUT_RELEASE_TYPE" = "beta" ]; then
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)-beta
-            PRERELEASE=true
-          elif [ "$INPUT_RELEASE_TYPE" = "hotfix" ]; then
-            VERSION=$(echo "$INPUT_TAG_NAME" | sed 's/^v//')
-            PRERELEASE=false
-            TAG_NAME="$INPUT_TAG_NAME"
-            case "$TAG_NAME" in
-              v*) ;;
-              *) TAG_NAME="v$TAG_NAME" ;;
-            esac
-          else
-            VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-            PRERELEASE=false
-          fi
-          if [ -z "$TAG_NAME" ]; then TAG_NAME="v$VERSION"; fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=${{ needs.create-release.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "prerelease=${{ needs.create-release.outputs.prerelease }}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ needs.create-release.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Rename Android artifacts
         run: |
@@ -771,10 +715,7 @@ jobs:
       - name: Upload Android artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.info.outputs.version }}
-          name: ${{ inputs.release_type == 'hotfix' && steps.info.outputs.tag_name || format('v{0}', steps.info.outputs.version) }}
-          body_path: releasenote.md
-          prerelease: ${{ steps.info.outputs.prerelease }}
+          tag_name: ${{ steps.info.outputs.tag_name }}
           overwrite_files: ${{ inputs.overwrite }}
           files: |
             src-tauri/gen/android/app/build/outputs/apk/audion_*_android.apk
