@@ -185,3 +185,39 @@ pub async fn get_stats_summary(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     queries::get_stats_summary(&conn).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_continue_listening(
+    limit: i32,
+    db: State<'_, Database>,
+    sync_state: State<'_, crate::sync::SyncState>,
+) -> Result<Vec<queries::Track>, String> {
+    if let crate::sync::provider::ProviderMode::Server = *sync_state.provider_mode.lock().unwrap() {
+        return Ok(vec![]);
+    }
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut tracks = queries::get_continue_listening(&conn, limit).map_err(|e| e.to_string())?;
+    let server_url = sync_state.server_url.lock().unwrap().clone();
+    let token = queries::get_sync_meta(&conn, "access_token").ok().flatten();
+    crate::sync::provider::resolve_tracks(&mut tracks, &server_url, token.as_deref());
+    Ok(tracks)
+}
+
+#[tauri::command]
+pub async fn get_recently_added_albums(
+    limit: i32,
+    db: State<'_, Database>,
+    sync_state: State<'_, crate::sync::SyncState>,
+) -> Result<Vec<queries::Album>, String> {
+    if let crate::sync::provider::ProviderMode::Server = *sync_state.provider_mode.lock().unwrap() {
+        return Ok(vec![]);
+    }
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut albums = queries::get_recently_added_albums(&conn, limit).map_err(|e| e.to_string())?;
+    let server_url = sync_state.server_url.lock().unwrap().clone();
+    let token = queries::get_sync_meta(&conn, "access_token").ok().flatten();
+    for a in &mut albums {
+        crate::sync::provider::resolve_album(a, &server_url, token.as_deref());
+    }
+    Ok(albums)
+}

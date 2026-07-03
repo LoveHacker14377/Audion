@@ -637,6 +637,8 @@ pub fn run() {
                     commands::get_top_tracks,
                     commands::get_top_albums,
                     commands::get_recently_played,
+                    commands::get_continue_listening,
+                    commands::get_recently_added_albums,
                     commands::get_top_artists,
                     commands::get_stats_summary,
                     // Lyrics commands
@@ -818,6 +820,8 @@ pub fn run() {
                     commands::get_top_tracks,
                     commands::get_top_albums,
                     commands::get_recently_played,
+                    commands::get_continue_listening,
+                    commands::get_recently_added_albums,
                     commands::get_top_artists,
                     commands::get_stats_summary,
                     // Lyrics commands

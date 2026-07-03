@@ -70,7 +70,11 @@
     "jumpBackIn": "Vuelve a escuchar",
     "yourTopSongs": "Tus canciones favoritas",
     "mostPlayedAlbums": "Álbumes más reproducidos",
-    "viewAll": "Ver todo"
+    "viewAll": "Ver todo",
+    "pinned": "Fijado arriba",
+    "continueListening": "Continuar escuchando",
+    "recentlyAdded": "Añadido recientemente",
+    "stats": "Tus estadísticas"
   },
   "sidebar": {
     "library": "Biblioteca",

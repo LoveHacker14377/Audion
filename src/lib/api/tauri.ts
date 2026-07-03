@@ -559,6 +559,14 @@ export async function getStatsSummary(): Promise<StatsSummary> {
     return await invoke('get_stats_summary');
 }
 
+export async function getContinueListening(limit: number): Promise<Track[]> {
+    return await invoke('get_continue_listening', { limit });
+}
+
+export async function getRecentlyAddedAlbums(limit: number): Promise<Album[]> {
+    return await invoke('get_recently_added_albums', { limit });
+}
+
 
 // File dialog
 

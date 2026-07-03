@@ -1912,3 +1912,71 @@ pub fn enqueue_track_sync_change(conn: &Connection, track: &Track, operation: &s
     Ok(())
 }
 
+pub fn get_continue_listening(conn: &Connection, limit: i32) -> Result<Vec<Track>> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.path, t.title, t.artist, t.album, t.track_number, t.duration, t.album_id, t.format, t.bitrate, t.source_type, t.cover_url, t.external_id, t.local_src, t.track_cover_path, t.disc_number, t.metadata_json, t.date_added, MAX(ph.played_at) as last_partial_play
+         FROM tracks t
+         INNER JOIN play_history ph ON t.id = ph.track_id
+         WHERE ph.duration_played > 10 
+           AND t.duration IS NOT NULL 
+           AND t.duration > 20 
+           AND ph.duration_played < (t.duration - 10)
+         GROUP BY COALESCE(t.album_id, -t.id)
+         ORDER BY last_partial_play DESC
+         LIMIT ?1",
+    )?;
+
+    let tracks = stmt
+        .query_map(params![limit], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                track_number: row.get(5)?,
+                duration: row.get(6)?,
+                album_id: row.get(7)?,
+                format: row.get(8)?,
+                bitrate: row.get(9)?,
+                source_type: row.get(10)?,
+                cover_url: row.get(11)?,
+                external_id: row.get(12)?,
+                local_src: row.get(13)?,
+                track_cover: None,
+                track_cover_path: row.get(14)?,
+                disc_number: row.get(15)?,
+                metadata_json: row.get(16)?,
+                date_added: row.get(17)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(tracks)
+}
+
+pub fn get_recently_added_albums(conn: &Connection, limit: i32) -> Result<Vec<Album>> {
+    let mut stmt = conn.prepare(
+        "SELECT a.id, a.name, a.artist, a.art_data, a.art_path, MAX(t.date_added) as album_date_added
+         FROM albums a
+         INNER JOIN tracks t ON a.id = t.album_id
+         GROUP BY a.id
+         ORDER BY album_date_added DESC
+         LIMIT ?1",
+    )?;
+
+    let albums = stmt
+        .query_map(params![limit], |row| {
+            Ok(Album {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                artist: row.get(2)?,
+                art_data: row.get(3)?,
+                art_path: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(albums)
+}
+

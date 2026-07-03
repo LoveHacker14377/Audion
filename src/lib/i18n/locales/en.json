@@ -70,7 +70,11 @@
     "jumpBackIn": "Jump Back In",
     "yourTopSongs": "Your Top Songs",
     "mostPlayedAlbums": "Most Played Albums",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "pinned": "Pinned to Top",
+    "continueListening": "Continue Listening",
+    "recentlyAdded": "Recently Added",
+    "stats": "Your stats"
   },
   "sidebar": {
     "library": "Library",
