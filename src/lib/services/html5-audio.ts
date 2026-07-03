@@ -580,24 +580,29 @@ function recreateHtml5AudioElement(): HTMLAudioElement {
 
 function setupHtml5AudioListeners(audio: HTMLAudioElement): void {
     audio.addEventListener('ended', () => {
+        if (audio !== html5Audio) return;
         registeredCallbacks?.onEnded();
     });
 
     audio.addEventListener('error', () => {
+        if (audio !== html5Audio) return;
         console.error('[Html5Audio] Audio error:', audio.error);
         registeredCallbacks?.onError(audio.error?.message || 'Unknown error');
     });
 
     audio.addEventListener('play', () => {
+        if (audio !== html5Audio) return;
         registeredCallbacks?.onPlayStateChange(true);
     });
 
     audio.addEventListener('pause', () => {
+        if (audio !== html5Audio) return;
         registeredCallbacks?.onPlayStateChange(false);
     });
 
     // Push duration as soon as the browser parses it — poller alone would lag up to 50ms
     audio.addEventListener('durationchange', () => {
+        if (audio !== html5Audio) return;
         if (audio.duration && !isNaN(audio.duration)) {
             registeredCallbacks?.onTimeUpdate(audio.currentTime, audio.duration);
         }
