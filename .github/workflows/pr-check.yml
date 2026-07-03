@@ -1,0 +1,72 @@
+# PR Checks — Catch platform-specific build failures BEFORE merge
+name: PR Checks
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Android Kotlin compilation — catches type errors, name shadowing, and
+  # Gradle config issues without needing a full Android build
+  # ---------------------------------------------------------------------------
+  android-kotlin-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (npm)
+        run: npm install
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89.0"
+
+      - name: Fetch Rust dependencies (needed for Android library sources)
+        run: cargo fetch --manifest-path src-tauri/Cargo.toml
+
+      - name: Cache tauri-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/tauri
+          key: tauri-cli-2.11.0
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --version 2.11.0 --locked
+
+      - name: Install Android SDK Platform 36
+        run: |
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-36"
+
+      - name: Initialize Android project
+        run: npm run tauri android init
+
+      - name: Verify MainActivity.kt exists
+        run: test -f src-tauri/gen/android/app/src/main/java/com/audion/app/MainActivity.kt
+
+      - name: Compile Kotlin (debug)
+        run: |
+          cd src-tauri/gen/android
+          ./gradlew compileDebugKotlin --no-daemon

@@ -638,9 +638,26 @@ jobs:
       - name: Initialize Android project
         run: npm run tauri android init
 
+      - name: Verify Android project initialized
+        run: |
+          test -f src-tauri/gen/android/app/src/main/java/com/audion/app/MainActivity.kt || {
+            echo "::error::MainActivity.kt missing after init — tauri android init may have failed"
+            exit 1
+          }
+          test -f src-tauri/gen/android/gradlew || {
+            echo "::error::gradlew missing after init"
+            exit 1
+          }
+
       - name: Bundle libc++_shared.so into jniLibs
         run: |
-          NDK_DIR="${ANDROID_HOME}/ndk/$(ls "${ANDROID_HOME}/ndk" | sort -V | tail -1)"
+          NDK_VERSION="29.0.14206865"
+          NDK_DIR="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+          if [ ! -d "$NDK_DIR" ]; then
+            echo "::error::NDK ${NDK_VERSION} not found at ${NDK_DIR}. Available NDKs:"
+            ls -la "${ANDROID_HOME}/ndk/" || true
+            exit 1
+          fi
           # NDK r23+ moved libc++_shared.so out of sysroot/usr/lib/<abi>/
           # It now lives under toolchains/llvm/prebuilt/<host>/lib/ per target triple
           TOOLCHAIN="${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64"
