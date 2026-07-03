@@ -17,8 +17,8 @@
   let openSections: Record<string, boolean> = {};
 
   function toggle(section: string) {
-    openSections[section] = !openSections[section];
-    openSections = openSections;
+    const isCurrentlyOpen = !!openSections[section];
+    openSections = { [section]: !isCurrentlyOpen };
   }
 </script>
 

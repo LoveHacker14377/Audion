@@ -33,7 +33,10 @@
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
-    <span class="accordion-title">{$_('settings.account', { default: 'Account' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.account', { default: 'Account' })}</span>
+      <span class="accordion-subtitle">{$_('settings.accountSubtitle', { default: 'Manage your user profile and login details' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

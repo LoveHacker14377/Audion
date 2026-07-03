@@ -13,7 +13,10 @@
     <svg class="accordion-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="5 3 19 12 5 21 5 3" />
     </svg>
-    <span class="accordion-title">{$_('settings.playback', { default: 'Playback' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.playback', { default: 'Playback' })}</span>
+      <span class="accordion-subtitle">{$_('settings.playbackSubtitle', { default: 'Adjust queue behavior, autoplay, and resume options' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

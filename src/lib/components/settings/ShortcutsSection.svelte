@@ -16,7 +16,10 @@
       <line x1="12" y1="22" x2="12" y2="9" />
       <path d="M2 9h20" />
     </svg>
-    <span class="accordion-title">{$_('settings.shortcuts', { default: 'Keyboard Shortcuts' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.shortcuts', { default: 'Keyboard Shortcuts' })}</span>
+      <span class="accordion-subtitle">{$_('settings.shortcutsSubtitle', { default: 'Customize hotkeys and media control shortcuts' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

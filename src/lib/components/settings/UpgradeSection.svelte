@@ -23,7 +23,10 @@
     <svg class="accordion-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
-    <span class="accordion-title">{$_('settings.upgrade', { default: 'Upgrade' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.upgrade', { default: 'Upgrade' })}</span>
+      <span class="accordion-subtitle">{$_('settings.upgradeSubtitle', { default: 'Unlock unlimited sync and professional features' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>
@@ -31,6 +34,7 @@
   {#if open}
     <div class="section-body" transition:slide|local>
       <div class="settings-card upgrade-card">
+        <div class="premium-card-badge">Unlock</div>
     {#if !$isSupporter}
       <div class="card-header-row">
         <div class="card-title-group">

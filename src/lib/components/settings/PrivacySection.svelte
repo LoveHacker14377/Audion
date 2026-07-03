@@ -15,7 +15,10 @@
     <svg class="accordion-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
-    <span class="accordion-title">{$_('settings.privacy', { default: 'Privacy' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.privacy', { default: 'Privacy' })}</span>
+      <span class="accordion-subtitle">{$_('settings.privacySubtitle', { default: 'Manage analytics, remote control, and diagnostic logs' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

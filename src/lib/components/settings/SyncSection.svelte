@@ -70,7 +70,10 @@
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
-    <span class="accordion-title">{$_('settings.sync', { default: 'Sync' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.sync', { default: 'Sync' })}</span>
+      <span class="accordion-subtitle">{$_('settings.syncSubtitle', { default: 'Configure track synchronization and cloud settings' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

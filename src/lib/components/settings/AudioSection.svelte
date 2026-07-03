@@ -132,7 +132,10 @@
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
     </svg>
-    <span class="accordion-title">{$_('settings.audio', { default: 'Audio' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.audio', { default: 'Audio' })}</span>
+      <span class="accordion-subtitle">{$_('settings.audioSubtitle', { default: 'Configure output devices, replay gain, and equalizer' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>
@@ -159,6 +162,8 @@
             </div>
           {/if}
         </div>
+
+        <div class="divider"></div>
 
         <!-- Output Device -->
         <div class="inner-section">
@@ -284,7 +289,7 @@
             <button
               class="toggle-btn"
               class:active={$equalizer.enabled}
-              on:click={() => equalizer.toggle()}
+              on:click={() => equalizer.setEnabled(!$equalizer.enabled)}
               role="switch"
               aria-checked={$equalizer.enabled}
               aria-label="Toggle Equalizer"
@@ -297,13 +302,14 @@
               <div class="eq-bands">
                 {#each $equalizer.bands as band, i}
                   <div class="eq-band">
-                    <span class="eq-band-label">{band.frequency}</span>
+                    <span class="eq-band-label">{band.label}</span>
                     <input
                       type="range"
                       min="-12"
                       max="12"
                       step="0.5"
                       value={band.gain}
+                      style="--eq-fill: {((band.gain + 12) / 24 * 100).toFixed(1)}%"
                       on:input={(e) => {
                         const val = parseFloat(e.currentTarget.value);
                         equalizer.setBandGain(i, val);
@@ -317,15 +323,15 @@
               <div class="eq-presets">
                 <span class="eq-presets-label">{$_('settings.presets', { default: 'Presets' })}</span>
                 <div class="eq-preset-pills">
-                  <button class="preset-pill" class:active={!$equalizer.preset} on:click={() => equalizer.setPreset(null)}>
-                    {$_( 'settings.flat', { default: 'Flat' } )}
+                  <button class="preset-pill" class:active={!$equalizer.currentPreset || $equalizer.currentPreset === 'Flat'} on:click={() => equalizer.reset()}>
+                    {$_('settings.flat', { default: 'Flat' })}
                   </button>
                   {#each EQ_PRESETS as preset}
                     <button
                       class="preset-pill"
-                      class:active={$equalizer.preset === preset.id}
-                      on:click={() => equalizer.setPreset(preset.id)}
-                      title={preset.description}
+                      class:active={$equalizer.currentPreset === preset.name}
+                      on:click={() => equalizer.applyPreset(preset.name)}
+                      title={preset.name}
                     >
                       {preset.name}
                     </button>

@@ -37,7 +37,10 @@
       <line x1="12" y1="16" x2="12" y2="12" />
       <line x1="12" y1="8" x2="12.01" y2="8" />
     </svg>
-    <span class="accordion-title">{$_('settings.about', { default: 'About' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.about', { default: 'About' })}</span>
+      <span class="accordion-subtitle">{$_('settings.aboutSubtitle', { default: 'View application version, updates, and credits' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>

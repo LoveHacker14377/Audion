@@ -47,7 +47,10 @@
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
-    <span class="accordion-title">{$_('settings.community', { default: 'Community' })}</span>
+    <div class="accordion-header-info">
+      <span class="accordion-title">{$_('settings.community', { default: 'Community' })}</span>
+      <span class="accordion-subtitle">{$_('settings.communitySubtitle', { default: 'Connect with other users, share tracks, and enable integrations' })}</span>
+    </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
       <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
     </svg>
