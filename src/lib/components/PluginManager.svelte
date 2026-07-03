@@ -348,7 +348,7 @@
         <div class="sort-selector">
           <select
             value={$pluginStore.sortBy}
-            on:change={(e) => pluginStore.setSortBy(e.currentTarget.value)}
+            on:change={(e) => pluginStore.setSortBy(e.currentTarget.value as any)}
           >
             <option value="stars">Most Stars</option>
             <option value="downloads">Most Downloads</option>
@@ -462,7 +462,7 @@
                 <img
                   src={getIconUrl(plugin)}
                   alt={plugin.manifest.name}
-                  on:error={(e) => (e.currentTarget.style.display = "none")}
+                  on:error={(e) => ((e.currentTarget as HTMLElement).style.display = "none")}
                 />
               {/if}
               <svg
@@ -565,7 +565,7 @@
                 <img
                   src={getIconUrl(plugin)}
                   alt={plugin.manifest.name}
-                  on:error={(e) => (e.currentTarget.style.display = "none")}
+                  on:error={(e) => ((e.currentTarget as HTMLElement).style.display = "none")}
                 />
               {/if}
               <svg
@@ -645,7 +645,7 @@
                 <img
                   src={getIconUrl(plugin)}
                   alt={plugin.name}
-                  on:error={(e) => (e.currentTarget.style.display = "none")}
+                  on:error={(e) => ((e.currentTarget as HTMLElement).style.display = "none")}
                 />
               {/if}
               <svg

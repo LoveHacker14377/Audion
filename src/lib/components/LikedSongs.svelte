@@ -138,7 +138,6 @@
         {:else}
             <TrackList
                 {tracks}
-                title="Liked Songs"
                 showAlbum={true}
                 scrollKey="liked-songs"
             />

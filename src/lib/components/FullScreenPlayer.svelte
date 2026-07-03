@@ -496,7 +496,7 @@
                 on:click={() => {
                   showMobileMenu = false;
                   toggleFullScreen();
-                  goToArtistDetail($currentTrack.artist);
+                  if ($currentTrack?.artist) goToArtistDetail($currentTrack.artist);
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
@@ -513,7 +513,7 @@
                 on:click={() => {
                   showMobileMenu = false;
                   toggleFullScreen();
-                  goToAlbumDetail($currentTrack.album_id);
+                  if ($currentTrack?.album_id) goToAlbumDetail($currentTrack.album_id);
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">

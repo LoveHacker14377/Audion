@@ -57,6 +57,9 @@ import {
     html5SetVolume,
     html5GetState,
     html5Cleanup,
+    html5Preload,
+    html5SwapPreload,
+    html5ClearPreload,
 } from '$lib/services/html5-audio';
 
 // Interval for polling native playback state
@@ -865,59 +868,72 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
         const streaming = isStreaming(track) || !!(track as any).stream_url || audioPath.startsWith('http://') || audioPath.startsWith('https://');
 
-        if (streaming) {
-            if (!audioPath) {
-                throw new Error('No audio path or stream URL found for track');
-            }
+        let swapped = false;
+        if (startTime === 0) {
+            swapped = await html5SwapPreload(audioPath, sliderToAudioVolume(get(volume)));
+        }
 
-            await nativeAudioStop().catch(() => { });
+        if (swapped) {
+            activeBackend.set('html5');
+            console.log('[Player] HTML5 swapped from preload:', track.title);
+            _scheduleHtml5Preload();
+        } else {
+            if (streaming) {
+                if (!audioPath) {
+                    throw new Error('No audio path or stream URL found for track');
+                }
 
-            if (classifyAudioPath(audioPath) === 'custom-scheme') {
-                const runtime = pluginStore.getRuntime();
-                if (runtime) {
-                    const sourceType = track.source_type;
-                    const externalId = track.external_id;
-                    if (sourceType && externalId) {
-                        console.log(`[Player] Resolving custom scheme: ${audioPath}`);
-                        const resolved = await runtime.resolveStreamUrl(sourceType, externalId, { track: trackForPlugins });
-                        if (resolved) {
-                            audioPath = resolved;
-                        } else {
-                            throw new Error(`Failed to resolve stream URL for ${sourceType}`);
+                await nativeAudioStop().catch(() => { });
+
+                if (classifyAudioPath(audioPath) === 'custom-scheme') {
+                    const runtime = pluginStore.getRuntime();
+                    if (runtime) {
+                        const sourceType = track.source_type;
+                        const externalId = track.external_id;
+                        if (sourceType && externalId) {
+                            console.log(`[Player] Resolving custom scheme: ${audioPath}`);
+                            const resolved = await runtime.resolveStreamUrl(sourceType, externalId, { track: trackForPlugins });
+                            if (resolved) {
+                                audioPath = resolved;
+                            } else {
+                                throw new Error(`Failed to resolve stream URL for ${sourceType}`);
+                            }
                         }
                     }
                 }
-            }
 
-            activeBackend.set('html5');
-            await html5Play(audioPath, sliderToAudioVolume(get(volume)), startTime);
-            console.log('[Player] HTML5 streaming started:', track.title);
+                activeBackend.set('html5');
+                await html5Play(audioPath, sliderToAudioVolume(get(volume)), startTime);
+                console.log('[Player] HTML5 streaming started:', track.title);
+                _scheduleHtml5Preload();
 
-        } else {
-            if (!audioPath) {
-                throw new Error('No local audio path found for track');
-            }
-
-            if (nativeAudioUsed) {
-                html5Stop();
-
-                await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
-
-                const vol = sliderToAudioVolume(get(volume));
-                await nativeAudioSetVolume(vol);
-
-                if (startTime > 0 && track.duration) {
-                    await nativeAudioSeek(startTime / track.duration);
+            } else {
+                if (!audioPath) {
+                    throw new Error('No local audio path found for track');
                 }
 
-                _schedulePreload();
+                if (nativeAudioUsed) {
+                    html5Stop();
 
-                activeBackend.set('native');
-                console.log('[Player] Native playback started:', track.title);
-            } else {
-                activeBackend.set('html5');
-                await html5Play(convertFileSrc(audioPath), sliderToAudioVolume(get(volume)), startTime);
-                console.log('[Player] Local playback started via HTML5:', track.title);
+                    await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
+
+                    const vol = sliderToAudioVolume(get(volume));
+                    await nativeAudioSetVolume(vol);
+
+                    if (startTime > 0 && track.duration) {
+                        await nativeAudioSeek(startTime / track.duration);
+                    }
+
+                    _schedulePreload();
+
+                    activeBackend.set('native');
+                    console.log('[Player] Native playback started:', track.title);
+                } else {
+                    activeBackend.set('html5');
+                    await html5Play(convertFileSrc(audioPath), sliderToAudioVolume(get(volume)), startTime);
+                    console.log('[Player] Local playback started via HTML5:', track.title);
+                    _scheduleHtml5Preload();
+                }
             }
         }
 
@@ -1430,6 +1446,7 @@ async function _advanceUiToTrack(track: Track): Promise<void> {
     broadcastState(true);
 
     _schedulePreload();
+    _scheduleHtml5Preload();
 
     if (get(appSettings).listenBrainzEnabled) {
         submitListenbrainzListen(
@@ -1462,6 +1479,76 @@ function _schedulePreload(): void {
 
     nativeAudioPreload(nextPath, nextTrackObj.id, (nextTrackObj as any).replay_gain_db ?? null).catch(e => {
         console.warn('[Player] Preload failed (non-fatal):', e);
+    });
+}
+
+async function _scheduleHtml5Preload(): Promise<void> {
+    if (get(activeBackend) !== 'html5') return;
+
+    const q = get(queue);
+    const nextIdx = _advanceQueueIndex(true);
+
+    if (nextIdx === null || nextIdx >= q.length) return;
+
+    const nextTrackObj = q[nextIdx];
+    if (!nextTrackObj) return;
+
+    let audioPath = nextTrackObj.local_src || nextTrackObj.path;
+
+    // Resolve server tracks
+    if (nextTrackObj.source_type === 'server' && !nextTrackObj.local_src) {
+        try {
+            audioPath = await audioGetStreamUrl(audioPath, nextTrackObj.id);
+        } catch (err) {
+            console.error('[Player] Preload path resolution failed:', err);
+            return;
+        }
+    }
+
+    if (!audioPath && (nextTrackObj as any).stream_url) {
+        audioPath = (nextTrackObj as any).stream_url;
+    }
+
+    if (!audioPath && nextTrackObj.external_id && (nextTrackObj.external_id.startsWith('http://') || nextTrackObj.external_id.startsWith('https://'))) {
+        audioPath = nextTrackObj.external_id;
+    }
+
+    if (!audioPath) return;
+
+    const streaming = isStreaming(nextTrackObj) || !!(nextTrackObj as any).stream_url || audioPath.startsWith('http://') || audioPath.startsWith('https://');
+
+    if (!streaming) {
+        // Next track is a local file, native backend handles its own preload
+        return;
+    }
+
+    // Resolve custom schemes if any
+    const scheme = audioPath.includes('://') ? audioPath.split('://')[0] + '://' : '';
+    const isCustomScheme = scheme && scheme !== 'http://' && scheme !== 'https://' && scheme !== 'file://' && scheme !== 'asset://' && scheme !== 'tauri://';
+
+    if (isCustomScheme) {
+        const runtime = pluginStore.getRuntime();
+        if (runtime) {
+            const sourceType = nextTrackObj.source_type;
+            const externalId = nextTrackObj.external_id;
+            if (sourceType && externalId) {
+                try {
+                    const fullTrack = await getFullTrack(nextTrackObj.id, true);
+                    const trackForPlugins = fullTrack || nextTrackObj;
+                    const resolved = await runtime.resolveStreamUrl(sourceType, externalId, { track: trackForPlugins });
+                    if (resolved) {
+                        audioPath = resolved;
+                    }
+                } catch (e) {
+                    console.error('[Player] Failed to resolve custom scheme for preload:', e);
+                }
+            }
+        }
+    }
+
+    console.log('[Player] Preloading next HTML5 track:', nextTrackObj.title, audioPath);
+    html5Preload(audioPath).catch(e => {
+        console.warn('[Player] HTML5 Preload failed (non-fatal):', e);
     });
 }
 

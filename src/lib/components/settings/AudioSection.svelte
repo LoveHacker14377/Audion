@@ -112,6 +112,24 @@
     return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} dB`;
   }
 
+  function handleInfoClick(e: Event, device: AudioDeviceInfo) {
+    e.stopPropagation();
+    if (infoPopoverDevice?.id === device.id) {
+      infoPopoverDevice = null;
+    } else {
+      infoPopoverDevice = device;
+    }
+  }
+
+  function getDeviceIcon(device: AudioDeviceInfo): 'speaker' | 'headphone' {
+    const type = device.device_type.toLowerCase();
+    const name = device.name.toLowerCase();
+    if (type.includes('headphone') || type.includes('headset') || name.includes('headphone') || name.includes('headset')) {
+      return 'headphone';
+    }
+    return 'speaker';
+  }
+
   onMount(async () => {
     if (!outputDeviceDisabled) {
       try {
@@ -193,7 +211,7 @@
                       <Icon name="loader" size="sm" />
                       <span>{$_('settings.loadingDevices', { default: 'Loading devices...' })}</span>
                     </div>
-                  {:else if deviceList && deviceList.length > 0}
+                  {:else if deviceList && deviceList.devices && deviceList.devices.length > 0}
                     <button
                       class="dropdown-item"
                       class:selected={!$appSettings.outputDevice}
@@ -204,7 +222,7 @@
                       <Icon name="speaker" size="xs" />
                       <span class="device-item-name">{$_('settings.systemDefault', { default: 'System default' })}</span>
                     </button>
-                    {#each deviceList as device (device.id)}
+                    {#each deviceList.devices as device (device.id)}
                       <div class="dropdown-item-wrapper">
                         <button
                           class="dropdown-item"
@@ -213,11 +231,7 @@
                           role="option"
                           aria-selected={$appSettings.outputDevice === device.id}
                         >
-                          {#if device.icon}
-                            <Icon name={device.icon} size="xs" />
-                          {:else}
-                            <Icon name="speaker" size="xs" />
-                          {/if}
+                          <Icon name={getDeviceIcon(device)} size="xs" />
                           <span class="device-item-name">{device.extended[0] ?? device.name}</span>
                           <span
                             class="device-info-button"

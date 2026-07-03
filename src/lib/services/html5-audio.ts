@@ -22,6 +22,7 @@ export function html5SetCallbacks(callbacks: Html5Callbacks): void {
 }
 
 export async function html5Play(path: string, volume: number, startTime = 0): Promise<void> {
+    html5ClearPreload();
     let audio = getHtml5Audio();
 
     // Pause and reset before switching tracks
@@ -69,6 +70,173 @@ export async function html5Play(path: string, volume: number, startTime = 0): Pr
     }
 }
 
+export async function html5Preload(path: string): Promise<void> {
+    html5ClearPreload();
+
+    preloadPath = path;
+    preloadReady = false;
+
+    if (typeof window === 'undefined') return;
+
+    preloadAudio = new Audio();
+    
+    // Wire up events on the preload element
+    preloadAudio.addEventListener('canplaythrough', () => {
+        if (preloadPath === path) {
+            console.log('[Html5Audio] Preload canplaythrough ready:', path);
+            preloadReady = true;
+            if (preloadTimeoutId) {
+                clearTimeout(preloadTimeoutId);
+                preloadTimeoutId = null;
+            }
+        }
+    });
+
+    preloadAudio.addEventListener('canplay', () => {
+        if (preloadPath === path && !preloadReady) {
+            canplayFallbackTimer = setTimeout(() => {
+                if (preloadPath === path && preloadAudio && !preloadReady) {
+                    console.log('[Html5Audio] Preload canplay fallback triggered. Marking ready.');
+                    preloadReady = true;
+                }
+            }, 3000);
+        }
+    });
+
+    preloadAudio.addEventListener('error', () => {
+        console.error('[Html5Audio] Preload error for:', path, preloadAudio?.error);
+        html5ClearPreload();
+    });
+
+    const finalKind = classifyAudioPath(path);
+
+    if (finalKind === 'blob') {
+        isPreloadDash = true;
+        try {
+            const mpdText = await fetch(path).then(r => r.text());
+            const bytes = new TextEncoder().encode(mpdText);
+            const binary = Array.from(bytes).reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+            const dataUrl = 'data:application/dash+xml;base64,' + btoa(binary);
+
+            const dashjs = await getDashPlayer();
+            preloadDashPlayer = dashjs.MediaPlayer().create();
+            preloadDashPlayer.initialize(preloadAudio, dataUrl, false);
+        } catch (e) {
+            console.error('[Html5Audio] Failed to preload DASH stream:', e);
+            html5ClearPreload();
+        }
+    } else {
+        isPreloadDash = false;
+        const resolvedPath = await resolvePlaylistUrl(path);
+        if (get(equalizer).enabled && canUseHtml5EqForPath(resolvedPath)) {
+            preloadAudio.crossOrigin = 'anonymous';
+        }
+        preloadAudio.src = resolvedPath;
+        preloadAudio.load();
+    }
+
+    preloadTimeoutId = setTimeout(() => {
+        if (preloadPath === path && preloadAudio) {
+            if (preloadAudio.readyState >= 2) {
+                console.log('[Html5Audio] Preload timeout reached, readyState is >= HAVE_CURRENT_DATA. Marking ready.');
+                preloadReady = true;
+            } else {
+                console.warn('[Html5Audio] Preload timed out without buffer. Clearing preload.');
+                html5ClearPreload();
+            }
+        }
+    }, 10000);
+}
+
+export async function html5SwapPreload(path: string, volume: number): Promise<boolean> {
+    if (!preloadReady || !preloadAudio || !preloadPath || preloadPath !== path) {
+        console.log('[Html5Audio] Swap called but preload is not ready/matching path.');
+        return false;
+    }
+
+    if (html5Audio) {
+        html5Audio.pause();
+        html5Audio.src = '';
+    }
+    if (dashPlayer) {
+        try { dashPlayer.destroy(); } catch (_) {}
+        dashPlayer = null;
+    }
+
+    const nextPath = preloadPath;
+    html5Audio = preloadAudio;
+    dashPlayer = preloadDashPlayer;
+
+    preloadAudio = null;
+    preloadDashPlayer = null;
+    preloadPath = null;
+    preloadReady = false;
+    if (preloadTimeoutId) {
+        clearTimeout(preloadTimeoutId);
+        preloadTimeoutId = null;
+    }
+    if (canplayFallbackTimer) {
+        clearTimeout(canplayFallbackTimer);
+        canplayFallbackTimer = null;
+    }
+
+    setupHtml5AudioListeners(html5Audio);
+    html5Audio.volume = volume;
+
+    const eqEnabled = get(equalizer).enabled;
+    const canUseEq = canUseHtml5EqForPath(nextPath);
+
+    if (eqEnabled && canUseEq) {
+        ensureHtml5EqGraph(html5Audio);
+        await resumeHtml5AudioContext();
+    } else {
+        if (html5AudioSourceNode) {
+            cleanupHtml5EqGraph();
+        }
+    }
+
+    try {
+        if (isPreloadDash && dashPlayer) {
+            dashPlayer.play();
+        } else {
+            await html5Audio.play();
+        }
+        console.log('[Html5Audio] Preloaded track swapped and started playing:', nextPath);
+        return true;
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+            console.warn('[Html5Audio] Swap play aborted', err);
+        } else {
+            console.error('[Html5Audio] Swap play failed:', err);
+            registeredCallbacks?.onError(err instanceof Error ? err.message : String(err));
+        }
+        return false;
+    }
+}
+
+export function html5ClearPreload(): void {
+    if (preloadTimeoutId) {
+        clearTimeout(preloadTimeoutId);
+        preloadTimeoutId = null;
+    }
+    if (canplayFallbackTimer) {
+        clearTimeout(canplayFallbackTimer);
+        canplayFallbackTimer = null;
+    }
+    if (preloadAudio) {
+        preloadAudio.pause();
+        preloadAudio.src = '';
+        preloadAudio = null;
+    }
+    if (preloadDashPlayer) {
+        try { preloadDashPlayer.destroy(); } catch (_) {}
+        preloadDashPlayer = null;
+    }
+    preloadPath = null;
+    preloadReady = false;
+    isPreloadDash = false;
+}
+
 export function html5Pause(): void {
     getHtml5Audio().pause();
 }
@@ -79,6 +247,7 @@ export async function html5Resume(): Promise<void> {
 }
 
 export function html5Stop(): void {
+    html5ClearPreload();
     if (!html5Audio) return; // Don't create the element just to stop it
     const audio = html5Audio;
     audio.pause();
@@ -128,6 +297,7 @@ export function html5Cleanup(): void {
         dashPlayer = null;
     }
     cleanupHtml5EqGraph();
+    html5ClearPreload();
 }
 
 // =============================================================================
@@ -149,6 +319,15 @@ let lastEqBypassWarningHost: string | null = null;
 
 // dash.js player instance for Hi-Res DASH/MPD streaming
 let dashPlayer: any | null = null;
+
+// Preload state for gapless streaming
+let preloadAudio: HTMLAudioElement | null = null;
+let preloadPath: string | null = null;
+let preloadReady = false;
+let preloadTimeoutId: any = null;
+let canplayFallbackTimer: any = null;
+let isPreloadDash = false;
+let preloadDashPlayer: any = null;
 
 // =============================================================================
 // INTERNAL: AUDIO PATH CLASSIFICATION
