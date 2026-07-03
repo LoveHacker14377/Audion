@@ -18,7 +18,7 @@
 
   .view-header h1 {
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     padding-left: var(--spacing-md);
   }
 
@@ -98,16 +98,16 @@
 
   .accordion-title {
     font-size: 0.9375rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: inherit;
     line-height: 1.3;
   }
 
   .accordion-subtitle {
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
     color: var(--text-subdued);
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -140,15 +140,15 @@
 
   .setting-title {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
     display: block;
   }
 
   .setting-description {
     font-size: 11px;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     color: var(--text-secondary);
     line-height: 1.4;
     margin-top: 2px;
@@ -187,8 +187,8 @@
   }
 
   .mode-btn span {
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
   }
 
   /* Color Grid */
@@ -275,7 +275,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: var(--accent-primary);
     color: var(--bg-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     border-radius: var(--radius-sm);
     transition: all var(--transition-fast);
   }
@@ -324,7 +324,7 @@
 
   .eq-band-label {
     font-size: 10px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-subdued);
     text-align: center;
     user-select: none;
@@ -332,7 +332,7 @@
 
   .eq-band-value {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
     min-width: 36px;
@@ -389,7 +389,7 @@
 
   .eq-presets-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-subdued);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -404,7 +404,7 @@
   .preset-pill {
     padding: 4px 10px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     background-color: var(--bg-surface);
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
@@ -439,8 +439,8 @@
   .segment-btn {
     flex: 1;
     padding: 6px 12px;
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     border-radius: var(--radius-full);
     transition: all var(--transition-fast);
@@ -482,8 +482,8 @@
     background: none;
     border: none;
     color: var(--text-subdued);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     padding: 4px 8px;
     cursor: pointer;
     transition: color 0.2s;
@@ -499,8 +499,8 @@
     color: #000;
     padding: 10px 20px;
     border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 700;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
     text-decoration: none;
     display: inline-block;
     transition: transform 0.2s, background-color 0.2s;
@@ -558,7 +558,7 @@
   .support-description {
     font-size: 0.9375rem;
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: var(--line-height-normal);
     margin: 0;
   }
 
@@ -597,13 +597,13 @@
   }
 
   .platform-name {
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
   }
 
   .platform-tag {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--text-subdued);
     margin-top: 2px;
   }
@@ -673,7 +673,7 @@
     }
 
     .path-display {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
     }
 
     /* Support links single column */
@@ -796,8 +796,8 @@
     color: #000;
     border: none;
     border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 700;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     white-space: nowrap;
     transition: background-color 0.2s, transform 0.15s;
@@ -838,7 +838,7 @@
 
   .path-display {
     flex: 1;
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -852,8 +852,8 @@
     background: none;
     border: none;
     color: var(--accent-primary);
-    font-size: 0.8125rem;
-    font-weight: 700;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     padding: 8px;
     text-decoration: underline;
@@ -898,7 +898,7 @@
     background: var(--accent-primary);
     color: var(--bg-base);
     font-size: 0.6875rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 3px 8px;
@@ -964,14 +964,14 @@
   }
 
   .option-title {
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     margin: 0;
   }
 
   .option-description {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 1.4;
     margin: 0 0 var(--spacing-md) 0;
@@ -1006,8 +1006,8 @@
   }
 
   .docker-guide-link {
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     color: var(--accent-primary);
     text-decoration: underline;
     display: inline-flex;
@@ -1046,20 +1046,20 @@
 
   .card-title {
     font-size: 1.125rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
   }
 
   .card-subtitle {
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
   }
 
   .pill-badge {
     padding: 4px 10px;
     border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     background: rgba(255, 255, 255, 0.08);
     color: var(--text-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1075,8 +1075,8 @@
     padding: 8px 16px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     transition: all var(--transition-fast);
     background: transparent;
@@ -1109,7 +1109,7 @@
   }
 
   .account-email-sm {
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     color: var(--text-subdued);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1130,7 +1130,7 @@
     align-items: center;
     justify-content: center;
     font-size: 1.25rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--accent-primary);
   }
 
@@ -1152,7 +1152,7 @@
   }
 
   .notice-text {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     color: var(--text-secondary);
   }
@@ -1193,7 +1193,7 @@
     gap: var(--spacing-xs);
     width: fit-content;
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
   }
 
   /* ─── Supporter Benefits & Limits Styles ─── */
@@ -1210,7 +1210,7 @@
   }
 
   .status-unlocked {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 0.9375rem;
   }
 
@@ -1222,8 +1222,8 @@
 
   .benefits-title,
   .upsell-title {
-    font-size: 0.8125rem;
-    font-weight: 700;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: var(--spacing-sm);
@@ -1244,7 +1244,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-primary);
   }
 
@@ -1273,14 +1273,14 @@
   }
 
   .limit-label {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
   }
 
   .limit-count {
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     font-family: monospace;
   }
@@ -1310,8 +1310,8 @@
   }
 
   .limit-value {
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
     color: var(--accent-warning, #ffae42);
     text-align: right;
   }
@@ -1321,7 +1321,7 @@
   }
 
   .upsell-desc {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     margin-bottom: var(--spacing-sm);
     color: var(--text-secondary);
   }
@@ -1337,12 +1337,12 @@
 
   .upsell-list li strong {
     color: var(--accent-primary);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
   }
 
   .text-accent {
     color: var(--accent-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   .sync-info {
@@ -1354,9 +1354,9 @@
 
   .sync-info .setting-label {
     margin-bottom: 0;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -1364,7 +1364,7 @@
   .sync-info .setting-value {
     font-size: 0.9375rem;
     color: var(--text-primary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .sync-btn {
@@ -1389,7 +1389,7 @@
 
   .text-error {
     color: #dc3545;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
   }
 
   /* Modal */
@@ -1427,7 +1427,7 @@
 
   .modal-header h2 {
     font-size: 1.25rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: #dc3545;
     margin: 0;
   }
@@ -1483,7 +1483,7 @@
 
   .warning-note {
     color: #dc3545 !important;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   .confirm-input {
@@ -1494,7 +1494,7 @@
     display: block;
     margin-bottom: var(--spacing-sm);
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
   }
 
   .confirm-input label strong {
@@ -1509,7 +1509,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
-    font-size: 1rem;
+    font-size: var(--font-size-md);
     font-family: monospace;
   }
 
@@ -1525,7 +1525,7 @@
 
   .error-message {
     color: #dc3545;
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     margin-top: var(--spacing-sm);
     text-align: center;
   }
@@ -1544,7 +1544,7 @@
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
@@ -1564,7 +1564,7 @@
     color: white;
     border: none;
     border-radius: var(--radius-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
@@ -1596,7 +1596,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     color: var(--text-primary);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
   }
 
   .preset-select-pill:focus {
@@ -1617,7 +1617,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     cursor: pointer;
     max-width: 200px;
     -webkit-appearance: none;
@@ -1644,7 +1644,7 @@
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
@@ -1692,7 +1692,7 @@
 
   .eq-gain {
     font-size: 0.7rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-secondary);
     min-width: 28px;
     text-align: center;
@@ -1704,7 +1704,7 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     white-space: nowrap;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   /* ─── Modern Toggle Styles ─── */
@@ -1785,14 +1785,14 @@
     background: var(--bg-highlight);
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     line-height: 1;
   }
 
   .key-plus {
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
 
   /* ─── Segmented Pill Control (3-segment) ─── */
@@ -1812,8 +1812,8 @@
     border: none;
     padding: var(--spacing-sm);
     color: var(--text-secondary);
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     border-radius: calc(var(--radius-lg) - 2px);
     transition: all 0.2s ease;
@@ -1925,7 +1925,7 @@
   .sync-message {
     margin-top: var(--spacing-sm);
     padding: var(--spacing-xs) 0;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     text-align: left;
     display: flex;
     align-items: center;
@@ -1970,14 +1970,14 @@
 
   .error-message {
     color: var(--text-primary);
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
     text-align: left;
   }
 
   .error-hint {
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     margin: 0;
     line-height: 1.4;
     text-align: left;
@@ -1986,7 +1986,7 @@
   .donate-link {
     color: var(--accent-primary);
     text-decoration: underline;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
   
   .donate-link:hover {
@@ -2011,12 +2011,12 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
   }
 
   .progress-text {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-primary);
   }
 
@@ -2026,12 +2026,12 @@
 
   .progress-eta {
     color: var(--accent-primary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .progress-percentage {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
     color: var(--accent-primary);
   }
 
@@ -2057,7 +2057,7 @@
   .progress-stats {
     display: flex;
     gap: var(--spacing-lg);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
 
   .stat-item {
@@ -2071,7 +2071,7 @@
 
   .stat-value {
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   .notice-content {
@@ -2079,8 +2079,8 @@
     align-items: center;
     gap: var(--spacing-sm);
     color: var(--accent-primary);
-    font-size: 0.8125rem;
-    font-weight: 500;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
   }
 
   .refresh-notice {
@@ -2097,7 +2097,7 @@
     background-color: var(--accent-primary);
     color: #000;
     border: none;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     padding: var(--spacing-xs) var(--spacing-md);
     cursor: pointer;
     transition:
@@ -2140,7 +2140,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     color: var(--text-primary);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     font-family: inherit;
     cursor: pointer;
     transition:
@@ -2251,7 +2251,7 @@
     background: none;
     border: none;
     color: var(--text-primary);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     font-family: inherit;
     cursor: pointer;
     text-align: left;
@@ -2309,7 +2309,7 @@
   .device-item-badge {
     flex-shrink: 0;
     font-size: 0.6875rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--text-subdued);
@@ -2378,7 +2378,7 @@
     .section-title {
       margin-bottom: var(--spacing-md);
       padding-bottom: var(--spacing-xs);
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
     }
 
     .setting-item {
@@ -2556,7 +2556,7 @@
     font-size: 0.625rem;
     font-style: italic;
     font-family: Georgia, serif;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -2595,8 +2595,8 @@
   }
 
   .device-info-primary {
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     margin-bottom: 3px;
     line-height: 1.3;
@@ -2605,7 +2605,7 @@
   .device-info-row {
     display: flex;
     gap: 6px;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: var(--text-primary);
     line-height: 1.4;
   }

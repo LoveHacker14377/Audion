@@ -116,8 +116,8 @@
     /* ── Message ── */
     .message {
         flex: 1;
-        font-size: 0.8125rem;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
         line-height: 1.3;
         white-space: nowrap;
         overflow: hidden;

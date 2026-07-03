@@ -307,12 +307,12 @@
 
     .empty-state h3 {
         font-size: 1.25rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .empty-state p {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .empty-state :global(svg) {

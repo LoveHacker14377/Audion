@@ -173,7 +173,7 @@
     .menu-item {
         text-align: left;
         padding: var(--spacing-sm) var(--spacing-md);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-primary);
         border-radius: var(--radius-sm);
         transition: background-color var(--transition-fast);
@@ -213,7 +213,7 @@
         position: relative;
         cursor: default;
         padding: var(--spacing-sm) var(--spacing-md);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-primary);
         border-radius: var(--radius-sm);
         transition: background-color var(--transition-fast);
@@ -283,7 +283,7 @@
         .menu-item,
         .menu-item.has-submenu {
             padding: var(--spacing-md);
-            font-size: 1rem;
+            font-size: var(--font-size-md);
             min-height: 48px;
             display: flex;
             align-items: center;

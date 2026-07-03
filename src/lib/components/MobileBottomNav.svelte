@@ -192,7 +192,7 @@
         color: var(--text-subdued);
         text-align: center;
         font-size: 10px;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         gap: 2px;
         padding: 4px 12px;
         border-radius: var(--radius-sm);

@@ -1187,7 +1187,7 @@
 
     .discover-header h1 {
         font-size: 1.65rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         margin: 0;
         color: var(--text-primary);
     }
@@ -1266,7 +1266,7 @@
         border-bottom: 2px solid transparent;
         color: var(--text-secondary);
         font-size: 0.85rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         transition:
             color var(--transition-fast),
@@ -1307,7 +1307,7 @@
     .loading-state p,
     .error-state p,
     .no-results p {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         margin: var(--spacing-md) 0 var(--spacing-xs);
         color: var(--text-primary);
     }
@@ -1357,7 +1357,7 @@
         align-items: center;
         justify-content: center;
         font-size: 2.5rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: #fff;
         background: linear-gradient(
             135deg,
@@ -1398,7 +1398,7 @@
     .type-chip {
         background: var(--accent-subtle);
         color: var(--accent-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     .genre-pills {
@@ -1533,7 +1533,7 @@
     }
 
     .track-title {
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -1541,7 +1541,7 @@
     }
 
     .track-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
         white-space: nowrap;
         overflow: hidden;
@@ -1561,8 +1561,8 @@
         border: none;
         padding: 4px 12px;
         border-radius: var(--radius-full);
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition:
             transform 0.1s,
@@ -1619,7 +1619,7 @@
 
     .detail-title-block h2 {
         font-size: 1.2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         margin: 0;
         color: var(--text-primary);
     }
@@ -1651,7 +1651,7 @@
 
     .detail-section h3 {
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--text-secondary);
@@ -1835,7 +1835,7 @@
 
     .disco-title {
         font-size: 0.88rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -1853,7 +1853,7 @@
         padding: 2px 10px;
         border-radius: var(--radius-full);
         font-size: 0.68rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         letter-spacing: 0.02em;
         text-transform: uppercase;
     }
@@ -1960,7 +1960,7 @@
     }
     .track-name {
         font-size: 0.92rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;

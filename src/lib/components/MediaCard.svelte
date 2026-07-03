@@ -370,8 +370,8 @@
     color: var(--bg-base);
     padding: 4px 8px;
     border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     pointer-events: none;
     z-index: 2;
   }
@@ -453,7 +453,7 @@
     padding: 4px 8px;
     background-color: var(--bg-surface);
     color: var(--text-primary);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     border-radius: var(--radius-sm);
     white-space: nowrap;
     opacity: 0;
@@ -556,7 +556,7 @@
     padding: 4px 8px;
     background-color: var(--bg-surface);
     color: var(--text-primary);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     border-radius: var(--radius-sm);
     white-space: nowrap;
     opacity: 0;
@@ -616,7 +616,7 @@
 
   .text-track:not(.secondary) .text-inner {
     font-size: 0.9375rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
   }
 
@@ -626,7 +626,7 @@
   }
 
   .text-track.secondary .text-inner {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
   }
 
@@ -644,7 +644,7 @@
     text-align: left;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
   }
 
@@ -690,10 +690,10 @@
       margin-bottom: var(--spacing-sm);
     }
     .text-track:not(.secondary) .text-inner {
-      font-size: 0.8125rem;
+      font-size: var(--font-size-sm);
     }
     .text-track.secondary .text-inner {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
     }
     .badge {
       font-size: 0.625rem;

@@ -280,7 +280,7 @@
 
     .playlist-name {
         font-size: 1.125rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin: 0;
         display: flex;
@@ -290,14 +290,14 @@
 
     .playlist-highlight {
         color: var(--accent-primary);
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
     }
 
     .selection-info {
         display: flex;
         align-items: center;
         gap: var(--spacing-md);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .selected-count {
@@ -305,7 +305,7 @@
         align-items: center;
         gap: var(--spacing-xs);
         color: var(--accent-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     .selected-count svg {
@@ -320,8 +320,8 @@
         background: none;
         border: none;
         color: var(--text-secondary);
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         padding: 0;
         text-decoration: underline;
@@ -347,7 +347,7 @@
         padding: var(--spacing-sm) var(--spacing-lg);
         border-radius: var(--radius-full);
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: all var(--transition-fast);
         white-space: nowrap;
@@ -438,8 +438,8 @@
     }
 
     .mobile-title {
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin: 0;
         white-space: nowrap;
@@ -448,7 +448,7 @@
     }
 
     .mobile-subtitle {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
@@ -457,8 +457,8 @@
     }
 
     .mobile-text-btn {
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         color: var(--accent-primary);
         padding: var(--spacing-sm) var(--spacing-md);
         border-radius: var(--radius-full);
@@ -491,7 +491,7 @@
         border: none;
         outline: none;
         color: var(--text-primary);
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         min-width: 0;
         height: 100%;
         user-select: text;
@@ -537,8 +537,8 @@
         border-radius: var(--radius-full);
         background-color: var(--accent-primary);
         color: var(--bg-base);
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
         border: none;
         box-shadow: 0 4px 20px color-mix(in srgb, var(--accent-primary), transparent 60%), 0 2px 8px rgba(0, 0, 0, 0.3);
         pointer-events: auto;

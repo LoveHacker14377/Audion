@@ -351,7 +351,7 @@
   .menu-header {
     padding: 6px 12px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-subdued);

@@ -128,7 +128,7 @@
     }
     
     .scan-title {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         font-size: 14px;
         margin-bottom: 2px;
@@ -144,7 +144,7 @@
     }
     
     .progress-text {
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
     }
     
     .eta-separator {
@@ -153,7 +153,7 @@
     
     .eta-text {
         color: var(--accent-primary);
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
     }
     
     .elapsed-text {
@@ -168,7 +168,7 @@
     .tracks-loaded {
         font-size: 13px;
         color: var(--accent-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         margin-bottom: 2px;
     }
     
@@ -198,7 +198,7 @@
     .count-item {
         padding: 2px 6px;
         border-radius: 3px;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
     }
 
     .count-item.added {

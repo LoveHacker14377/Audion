@@ -585,7 +585,7 @@
         border: none;
         outline: none;
         color: var(--text-primary);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         min-width: 0;
         height: 100%;
         user-select: text;
@@ -597,7 +597,7 @@
     }
 
     .search-count {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         white-space: nowrap;
         margin-right: 4px;
@@ -678,7 +678,7 @@
 
     .mobile-title {
         font-size: 1.1rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--accent-primary);
         flex: 1;
         text-align: center;

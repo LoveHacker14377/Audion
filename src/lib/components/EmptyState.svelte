@@ -66,7 +66,7 @@
 
     .empty-title {
         font-size: 1.5rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         letter-spacing: -0.01em;
     }
@@ -75,7 +75,7 @@
         font-size: 0.9375rem;
         color: var(--text-secondary);
         max-width: 320px;
-        line-height: 1.5;
+        line-height: var(--line-height-normal);
     }
 
     .empty-action {
@@ -84,8 +84,8 @@
         border-radius: var(--radius-full);
         background: var(--accent-primary);
         color: var(--bg-base);
-        font-weight: 600;
-        font-size: 0.875rem;
+        font-weight: var(--font-weight-semibold);
+        font-size: var(--font-size-base);
         border: none;
         cursor: pointer;
         transition: all var(--transition-fast);

@@ -633,15 +633,15 @@
     }
 
     .album-type {
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         color: var(--text-primary);
     }
 
     .album-title {
         font-size: 3rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         line-height: 1.1;
         margin: var(--spacing-sm) 0;
         color: var(--text-primary);
@@ -651,13 +651,13 @@
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
         margin-bottom: var(--spacing-lg);
     }
 
     .album-artist {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         background: none;
         border: none;
@@ -679,7 +679,7 @@
     }
 
     .play-all-btn {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         padding: var(--spacing-sm) var(--spacing-xl);
     }
 
@@ -693,7 +693,7 @@
         background-color: transparent;
         border: 1px solid var(--border-color);
         color: var(--text-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -701,7 +701,7 @@
         transition: all var(--transition-fast);
         padding: var(--spacing-sm) var(--spacing-xl);
         border-radius: var(--radius-full);
-        font-size: 1rem;
+        font-size: var(--font-size-md);
     }
 
     .btn-secondary:hover:not(:disabled) {
@@ -744,8 +744,8 @@
         padding: var(--spacing-md) var(--spacing-xl);
         background: transparent;
         color: var(--text-primary);
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         text-transform: none;
         letter-spacing: normal;
         border: none;
@@ -799,7 +799,7 @@
     }
 
     .mb-info-hint {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
     }
 
@@ -811,8 +811,8 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: var(--radius-full);
         padding: var(--spacing-xs) 10px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-secondary);
         white-space: nowrap;
     }
@@ -876,7 +876,7 @@
         .play-all-btn,
         .btn-secondary {
             padding: var(--spacing-sm) var(--spacing-lg);
-            font-size: 0.875rem;
+            font-size: var(--font-size-base);
             min-height: 44px;
         }
 

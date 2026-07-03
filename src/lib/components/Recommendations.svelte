@@ -383,7 +383,7 @@
 
     .state-card h3 {
         font-size: 1.2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         margin: 0;
     }
@@ -404,7 +404,7 @@
         border: none;
         padding: 10px 24px;
         border-radius: var(--radius-lg);
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         cursor: pointer;
         font-size: 0.9rem;
         margin-top: var(--spacing-sm);
@@ -485,7 +485,7 @@
     }
 
     .rec-title {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         font-size: 0.9rem;
         color: var(--text-primary);
         white-space: nowrap;
@@ -511,7 +511,7 @@
     }
 
     .rec-album {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-tertiary);
         white-space: nowrap;
         overflow: hidden;
@@ -526,7 +526,7 @@
     }
 
     .rec-score {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-tertiary);
         min-width: 32px;
         text-align: right;

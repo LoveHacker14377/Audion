@@ -421,7 +421,7 @@
     background: rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-full);
     font-size: 0.7rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: #888;
@@ -499,9 +499,9 @@
   }
 
   .status-info .label {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: #777;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   .remote .status-info .label {
@@ -510,7 +510,7 @@
 
   .status-info .value {
     font-size: 1.1rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: white;
   }
 
@@ -551,7 +551,7 @@
   }
 
   .section-header span {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     font-weight: 800;
     text-transform: uppercase;
     color: #555;
@@ -628,8 +628,8 @@
 
   .device-name {
     display: block;
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-md);
     color: white;
     margin-bottom: 2px;
   }
@@ -661,7 +661,7 @@
   }
 
   .idle-text {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     color: #444;
   }
 
@@ -703,7 +703,7 @@
     padding: var(--spacing-sm);
     border-radius: var(--radius-lg);
     font-size: 0.85rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     transition: 0.2s;
     display: flex;
@@ -747,7 +747,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-lg);
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
@@ -766,7 +766,7 @@
     background: transparent;
     border: none;
     color: var(--accent-primary);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     font-size: 0.7rem;
   }
@@ -785,7 +785,7 @@
   .empty-state p {
     margin: 0 0 4px 0;
     color: #888;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
   }
 
   @media (max-width: 480px) {

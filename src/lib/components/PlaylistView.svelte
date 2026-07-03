@@ -516,7 +516,7 @@
 
     .view-header h1 {
         font-size: 2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
     }
 
     .header-actions {
@@ -551,7 +551,7 @@
     }
 
     .rename-label {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
         white-space: nowrap;
         flex-shrink: 0;

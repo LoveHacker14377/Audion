@@ -659,8 +659,8 @@
     }
 
     .lyrics-header h3 {
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
@@ -685,7 +685,7 @@
         border: 1px solid var(--border-color);
         color: var(--text-secondary);
         font-size: 0.72rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         letter-spacing: 0.3px;
         text-transform: uppercase;
         cursor: pointer;
@@ -734,19 +734,19 @@
         padding: 8px 12px;
         border-radius: calc(var(--radius-md) - 2px);
         font-size: 0.82rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-secondary);
         cursor: pointer;
         transition: all var(--transition-fast);
     }
     .source-menu-item:hover { background: var(--bg-highlight); color: var(--text-primary); }
-    .source-menu-item.active { color: var(--text-primary); font-weight: 600; }
+    .source-menu-item.active { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 
     .source-menu-label  { flex: 1; }
 
     .source-menu-format {
         font-size: 0.65rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         letter-spacing: 0.4px;
         color: var(--text-subdued);
         background: var(--bg-highlight);
@@ -840,7 +840,7 @@
     }
 
     .lyrics-track-info {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         opacity: 0.7;
         margin-top: var(--spacing-sm);
     }
@@ -870,8 +870,8 @@
         border: 1px solid var(--border-color);
         background: var(--bg-highlight);
         color: var(--text-secondary);
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: all var(--transition-fast);
     }
@@ -901,7 +901,7 @@
     /* ------------------------------------------------------------------ */
     .section-label {
         font-size: 0.65rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--text-subdued);
@@ -925,7 +925,7 @@
     .lyric-line {
         --line-distance: 6;
         font-size: 1.15rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         line-height: 1.6;
         color: var(--lyrics-inactive);
         padding: 12px 0;
@@ -1137,7 +1137,7 @@
         opacity: 0.55;
         margin-top: 1px;
         letter-spacing: 0;
-        font-weight: 600; /* slightly lighter than parent 700/800 */
+        font-weight: var(--font-weight-semibold); /* slightly lighter than parent 700/800 */
     }
     .lyric-line.active .bg-vocal { opacity: 0.7; }
 

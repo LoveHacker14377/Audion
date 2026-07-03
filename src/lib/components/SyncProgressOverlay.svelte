@@ -117,7 +117,7 @@
 
     .label {
         font-size: 0.85rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary, #ffffff);
         letter-spacing: -0.01em;
     }
@@ -145,8 +145,8 @@
     }
 
     .percent {
-        font-size: 0.75rem;
-        font-weight: 700;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-bold);
         color: var(--text-secondary, #b3b3b3);
         font-variant-numeric: tabular-nums;
         min-width: 32px;

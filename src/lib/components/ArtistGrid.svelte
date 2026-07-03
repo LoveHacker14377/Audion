@@ -274,7 +274,7 @@
     align-items: center;
     justify-content: center;
     font-size: 3rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
   }
 

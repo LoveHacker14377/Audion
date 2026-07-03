@@ -269,9 +269,9 @@
     .header-info h2 {
         margin: 0;
         font-size: 1.5rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
-        line-height: 1.2;
+        line-height: var(--line-height-tight);
         margin-bottom: var(--spacing-xs);
     }
 
@@ -286,13 +286,13 @@
         color: white;
         padding: 2px 8px;
         border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
     }
 
     .date {
         color: var(--text-subdued);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .close-btn {
@@ -328,7 +328,7 @@
     .markdown-content :global(h3) {
         margin-top: 1.5em;
         margin-bottom: 0.5em;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
@@ -339,7 +339,7 @@
         font-size: 1.1rem;
     }
     .markdown-content :global(h3) {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
     }
 
     .markdown-content :global(p) {
@@ -393,8 +393,8 @@
     }
 
     .assets-section h3 {
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin-bottom: var(--spacing-md);
         text-transform: uppercase;
@@ -425,13 +425,13 @@
 
     .asset-name {
         color: var(--text-primary);
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         font-size: 0.9375rem;
     }
 
     .asset-size {
         color: var(--text-subdued);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
     }
 
     .download-btn {
@@ -443,8 +443,8 @@
         color: var(--text-primary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         transition: all 0.2s;
     }
@@ -456,7 +456,7 @@
     }
 
     .no-notes {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-subdued);
         font-style: italic;
         margin: 0 0 var(--spacing-md);
@@ -470,8 +470,8 @@
         border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 65%);
         padding: 2px 8px;
         border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
     }
 
     .ota-actions {
@@ -483,7 +483,7 @@
     .ota-hint {
         font-size: 0.9rem;
         color: var(--text-secondary);
-        line-height: 1.5;
+        line-height: var(--line-height-normal);
         margin: 0;
     }
 
@@ -501,7 +501,7 @@
         border: none;
         border-radius: var(--radius-md);
         font-size: 0.9375rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         cursor: pointer;
         transition: background-color 0.2s, transform 0.15s;
     }
@@ -523,7 +523,7 @@
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: background-color 0.2s, color 0.2s;
     }
@@ -544,8 +544,8 @@
         color: var(--text-subdued);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         transition: background-color 0.2s, color 0.2s;
     }

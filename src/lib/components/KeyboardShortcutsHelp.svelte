@@ -445,7 +445,7 @@
 
     .modal-header h2 {
         font-size: 1.25rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin: 0;
         flex: 1;
@@ -463,8 +463,8 @@
         gap: 6px;
         padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-sm);
-        font-size: 0.8125rem;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
         color: var(--text-secondary);
         border: 1px solid var(--bg-highlight);
         transition: all var(--transition-fast);
@@ -478,7 +478,7 @@
     }
 
     .btn-text-danger {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: var(--color-error, #e05252);
         padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-sm);
@@ -523,8 +523,8 @@
     }
 
     .category-title {
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--accent-primary);
@@ -561,7 +561,7 @@
 
     .key-separator {
         color: var(--text-subdued);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
     }
 
     kbd {
@@ -574,8 +574,8 @@
         background-color: var(--bg-highlight);
         border: 1px solid var(--text-subdued);
         border-radius: var(--radius-xs);
-        font-size: 0.75rem;
-        font-weight: 500;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-medium);
         font-family: inherit;
         color: var(--text-primary);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -583,13 +583,13 @@
 
     .shortcut-description {
         color: var(--text-secondary);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         text-align: right;
         flex: 1;
     }
 
     .unbound-label {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
     }
 
@@ -603,7 +603,7 @@
         background-color: var(--accent-primary);
         color: #fff;
         font-size: 0.625rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         margin-left: 4px;
     }
 
@@ -701,7 +701,7 @@
     /* conflict & error UI */
 
     .binding-error {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--color-error, #e05252);
         margin: 2px 0 4px 0;
         padding-left: 4px;
@@ -734,14 +734,14 @@
 
     .capture-prompt p {
         color: var(--text-primary);
-        font-size: 1rem;
-        font-weight: 500;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-medium);
         margin: 0;
     }
 
     .capture-hint {
-        font-size: 0.8125rem !important;
-        font-weight: 400 !important;
+        font-size: var(--font-size-sm) !important;
+        font-weight: var(--font-weight-normal) !important;
         color: var(--text-subdued) !important;
     }
 
@@ -757,8 +757,8 @@
     }
 
     .conflict-warning p {
-        font-size: 0.875rem !important;
-        font-weight: 400 !important;
+        font-size: var(--font-size-base) !important;
+        font-weight: var(--font-weight-normal) !important;
         color: var(--text-primary) !important;
         margin: 0;
     }
@@ -774,8 +774,8 @@
         background-color: var(--color-error, #e05252);
         color: #fff;
         border-radius: var(--radius-sm);
-        font-size: 0.8125rem;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
         transition: opacity var(--transition-fast);
     }
 
@@ -786,8 +786,8 @@
         background-color: var(--bg-highlight);
         color: var(--text-primary);
         border-radius: var(--radius-sm);
-        font-size: 0.8125rem;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
         transition: background-color var(--transition-fast);
     }
 
@@ -803,7 +803,7 @@
 
     .hint {
         color: var(--text-subdued);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         text-align: center;
         margin: 0;
     }

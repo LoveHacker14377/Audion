@@ -234,7 +234,7 @@
 
     .progress-text {
         font-size: 10px;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--accent-primary);
         margin-left: 6px;
         white-space: nowrap;

@@ -686,7 +686,7 @@
         padding: var(--spacing-xs) var(--spacing-sm);
         background-color: var(--bg-surface);
         color: var(--text-primary);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         border-radius: var(--radius-sm);
         white-space: nowrap;
         opacity: 0;
@@ -803,15 +803,15 @@
     }
 
     .playlist-type {
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         color: var(--text-primary);
     }
 
     .playlist-title {
         font-size: 3rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         line-height: 1.1;
         margin: var(--spacing-sm) 0;
         color: var(--text-primary);
@@ -820,7 +820,7 @@
 
     .edit-input {
         font-size: 3rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         background-color: var(--bg-surface);
         border: 2px solid var(--accent-primary);
         border-radius: var(--radius-sm);
@@ -833,7 +833,7 @@
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
         margin-bottom: var(--spacing-lg);
     }
@@ -850,7 +850,7 @@
 
     .play-all-btn,
     .add-songs-btn {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         padding: var(--spacing-sm) var(--spacing-xl);
     }
 
@@ -872,12 +872,12 @@
 
     .empty-state h3 {
         font-size: 1.25rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .empty-state p {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .btn-secondary.downloaded {
@@ -949,7 +949,7 @@
         .add-songs-btn,
         .btn-secondary {
             padding: var(--spacing-sm) var(--spacing-lg);
-            font-size: 0.875rem;
+            font-size: var(--font-size-base);
             min-height: 44px;
         }
 

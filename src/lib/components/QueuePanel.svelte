@@ -644,8 +644,8 @@
     }
 
     .queue-header h3 {
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
@@ -656,7 +656,7 @@
     }
 
     .clear-btn {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
         padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-sm);
@@ -697,7 +697,7 @@
 
     .section-title {
         font-size: 0.6875rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         color: var(--text-subdued);
@@ -888,8 +888,8 @@
     }
 
     .track-title {
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
     }
 
@@ -898,12 +898,12 @@
     }
 
     .track-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
     .track-duration {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         flex-shrink: 0;
     }
@@ -941,12 +941,12 @@
     }
 
     .empty-state p {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         color: var(--text-secondary);
     }
 
     .empty-state span {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
     }
 
     .history {

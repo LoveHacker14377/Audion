@@ -1072,7 +1072,7 @@
         min-width: 0;
     }
     .track-name {
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1126,7 +1126,7 @@
 
     .fun-fact {
         font-size: 1.1rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         font-style: italic;
         color: var(--accent-primary);
         margin-top: var(--spacing-md);
@@ -1225,7 +1225,7 @@
     .grid-item {
         display: flex;
         gap: 6px;
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         font-weight: 900;
         white-space: nowrap;
         overflow: hidden;
@@ -1298,7 +1298,7 @@
     }
 
     .genre-label {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         opacity: 0.7;
         text-transform: uppercase;
         letter-spacing: 2px;
@@ -1313,7 +1313,7 @@
     }
 
     .also-label {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         text-transform: uppercase;
         letter-spacing: 2px;
         opacity: 0.5;
@@ -1332,8 +1332,8 @@
         color: #c4b5fd;
         padding: 4px 14px;
         border-radius: 20px;
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
     }
 
     .genre-loading {

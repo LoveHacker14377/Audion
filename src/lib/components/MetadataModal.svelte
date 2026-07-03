@@ -214,7 +214,7 @@
     .modal-title h2 {
         margin: 0;
         font-size: 1.1rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -265,7 +265,7 @@
 
     .section-label {
         font-size: 0.68rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         color: var(--text-subdued);
@@ -402,7 +402,7 @@
 
         .meta-key {
             min-width: 80px;
-            font-size: 0.75rem;
+            font-size: var(--font-size-xs);
         }
 
         .meta-value {

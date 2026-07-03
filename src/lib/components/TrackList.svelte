@@ -1348,7 +1348,7 @@
     color: var(--text-secondary);
     border-radius: var(--radius-sm);
     padding: 2px 8px;
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
@@ -1367,7 +1367,7 @@
     padding-left: var(--spacing-lg);
     border-bottom: 1px solid var(--border-color);
     font-size: 0.78rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     line-height: 1.1;
@@ -1445,7 +1445,7 @@
 
   .sort-icon {
     color: var(--accent-primary);
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
   }
 
   .list-body {
@@ -1574,7 +1574,7 @@
     justify-content: center;
     text-align: center;
     color: var(--text-subdued);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
   }
 
   .track-row:hover .col-num:not(:has(.playing-icon)) {
@@ -1734,15 +1734,15 @@
 
   .track-name {
     font-size: 0.9375rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
     margin: 0;
   }
 
   .quality-tag {
     font-size: 0.6rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     padding: 2px 6px;
     border-radius: var(--radius-sm);
     background-color: var(--bg-highlight);
@@ -1765,7 +1765,7 @@
   }
 
   .track-artist {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     background: none;
     border: none;
@@ -1773,7 +1773,7 @@
     margin: 0;
     text-align: left;
     max-width: fit-content;
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
     min-height: 0;
   }
 
@@ -1790,7 +1790,7 @@
   }
 
   .col-album-cell {
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
     background: none;
     border: none;
@@ -1798,7 +1798,7 @@
     width: 100%;
     justify-self: stretch;
     text-align: left;
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
   }
 
   .col-album-cell:hover:not(:disabled) {
@@ -1809,7 +1809,7 @@
 
   .col-duration {
     text-align: right;
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     color: var(--text-subdued);
     display: flex;
     align-items: center;
@@ -1818,7 +1818,7 @@
 
   .col-date-added {
     text-align: right;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-sm);
     color: var(--text-subdued);
     display: flex;
     align-items: center;
@@ -1839,12 +1839,12 @@
 
   .empty-state h3 {
     font-size: 1.25rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
   }
 
   .empty-state p {
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
   }
 
   .track-row.unavailable {
@@ -2042,18 +2042,18 @@
     /* Title in album view — bold, prominent */
     .list-body.mobile-album .track-name {
       font-size: 0.9375rem;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       color: var(--text-primary);
     }
 
     .list-body.mobile-album .track-artist {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-secondary);
     }
 
     /* Duration compact */
     .list-body.mobile-album .col-duration {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-subdued);
     }
 
@@ -2110,19 +2110,19 @@
     /* Title + Artist stacked */
     .list-body.mobile-playlist .track-name {
       font-size: 0.9375rem;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       color: var(--text-primary);
     }
 
     .list-body.mobile-playlist .track-artist {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-secondary);
       margin-top: 0;
     }
 
     /* Duration compact */
     .list-body.mobile-playlist .col-duration {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-subdued);
     }
 
@@ -2179,19 +2179,19 @@
     /* Title + Artist stacked */
     .list-body.mobile-library .track-name {
       font-size: 0.9375rem;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       color: var(--text-primary);
     }
 
     .list-body.mobile-library .track-artist {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-secondary);
       margin-top: 2px;
     }
 
     /* Duration compact */
     .list-body.mobile-library .col-duration {
-      font-size: 0.75rem;
+      font-size: var(--font-size-xs);
       color: var(--text-subdued);
     }
 
@@ -2259,7 +2259,7 @@
       top: 50%;
       transform: translateY(-50%);
       font-size: 1.25rem;
-      font-weight: 700;
+      font-weight: var(--font-weight-bold);
       color: var(--accent-primary);
       opacity: 0;
       transition: opacity 0.15s ease;

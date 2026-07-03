@@ -820,7 +820,7 @@
 
     .artist-initial {
         font-size: 4rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
     }
 
@@ -839,15 +839,15 @@
     }
 
     .artist-type {
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
         text-transform: uppercase;
         color: var(--text-primary);
     }
 
     .artist-name {
         font-size: 3rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         line-height: 1.1;
         margin: var(--spacing-sm) 0;
         color: var(--text-primary);
@@ -857,7 +857,7 @@
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
         margin-bottom: var(--spacing-lg);
     }
@@ -872,7 +872,7 @@
     }
 
     .play-all-btn {
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         padding: var(--spacing-sm) var(--spacing-xl);
     }
 
@@ -885,8 +885,8 @@
 
     .tab {
         padding: var(--spacing-md);
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-secondary);
         border-bottom: 2px solid transparent;
         margin-bottom: -1px;
@@ -911,7 +911,7 @@
         background-color: transparent;
         border: 1px solid var(--border-color);
         color: var(--text-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -919,7 +919,7 @@
         transition: all var(--transition-fast);
         padding: var(--spacing-sm) var(--spacing-xl);
         border-radius: var(--radius-full);
-        font-size: 1rem;
+        font-size: var(--font-size-md);
     }
 
     .btn-secondary:hover:not(:disabled) {
@@ -959,7 +959,7 @@
 
     .about-error {
         color: var(--color-error, #f87171);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .about-section {
@@ -970,7 +970,7 @@
 
     .about-heading {
         font-size: 0.7rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         text-transform: uppercase;
         letter-spacing: 2px;
         color: var(--text-subdued);
@@ -990,7 +990,7 @@
         padding: var(--spacing-xs) var(--spacing-md);
         border-radius: var(--radius-full);
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     .about-bio {
@@ -1005,7 +1005,7 @@
         align-items: center;
         gap: var(--spacing-xs);
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-full);
@@ -1038,7 +1038,7 @@
 
     .about-empty {
         color: var(--text-secondary);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         padding: var(--spacing-xl) 0;
     }
 
@@ -1062,7 +1062,7 @@
         align-items: center;
         justify-content: center;
         font-size: 2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         background: var(--bg-highlight);
     }
@@ -1093,7 +1093,7 @@
         border-radius: var(--radius-full);
         padding: var(--spacing-xs) var(--spacing-md);
         font-size: 0.72rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: all var(--transition-fast);
         white-space: nowrap;
@@ -1216,7 +1216,7 @@
         .play-all-btn,
         .btn-secondary {
             padding: var(--spacing-sm) var(--spacing-lg);
-            font-size: 0.875rem;
+            font-size: var(--font-size-base);
             min-height: 44px;
         }
 

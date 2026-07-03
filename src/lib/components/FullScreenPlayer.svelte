@@ -1418,7 +1418,7 @@
   .desktop-album-context {
     margin: 0.15rem 0 0;
     font-size: 0.95rem;
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
     color: rgba(255, 255, 255, 0.64);
     white-space: nowrap;
     overflow: hidden;
@@ -1602,7 +1602,7 @@
     justify-content: space-between;
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.4);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     letter-spacing: 0.05em;
   }
 
@@ -1770,7 +1770,7 @@
     color: rgba(255, 255, 255, 0.35);
     padding: 0.5rem 0;
     border-radius: 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: 0.95rem;
     cursor: pointer;
     position: relative;
@@ -1857,7 +1857,7 @@
 
   .section-label {
     font-size: 0.7rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.4);
@@ -2001,7 +2001,7 @@
   .now-playing-label {
     text-transform: uppercase;
     font-size: 0.7rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     letter-spacing: 0.1em;
     opacity: 0.6;
   }
@@ -2074,7 +2074,7 @@
   }
 
   .mobile-view .time {
-    font-size: 0.75rem;
+    font-size: var(--font-size-xs);
     opacity: 0.5;
     min-width: 35px;
   }
@@ -2154,19 +2154,19 @@
 
   .compact-line.current {
     font-size: 1.05rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     margin: 0.25rem 0;
   }
 
   .compact-line.dimmed {
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     opacity: 0.4;
   }
 
   .mobile-lyrics-wrapper .lyric-line {
     font-size: 22px;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     line-height: 1.4;
     padding: 0.75rem 0;
     color: rgba(255, 255, 255, 0.15);
@@ -2334,7 +2334,7 @@
 
   .sheet-track-title {
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: #fff;
     white-space: nowrap;
     overflow: hidden;
@@ -2389,7 +2389,7 @@
     background: var(--accent-color, #1db954);
     color: #000;
     font-size: 0.7rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -2419,8 +2419,8 @@
 
   .sheet-timer-badge {
     margin-left: auto;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     color: var(--accent-color, #1db954);
   }
 
@@ -2438,7 +2438,7 @@
     background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.82rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: all 0.15s ease;

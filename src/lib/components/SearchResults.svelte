@@ -560,12 +560,12 @@
 
     .no-results h3 {
         font-size: 1.25rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .no-results p {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     .result-section {
@@ -574,7 +574,7 @@
 
     .section-title {
         font-size: 1.25rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         margin-bottom: var(--spacing-md);
     }
@@ -589,7 +589,7 @@
         background: var(--bg-surface);
         color: var(--text-secondary);
         border: 1px solid var(--border-color);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: default;
         -webkit-appearance: none;
         -moz-appearance: none;
@@ -626,7 +626,7 @@
         color: var(--text-secondary);
         font-size: 0.8rem;
         text-align: center;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
     }
 
     /* Remove native inner focus indicator / arrow on some browsers */
@@ -689,17 +689,17 @@
 
     .track-title {
         font-size: 0.9375rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
     }
 
     .track-artist {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: var(--text-secondary);
     }
 
     .more-results {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-subdued);
         padding: var(--spacing-sm);
     }
@@ -744,13 +744,13 @@
     }
 
     .album-name {
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .album-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
@@ -794,7 +794,7 @@
 
     .artist-initial {
         font-size: 2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
     }
 
@@ -806,13 +806,13 @@
     }
 
     .artist-name {
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .artist-meta {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
@@ -864,8 +864,8 @@
     }
 
     .playlist-name {
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
     .link-text {

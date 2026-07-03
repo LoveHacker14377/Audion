@@ -512,7 +512,7 @@
 
     .title {
         font-size: 0.9rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: #fff;
         white-space: nowrap;
         overflow: hidden;
@@ -522,7 +522,7 @@
 
     .artist {
         font-size: 0.72rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: rgba(255, 255, 255, 0.5);
         white-space: nowrap;
         overflow: hidden;
@@ -544,7 +544,7 @@
         padding: 5px 12px;
         border-radius: 20px;
         font-size: 0.65rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         border: 1px solid rgba(255, 255, 255, 0.1);
         background: rgba(255, 255, 255, 0.05);
         color: rgba(255, 255, 255, 0.5);
@@ -607,7 +607,7 @@
 
     .t-label {
         font-size: 0.65rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: rgba(255, 255, 255, 0.4);
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
@@ -757,7 +757,7 @@
 
     .ly-now {
         font-size: 0.85rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: #fff;
         white-space: nowrap;
         overflow: hidden;
@@ -779,7 +779,7 @@
 
     .ly-next {
         font-size: 0.7rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: rgba(255, 255, 255, 0.3);
         white-space: nowrap;
         overflow: hidden;
@@ -789,7 +789,7 @@
 
     .ly-muted {
         font-size: 0.72rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: rgba(255, 255, 255, 0.25);
         font-style: italic;
     }

@@ -745,7 +745,7 @@
 
     .home-header h1 {
         font-size: 1.5rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
     }
 
@@ -784,8 +784,8 @@
         align-items: center;
         gap: var(--spacing-xs);
         color: var(--accent-primary);
-        font-size: 0.75rem;
-        font-weight: 500;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-medium);
         padding: 0 var(--spacing-sm);
     }
 
@@ -879,14 +879,14 @@
 
     .liked-banner-title {
         font-size: 1.1rem;
-        font-weight: 700;
-        line-height: 1.2;
+        font-weight: var(--font-weight-bold);
+        line-height: var(--line-height-tight);
     }
 
     .liked-banner-subtitle {
         font-size: 0.8rem;
         opacity: 0.8;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
     }
 
     /* ===== Quick Play Grid (Spotify 2-col compact cards) ===== */
@@ -932,8 +932,8 @@
     }
 
     .quick-play-name {
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         padding-right: 8px;
         flex: 1;
         min-width: 0;
@@ -946,7 +946,7 @@
 
     .section-title {
         font-size: 1.25rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         padding: 0 var(--spacing-md);
         margin-bottom: var(--spacing-sm);
@@ -1047,15 +1047,15 @@
 
     .card-title {
         display: block;
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin-bottom: 2px;
     }
 
     .card-subtitle {
         display: block;
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
@@ -1125,7 +1125,7 @@
         padding: 6px 16px;
         border-radius: 20px;
         font-size: 0.85rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         width: fit-content;
     }
 
@@ -1154,12 +1154,12 @@
 
     .empty-home h2 {
         font-size: 1.25rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .empty-home p {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
     }
 
@@ -1171,8 +1171,8 @@
         padding: 14px 28px;
         background-color: var(--accent-primary);
         color: var(--bg-base);
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
         border: none;
         border-radius: var(--radius-full);
         cursor: pointer;
@@ -1195,8 +1195,8 @@
         gap: var(--spacing-sm);
         margin-top: var(--spacing-lg);
         color: var(--accent-primary);
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
     }
 
     /* ===== Bottom Spacer ===== */
@@ -1281,8 +1281,8 @@
 
     .song-rank {
         width: 24px;
-        font-size: 0.875rem;
-        font-weight: 700;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
         color: var(--text-subdued);
         text-align: center;
     }
@@ -1310,19 +1310,19 @@
     .song-title {
         display: block;
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .song-subtitle {
         display: block;
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: var(--text-secondary);
     }
 
     .song-count {
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         color: var(--accent-primary);
         opacity: 0.8;
     }
@@ -1414,7 +1414,7 @@
     }
 
     .recap-text {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: rgba(255, 255, 255, 0.9);
         margin: 0 0 16px 0;
         max-width: 80%;
@@ -1523,12 +1523,12 @@
         font-weight: 800;
         color: white;
         margin: 0;
-        line-height: 1.2;
+        line-height: var(--line-height-tight);
     }
 
     .hero-artist {
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         color: rgba(255, 255, 255, 0.8);
         margin: 4px 0 0;
     }
@@ -1540,8 +1540,8 @@
     }
 
     .play-stat {
-        font-size: 0.75rem;
-        font-weight: 700;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-bold);
         color: rgba(255, 255, 255, 0.6);
     }
 
@@ -1580,8 +1580,8 @@
     }
 
     .chart-card-header h3 {
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
         margin: 0;
         color: var(--text-primary);
     }
@@ -1636,12 +1636,12 @@
 
     .mini-title {
         font-size: 0.85rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .mini-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
     }
 

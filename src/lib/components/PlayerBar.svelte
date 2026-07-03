@@ -772,8 +772,8 @@
     }
 
     .track-title {
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
     }
 
     .track-title:hover {
@@ -783,7 +783,7 @@
     }
 
     .track-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
     }
 
@@ -795,7 +795,7 @@
 
     .no-track {
         color: var(--text-subdued);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
     }
 
     /* Like button (desktop) */
@@ -934,7 +934,7 @@
         padding: 4px 8px;
         background-color: var(--bg-surface);
         color: var(--text-primary);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         border-radius: var(--radius-sm);
         white-space: nowrap;
         opacity: 0;
@@ -951,7 +951,7 @@
     .repeat-one {
         position: absolute;
         font-size: 0.6rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         margin-top: 2px;
     }
 
@@ -1046,7 +1046,7 @@
         align-items: center;
         gap: 5px;
         font-size: 0.65rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         letter-spacing: 0.06em;
         color: #fff;
         background: #e53935;
@@ -1172,14 +1172,14 @@
 
     .sleep-timer-title {
         font-size: 0.78rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
     }
 
     .sleep-timer-remaining {
         font-size: 0.72rem;
         color: var(--accent-color, #1db954);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     .sleep-timer-presets {
@@ -1194,7 +1194,7 @@
         background: var(--bg-surface);
         color: var(--text-secondary);
         border-radius: var(--radius-sm);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         height: 30px;
         cursor: pointer;
         transition: all var(--transition-fast);
@@ -1358,7 +1358,7 @@
 
     .mini-title {
         font-size: 14px;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: #fff;
         white-space: nowrap;
         overflow: hidden;

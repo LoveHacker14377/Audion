@@ -315,15 +315,15 @@
 
     .modal-header h2 {
         font-size: 1.375rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         margin-bottom: var(--spacing-sm);
     }
 
     .subtitle {
         color: var(--text-secondary);
-        font-size: 0.875rem;
-        line-height: 1.5;
+        font-size: var(--font-size-base);
+        line-height: var(--line-height-normal);
     }
 
     .modal-body {
@@ -344,7 +344,7 @@
         background: var(--bg-surface);
         color: var(--text-primary);
         font-size: 0.9375rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         transition:
             background var(--transition-fast),
@@ -379,8 +379,8 @@
     }
 
     .form-group label {
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-secondary);
     }
 
@@ -401,14 +401,14 @@
     }
 
     .error-text {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: var(--error-color, #ff5c5c);
         margin-top: var(--spacing-xs);
         line-height: 1.4;
     }
 
     .success-text {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: #4ade80;
         margin-top: var(--spacing-xs);
         line-height: 1.4;
@@ -435,7 +435,7 @@
         padding: 12px;
         border-radius: var(--radius-md);
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
         width: 100%;
@@ -471,7 +471,7 @@
         padding: 12px;
         border-radius: var(--radius-md);
         font-size: 0.9375rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         cursor: pointer;
         transition: opacity var(--transition-fast), transform var(--transition-fast);
         width: 100%;
@@ -497,7 +497,7 @@
     .secondary-action {
         margin-top: var(--spacing-sm);
         text-decoration: underline;
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         align-self: center;
     }
 
@@ -510,17 +510,17 @@
     }
 
     .privacy-note {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         text-align: center;
-        line-height: 1.5;
+        line-height: var(--line-height-normal);
     }
 
     .btn-text {
         background: none;
         border: none;
         color: var(--text-secondary);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         cursor: pointer;
         padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-sm);
@@ -537,14 +537,14 @@
         background: rgba(255, 255, 255, 0.02);
         border: 1px dashed var(--border-color);
         border-radius: var(--radius-md);
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
     }
 
     .docker-info-header {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin-bottom: 6px;
     }
@@ -562,7 +562,7 @@
     .docker-info-link {
         color: var(--accent-primary);
         text-decoration: underline;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         display: inline-flex;
         align-items: center;
     }

@@ -208,8 +208,8 @@
     }
 
     .liked-label {
-        font-size: 0.75rem;
-        font-weight: 700;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-bold);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         color: var(--text-secondary);
@@ -232,7 +232,7 @@
 
     .liked-count {
         font-size: 0.9rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
         margin-top: var(--spacing-sm);
         display: flex;
@@ -273,7 +273,7 @@
         padding: 0 32px 0 8px;
         background-color: var(--accent-primary);
         color: white;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         border: none;
         border-radius: var(--radius-full);
         font-size: 1.05rem;
@@ -314,10 +314,10 @@
         padding: 0 28px;
         background-color: transparent;
         color: var(--text-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         border: 1px solid var(--border-subtle);
         border-radius: var(--radius-full);
-        font-size: 1rem;
+        font-size: var(--font-size-md);
         cursor: pointer;
         transition: all var(--transition-normal);
     }
@@ -356,13 +356,13 @@
 
     .empty-state p {
         font-size: 1.2rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin: 0;
     }
 
     .empty-hint {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
     }
 

@@ -279,7 +279,7 @@
     .modal-header h2 {
         margin: 0;
         font-size: 1.25rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
     }
 
@@ -341,7 +341,7 @@
     }
 
     .plugin-name {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         font-size: 0.9375rem;
     }
@@ -350,12 +350,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
     }
 
     .old-version { color: var(--text-subdued); }
     .arrow { color: var(--text-subdued); }
-    .new-version { color: #22c55e; font-weight: 600; }
+    .new-version { color: #22c55e; font-weight: var(--font-weight-semibold); }
 
     .item-actions {
         display: flex;
@@ -365,7 +365,7 @@
 
     .changelog-link {
         color: var(--accent-primary);
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         text-decoration: none;
     }
 
@@ -374,8 +374,8 @@
     .btn-update-one {
         padding: 5px 12px;
         border-radius: var(--radius-sm);
-        font-size: 0.8125rem;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
         background-color: var(--bg-elevated);
         color: var(--text-primary);
         border: 1px solid var(--border-color);
@@ -406,8 +406,8 @@
     .btn-primary {
         padding: 8px 16px;
         border-radius: var(--radius-sm);
-        font-weight: 500;
-        font-size: 0.875rem;
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-base);
         cursor: pointer;
         transition: all 0.2s;
         background-color: var(--accent-primary);
@@ -428,8 +428,8 @@
     .btn-secondary {
         padding: 8px 16px;
         border-radius: var(--radius-sm);
-        font-weight: 500;
-        font-size: 0.875rem;
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-base);
         cursor: pointer;
         transition: all 0.2s;
         background-color: transparent;

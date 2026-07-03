@@ -857,8 +857,8 @@
 
     .drop-subtext {
         color: var(--text-secondary);
-        font-size: 1rem;
-        font-weight: 500;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-medium);
     }
 
     .drop-error {
@@ -893,7 +893,7 @@
 
     .error-message {
         flex: 1;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         font-size: 0.9375rem;
     }
 
@@ -938,7 +938,7 @@
 
     .view-header h1 {
         font-size: 2rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
     }
 
     .view-content {
@@ -964,7 +964,7 @@
     }
 
     .scan-status {
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         color: var(--text-secondary);
         margin-top: var(--spacing-xs);
     }
@@ -1001,7 +1001,7 @@
         border-radius: var(--radius-full);
         border: 1px solid transparent;
         font-size: 0.9375rem;
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         cursor: pointer;
         transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
     }
@@ -1022,9 +1022,9 @@
     .pill-inactive:hover { opacity: 1; color: var(--text-secondary); }
 
     .pill-count {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         opacity: 0.75;
-        font-weight: 400;
+        font-weight: var(--font-weight-normal);
         padding-right: 6px;
     }
 
@@ -1057,7 +1057,7 @@
         border: none;
         outline: none;
         color: var(--text-primary);
-        font-size: 0.875rem;
+        font-size: var(--font-size-base);
         min-width: 0;
         height: 100%;
         user-select: text;
@@ -1108,8 +1108,8 @@
         flex-shrink: 0;
         padding: 8px 16px;
         border-radius: var(--radius-full);
-        font-size: 0.8125rem;
-        font-weight: 600;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         background-color: rgba(255, 255, 255, 0.07);
         border: none;

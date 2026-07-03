@@ -976,7 +976,7 @@
 
     .logo-text {
         font-size: 1.5rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         letter-spacing: -0.5px;
     }
 
@@ -1046,7 +1046,7 @@
 
     .nav-section-title {
         font-size: 0.6875rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         text-transform: uppercase;
         letter-spacing: 0.12em;
         color: var(--text-subdued);
@@ -1083,7 +1083,7 @@
     .nav-item.active {
         color: var(--text-primary);
         background-color: var(--bg-surface);
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
     }
 
     .nav-item.playing {
@@ -1110,7 +1110,7 @@
 
     .nav-count {
         margin-left: auto;
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
     }
 
@@ -1155,7 +1155,7 @@
 
     .nav-item.playing .nav-count {
         color: var(--accent-primary);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     .sidebar-footer {
@@ -1173,7 +1173,7 @@
         background-color: var(--bg-surface);
         color: var(--text-primary);
         border-radius: var(--radius-md);
-        font-weight: 500;
+        font-weight: var(--font-weight-medium);
         transition: all var(--transition-fast);
     }
 
@@ -1188,7 +1188,7 @@
 
     .scan-error {
         margin-top: var(--spacing-sm);
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--error-color);
         text-align: center;
     }
@@ -1218,7 +1218,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
     }
 
     .pinned-indicator-sidebar {

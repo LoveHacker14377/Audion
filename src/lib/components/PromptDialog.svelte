@@ -109,7 +109,7 @@
 
     .dialog-title {
         font-size: 1.125rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         margin: 0;
     }
@@ -118,7 +118,7 @@
         font-size: 0.9375rem;
         color: var(--text-secondary);
         margin: 0;
-        line-height: 1.5;
+        line-height: var(--line-height-normal);
     }
 
     .input-container {

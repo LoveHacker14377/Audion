@@ -820,8 +820,8 @@
         padding: 8px 16px;
         border-radius: 20px;
         color: var(--text-primary);
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         transition: all 0.2s ease;
     }
@@ -863,7 +863,7 @@
         border: none;
         color: var(--text-subdued);
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
     }
 
@@ -899,7 +899,7 @@
     .chart-rank {
         width: 20px;
         font-size: 0.9rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-subdued);
         text-align: center;
     }
@@ -936,7 +936,7 @@
 
     .chart-title {
         font-size: 0.9rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -944,7 +944,7 @@
     }
 
     .chart-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         white-space: nowrap;
         overflow: hidden;
@@ -1090,7 +1090,7 @@
 
     .quick-play-name {
         font-size: 0.85rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -1104,7 +1104,7 @@
     }
 
     .quick-play-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
         background: none;
         border: none;
@@ -1187,7 +1187,7 @@
 
     .section-title {
         font-size: 1.4rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         margin: 0 0 16px 0;
     }
@@ -1266,8 +1266,8 @@
 
     .top-track-rank {
         width: 32px;
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
         color: var(--text-subdued);
         text-align: center;
         flex-shrink: 0;
@@ -1357,8 +1357,8 @@
     }
 
     .top-track-title {
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
         color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
@@ -1370,7 +1370,7 @@
     }
 
     .top-track-artist {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-secondary);
         white-space: nowrap;
         overflow: hidden;
@@ -1388,13 +1388,13 @@
     }
 
     .top-track-plays {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         flex-shrink: 0;
     }
 
     .top-track-duration {
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
         color: var(--text-subdued);
         width: 48px;
         text-align: right;

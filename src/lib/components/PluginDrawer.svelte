@@ -176,8 +176,8 @@
     }
 
     .drawer-title {
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
         color: var(--text-primary);
         margin: 0;
         letter-spacing: -0.01em;
@@ -239,17 +239,17 @@
 
     .empty-title {
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         color: var(--text-secondary);
         margin: 0;
     }
 
     .empty-sub {
-        font-size: 0.8125rem;
+        font-size: var(--font-size-sm);
         color: var(--text-subdued);
         margin: 0;
         max-width: 220px;
-        line-height: 1.5;
+        line-height: var(--line-height-normal);
     }
 
     /* Mobile: slide up from bottom instead */
