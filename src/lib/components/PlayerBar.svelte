@@ -876,6 +876,7 @@
         gap: var(--spacing-xs);
         min-width: 0;
         overflow: visible;
+        padding-top: 6px;
     }
 
     .controls-buttons {
