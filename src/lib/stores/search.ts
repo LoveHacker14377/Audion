@@ -41,19 +41,32 @@ searchQuery.subscribe(query => {
     }
 
     debounceTimer = setTimeout(async () => {
-        const results = await searchLibrary(q, 100, 0);
-        searchResults.set({
-            tracks: results.tracks,
-            albums: results.albums,
-            artists: results.artists,
-            playlists: results.playlists,
-            hasResults:
-                results.tracks.length > 0 ||
-                results.albums.length > 0 ||
-                results.artists.length > 0 ||
-                results.playlists.length > 0,
-            query: q,
-        });
+        try {
+            const results = await searchLibrary(q, 100, 0);
+            searchResults.set({
+                tracks: results.tracks,
+                albums: results.albums,
+                artists: results.artists,
+                playlists: results.playlists,
+                hasResults:
+                    results.tracks.length > 0 ||
+                    results.albums.length > 0 ||
+                    results.artists.length > 0 ||
+                    results.playlists.length > 0,
+                query: q,
+            });
+        } catch (err) {
+            console.error("[Search] searchLibrary failed:", err);
+            // Show error state so user knows it's broken, not empty
+            searchResults.set({
+                tracks: [],
+                albums: [],
+                artists: [],
+                playlists: [],
+                hasResults: false,
+                query: q,
+            });
+        }
     }, 150);
 });
 
