@@ -103,7 +103,7 @@ class MainActivity : TauriActivity() {
           if (isExternal) {
             try {
               val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                data = Uri.parse("package:${packageName}")
+                setData(Uri.parse("package:${packageName}"))
               }
               startActivity(intent)
 
