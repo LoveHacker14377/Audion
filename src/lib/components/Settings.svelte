@@ -1,16 +1,16 @@
 <script lang="ts">
-  import SupportSection from "./settings/SupportSection.svelte";
-  import AccountSection from "./settings/AccountSection.svelte";
-  import SyncSection from "./settings/SyncSection.svelte";
-  import PlaybackSection from "./settings/PlaybackSection.svelte";
-  import ShortcutsSection from "./settings/ShortcutsSection.svelte";
-  import StorageSection from "./settings/StorageSection.svelte";
   import AudioSection from "./settings/AudioSection.svelte";
-  import CommunitySection from "./settings/CommunitySection.svelte";
   import AppearanceSection from "./settings/AppearanceSection.svelte";
+  import PlaybackSection from "./settings/PlaybackSection.svelte";
+  import SyncSection from "./settings/SyncSection.svelte";
+  import AccountSection from "./settings/AccountSection.svelte";
+  import StorageSection from "./settings/StorageSection.svelte";
+  import ShortcutsSection from "./settings/ShortcutsSection.svelte";
   import PrivacySection from "./settings/PrivacySection.svelte";
+  import CommunitySection from "./settings/CommunitySection.svelte";
   import UpgradeSection from "./settings/UpgradeSection.svelte";
   import AboutSection from "./settings/AboutSection.svelte";
+  import SupportSection from "./settings/SupportSection.svelte";
   import "./settings/styles.css";
   import { _ } from "svelte-i18n";
 
@@ -29,18 +29,18 @@
 
   <div class="settings-content">
     <div class="settings-container">
-      <SupportSection open={openSections['support'] ?? false} on:toggle={() => toggle('support')} />
-      <AccountSection open={openSections['account'] ?? false} on:toggle={() => toggle('account')} />
-      <SyncSection open={openSections['sync'] ?? false} on:toggle={() => toggle('sync')} />
-      <PlaybackSection open={openSections['playback'] ?? false} on:toggle={() => toggle('playback')} />
-      <ShortcutsSection open={openSections['shortcuts'] ?? false} on:toggle={() => toggle('shortcuts')} />
-      <StorageSection open={openSections['storage'] ?? false} on:toggle={() => toggle('storage')} />
       <AudioSection open={openSections['audio'] ?? false} on:toggle={() => toggle('audio')} />
-      <CommunitySection open={openSections['community'] ?? false} on:toggle={() => toggle('community')} />
       <AppearanceSection open={openSections['appearance'] ?? false} on:toggle={() => toggle('appearance')} />
+      <PlaybackSection open={openSections['playback'] ?? false} on:toggle={() => toggle('playback')} />
+      <SyncSection open={openSections['sync'] ?? false} on:toggle={() => toggle('sync')} />
+      <AccountSection open={openSections['account'] ?? false} on:toggle={() => toggle('account')} />
+      <StorageSection open={openSections['storage'] ?? false} on:toggle={() => toggle('storage')} />
+      <ShortcutsSection open={openSections['shortcuts'] ?? false} on:toggle={() => toggle('shortcuts')} />
       <PrivacySection open={openSections['privacy'] ?? false} on:toggle={() => toggle('privacy')} />
+      <CommunitySection open={openSections['community'] ?? false} on:toggle={() => toggle('community')} />
       <UpgradeSection open={openSections['upgrade'] ?? false} on:toggle={() => toggle('upgrade')} />
       <AboutSection open={openSections['about'] ?? false} on:toggle={() => toggle('about')} />
+      <SupportSection open={openSections['support'] ?? false} on:toggle={() => toggle('support')} />
     </div>
   </div>
 </div>

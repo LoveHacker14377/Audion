@@ -323,9 +323,6 @@
               <div class="eq-presets">
                 <span class="eq-presets-label">{$_('settings.presets', { default: 'Presets' })}</span>
                 <div class="eq-preset-pills">
-                  <button class="preset-pill" class:active={!$equalizer.currentPreset || $equalizer.currentPreset === 'Flat'} on:click={() => equalizer.reset()}>
-                    {$_('settings.flat', { default: 'Flat' })}
-                  </button>
                   {#each EQ_PRESETS as preset}
                     <button
                       class="preset-pill"
