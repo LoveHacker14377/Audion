@@ -1,0 +1,341 @@
+<script lang="ts">
+  import { _ } from "svelte-i18n";
+  import { appSettings } from "$lib/stores/settings";
+  import { equalizer, EQ_PRESETS } from "$lib/stores/equalizer";
+  import { nativeAudioStop, nativeAudioSetReplayGainEnabled, nativeAudioListDevices, nativeAudioGetDeviceInfo, nativeAudioSetOutputDevice, type DeviceList, type AudioDeviceInfo } from "$lib/services/native-audio";
+  import Icon from "$lib/components/Icon.svelte";
+  import { onMount, onDestroy } from "svelte";
+  import { slide } from "svelte/transition";
+  import { createEventDispatcher } from "svelte";
+
+  export let open: boolean = false;
+  const dispatch = createEventDispatcher();
+
+  // Audio Backend state
+  let initialAudioBackend = $appSettings.audioBackend;
+  let showRefreshNotice = false;
+  $: showRefreshNotice = $appSettings.audioBackend !== initialAudioBackend;
+  $: replayGainDisabled = $appSettings.audioBackend === 'html5';
+  $: outputDeviceDisabled = $appSettings.audioBackend === 'html5';
+
+  let deviceList: DeviceList | null = null;
+  let isLoadingDevices = false;
+  let deviceDropdownOpen = false;
+  let deviceDropdownRef: HTMLDivElement;
+  let infoPopoverDevice: AudioDeviceInfo | null = null;
+
+  function handleDeviceDropdownToggle() {
+    if (outputDeviceDisabled) return;
+    deviceDropdownOpen = !deviceDropdownOpen;
+    if (deviceDropdownOpen) {
+      handleLoadDevices();
+    } else {
+      infoPopoverDevice = null;
+    }
+  }
+
+  function handleDeviceSelect(device: AudioDeviceInfo | null) {
+    const requestedId = device?.id ?? null;
+    const currentId = $appSettings.outputDevice ?? null;
+    if (requestedId === currentId) {
+      deviceDropdownOpen = false;
+      infoPopoverDevice = null;
+      return;
+    }
+    handleSetOutputDevice(requestedId);
+    deviceDropdownOpen = false;
+    infoPopoverDevice = null;
+  }
+
+  function handleDeviceDropdownKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      infoPopoverDevice = null;
+      deviceDropdownOpen = false;
+    }
+  }
+
+  function handleDeviceDropdownOutside(e: MouseEvent) {
+    if (deviceDropdownRef && !deviceDropdownRef.contains(e.target as Node)) {
+      deviceDropdownOpen = false;
+      infoPopoverDevice = null;
+    }
+  }
+
+  let isLoadingDevicesStore: boolean = false;
+
+  async function handleLoadDevices() {
+    if (isLoadingDevicesStore) return;
+    isLoadingDevicesStore = true;
+    isLoadingDevices = true;
+    try {
+      const freshList = await nativeAudioListDevices();
+      deviceList = freshList;
+    } catch (e) {
+      console.warn('[AudioSection] Failed to load devices:', e);
+      deviceList = null;
+    } finally {
+      isLoadingDevicesStore = false;
+      isLoadingDevices = false;
+    }
+  }
+
+  async function handleSetOutputDevice(device: string | null) {
+    const previous = $appSettings.outputDevice;
+    appSettings.setOutputDevice(device);
+    try {
+      await nativeAudioSetOutputDevice(device);
+    } catch (e) {
+      console.warn('[AudioSection] Failed to set output device:', e);
+      appSettings.setOutputDevice(previous);
+    }
+  }
+
+  async function handleToggleReplayGain() {
+    if (replayGainDisabled) return;
+    const next = !$appSettings.replayGainEnabled;
+    appSettings.setReplayGainEnabled(next);
+    try {
+      await nativeAudioSetReplayGainEnabled(next);
+    } catch (e) {
+      console.warn('[AudioSection] Failed to set replay gain:', e);
+      appSettings.setReplayGainEnabled(!next);
+    }
+  }
+
+  function handleRefresh() {
+    nativeAudioStop();
+    window.location.reload();
+  }
+
+  function formatEqGain(gain: number): string {
+    const rounded = Math.round(gain * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} dB`;
+  }
+
+  onMount(async () => {
+    if (!outputDeviceDisabled) {
+      try {
+        deviceList = await nativeAudioGetDeviceInfo();
+      } catch (e) {
+        console.warn('[AudioSection] Failed to load cached device info:', e);
+      }
+    }
+  });
+</script>
+
+<svelte:window on:mousedown={handleDeviceDropdownOutside} />
+
+<section class="settings-section" aria-labelledby="audio-heading">
+  <button class="accordion-trigger" on:click={() => dispatch('toggle')} aria-expanded={open}>
+    <svg class="accordion-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+    <span class="accordion-title">{$_('settings.audio', { default: 'Audio' })}</span>
+    <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
+    </svg>
+  </button>
+  {#if open}
+    <div class="section-body" transition:slide|local>
+      <div class="settings-card">
+        <!-- Output Driver -->
+        <div class="inner-section">
+          <span class="setting-title">{$_('settings.outputDriver', { default: 'Output driver' })}</span>
+          <span class="setting-description">{$_('settings.outputDriverDesc', { default: 'Select the backend for audio playback' })}</span>
+          <div class="segmented-pill" style="margin-top: 6px;">
+            <button class="segment-btn" class:active={$appSettings.audioBackend === 'auto'} on:click={() => appSettings.setAudioBackend('auto')}>{$_('settings.auto', { default: 'Auto' })}</button>
+            <button class="segment-btn" class:active={$appSettings.audioBackend === 'native'} on:click={() => appSettings.setAudioBackend('native')}>{$_('settings.native', { default: 'Native' })}</button>
+            <button class="segment-btn" class:active={$appSettings.audioBackend === 'html5'} on:click={() => appSettings.setAudioBackend('html5')}>{$_('settings.html5', { default: 'HTML5' })}</button>
+          </div>
+          {#if showRefreshNotice}
+            <div class="refresh-notice">
+              <Icon name="info" size="xs" />
+              <span>{$_('settings.restartRequired', { default: 'Audio backend change requires restart' })}</span>
+              <button class="refresh-btn" on:click={handleRefresh}>
+                <Icon name="refresh" size="sm" />{$_('settings.refresh', { default: 'Refresh' })}
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Output Device -->
+        <div class="inner-section">
+          <span class="setting-title">{$_('settings.outputDevice', { default: 'Output device' })}</span>
+          <span class="setting-description">{$_('settings.outputDeviceDesc', { default: 'Select audio output device' })}</span>
+          <div class="device-dropdown-wrapper" role="listbox" aria-label="Output device" aria-disabled={outputDeviceDisabled}>
+            <div class="custom-dropdown" class:disabled={outputDeviceDisabled} bind:this={deviceDropdownRef}>
+              <button
+                class="dropdown-selected"
+                on:click={handleDeviceDropdownToggle}
+                disabled={outputDeviceDisabled}
+                aria-expanded={deviceDropdownOpen}
+              >
+                {#if $appSettings.outputDevice}
+                  {($appSettings.outputDevice.length > 43) ? $appSettings.outputDevice.slice(0, 43) + '...' : $appSettings.outputDevice}
+                {:else}
+                  {$_('settings.defaultDevice', { default: 'System default' })}
+                {/if}
+                <svg class="dropdown-chevron" class:rotated={deviceDropdownOpen} viewBox="0 0 24 24" width="14" height="14">
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+              </button>
+              {#if deviceDropdownOpen}
+                <div class="dropdown-menu" on:keydown={handleDeviceDropdownKeydown} role="listbox">
+                  {#if isLoadingDevices}
+                    <div class="dropdown-item loading-item">
+                      <Icon name="loader" size="sm" />
+                      <span>{$_('settings.loadingDevices', { default: 'Loading devices...' })}</span>
+                    </div>
+                  {:else if deviceList && deviceList.length > 0}
+                    <button
+                      class="dropdown-item"
+                      class:selected={!$appSettings.outputDevice}
+                      on:click={() => handleDeviceSelect(null)}
+                      role="option"
+                      aria-selected={!$appSettings.outputDevice}
+                    >
+                      <Icon name="speaker" size="xs" />
+                      <span class="device-item-name">{$_('settings.systemDefault', { default: 'System default' })}</span>
+                    </button>
+                    {#each deviceList as device (device.id)}
+                      <div class="dropdown-item-wrapper">
+                        <button
+                          class="dropdown-item"
+                          class:selected={$appSettings.outputDevice === device.id}
+                          on:click={() => handleDeviceSelect(device)}
+                          role="option"
+                          aria-selected={$appSettings.outputDevice === device.id}
+                        >
+                          {#if device.icon}
+                            <Icon name={device.icon} size="xs" />
+                          {:else}
+                            <Icon name="speaker" size="xs" />
+                          {/if}
+                          <span class="device-item-name">{device.extended[0] ?? device.name}</span>
+                          <span
+                            class="device-info-button"
+                            class:active={infoPopoverDevice?.id === device.id}
+                            on:click={(e) => handleInfoClick(e, device)}
+                            role="button"
+                            aria-label="Device info"
+                            tabindex="0"
+                            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleInfoClick(e, device); }}
+                          >i</span>
+                          {#if infoPopoverDevice?.id === device.id}
+                            <div class="device-info-popover" role="tooltip">
+                              <div class="device-info-primary">{device.extended[0] ?? device.name}</div>
+                              {#if device.driver}<div class="device-info-row"><span class="device-info-label">Driver</span><span>{device.driver}</span></div>{/if}
+                              {#if device.manufacturer}<div class="device-info-row"><span class="device-info-label">Manufacturer</span><span>{device.manufacturer}</span></div>{/if}
+                              <div class="device-info-row"><span class="device-info-label">Interface</span><span>{device.interface_type}</span></div>
+                              <div class="device-info-row"><span class="device-info-label">Type</span><span>{device.device_type}</span></div>
+                              {#if device.address}<div class="device-info-row"><span class="device-info-label">Address</span><span>{device.address}</span></div>{/if}
+                              <div class="device-info-id">{device.id}</div>
+                            </div>
+                          {/if}
+                        </button>
+                      </div>
+                    {/each}
+                  {:else}
+                    <div class="dropdown-item empty-item">
+                      <span>{$_('settings.noDevices', { default: 'No devices found' })}</span>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+
+        <!-- Replay Gain -->
+        <div class="inner-section">
+          <div class="toggle-container">
+            <div class="toggle-info">
+              <span class="setting-title">{$_('settings.replayGain', { default: 'Replay Gain' })}</span>
+              <span class="setting-description">{$_('settings.replayGainDesc', { default: 'Normalize playback volume across tracks' })}</span>
+            </div>
+            <button
+              class="toggle-btn"
+              class:active={$appSettings.replayGainEnabled}
+              on:click={handleToggleReplayGain}
+              role="switch"
+              aria-checked={$appSettings.replayGainEnabled}
+              aria-label="Toggle Replay Gain"
+            >
+              <div class="toggle-handle"></div>
+            </button>
+          </div>
+          {#if replayGainDisabled}
+            <div class="disabled-notice">
+              <Icon name="info" size="xs" />
+              <span>{$_('settings.replayGainDisabled', { default: 'Replay Gain requires Native audio backend' })}</span>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Equalizer -->
+        <div class="inner-section">
+          <div class="toggle-container">
+            <div class="toggle-info">
+              <span class="setting-title">{$_('settings.equalizer', { default: 'Equalizer' })}</span>
+              <span class="setting-description">{$_('settings.equalizerDesc', { default: 'Adjust frequency response' })}</span>
+            </div>
+            <button
+              class="toggle-btn"
+              class:active={$equalizer.enabled}
+              on:click={() => equalizer.toggle()}
+              role="switch"
+              aria-checked={$equalizer.enabled}
+              aria-label="Toggle Equalizer"
+            >
+              <div class="toggle-handle"></div>
+            </button>
+          </div>
+          {#if $equalizer.enabled}
+            <div class="eq-controls">
+              <div class="eq-bands">
+                {#each $equalizer.bands as band, i}
+                  <div class="eq-band">
+                    <span class="eq-band-label">{band.frequency}</span>
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      step="0.5"
+                      value={band.gain}
+                      on:input={(e) => {
+                        const val = parseFloat(e.currentTarget.value);
+                        equalizer.setBandGain(i, val);
+                      }}
+                      aria-label="{band.frequency} band"
+                    />
+                    <span class="eq-band-value">{formatEqGain(band.gain)}</span>
+                  </div>
+                {/each}
+              </div>
+              <div class="eq-presets">
+                <span class="eq-presets-label">{$_('settings.presets', { default: 'Presets' })}</span>
+                <div class="eq-preset-pills">
+                  <button class="preset-pill" class:active={!$equalizer.preset} on:click={() => equalizer.setPreset(null)}>
+                    {$_( 'settings.flat', { default: 'Flat' } )}
+                  </button>
+                  {#each EQ_PRESETS as preset}
+                    <button
+                      class="preset-pill"
+                      class:active={$equalizer.preset === preset.id}
+                      on:click={() => equalizer.setPreset(preset.id)}
+                      title={preset.description}
+                    >
+                      {preset.name}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+</section>
