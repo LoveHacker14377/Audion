@@ -661,7 +661,7 @@ jobs:
           # NDK r23+ moved libc++_shared.so out of sysroot/usr/lib/<abi>/
           # It now lives under toolchains/llvm/prebuilt/<host>/lib/ per target triple
           TOOLCHAIN="${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64"
-          JNI_DIR="src-tauri/gen/android/app/src/jniLibs"
+          JNI_DIR="src-tauri/gen/android/app/src/main/jniLibs"
           declare -A ABI_TRIPLE=(
             [arm64-v8a]=aarch64-linux-android
             [armeabi-v7a]=arm-linux-androideabi
