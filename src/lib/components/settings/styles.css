@@ -625,6 +625,104 @@
       flex-direction: row;
       align-items: flex-start;
     }
+
+    /* Theme mode buttons stack vertically */
+    .theme-modes {
+      flex-direction: column;
+    }
+
+    /* Card header wraps */
+    .card-header-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--spacing-sm);
+    }
+
+    /* Compact settings card on mobile */
+    .settings-card {
+      padding: var(--spacing-md);
+      gap: var(--spacing-md);
+    }
+
+    /* About row stacks */
+    .about-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* Restart notice stacks */
+    .restart-notice {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .btn-restart-compact {
+      width: 100%;
+      text-align: center;
+    }
+
+    /* Docker guide stacks */
+    .docker-guide-banner {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    /* Path selector wraps */
+    .path-selector {
+      flex-wrap: wrap;
+    }
+
+    .path-display {
+      font-size: 0.75rem;
+    }
+
+    /* Support links single column */
+    .support-links-row {
+      grid-template-columns: 1fr;
+    }
+
+    /* EQ controls compact */
+    .eq-band {
+      max-width: 100%;
+    }
+
+    .eq-band input[type="range"] {
+      width: 18px;
+      height: 70px;
+    }
+
+    .eq-band-label,
+    .eq-band-value {
+      font-size: 8px;
+    }
+
+    .eq-bands {
+      gap: 1px;
+    }
+
+    /* Preset selector + reset wrap */
+    .preset-selector {
+      flex-wrap: wrap;
+    }
+
+    .preset-select {
+      max-width: 100%;
+    }
+
+    /* Segmented pill smaller text */
+    .segment-btn {
+      font-size: 0.7rem;
+      padding: 5px 8px;
+    }
+
+    /* Accordion touch-friendly */
+    .accordion-trigger {
+      padding: var(--spacing-sm);
+    }
+
+    .accordion-title {
+      font-size: 0.85rem;
+    }
   }
 
   .btn-outline-compact.danger {
