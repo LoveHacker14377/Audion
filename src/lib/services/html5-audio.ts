@@ -287,13 +287,11 @@ function canUseHtml5EqForPath(path: string): boolean {
     if (kind === 'local' || kind === 'blob') return true;
     if (kind !== 'stream') return true;
 
-    // Cross-origin streams often block WebAudio processing without CORS headers.
-    try {
-        const url = new URL(path);
-        return url.origin === window.location.origin;
-    } catch {
-        return false;
-    }
+    // Cross-origin streams: try them. If the server sends CORS headers
+    // (Access-Control-Allow-Origin), WebAudio will work.
+    // If not, ensureHtml5EqGraph will throw when creating the
+    // MediaElementSourceNode and we fall back to direct playback.
+    return true;
 }
 
 async function prepareHtml5AudioForPath(audio: HTMLAudioElement, path: string): Promise<HTMLAudioElement> {
