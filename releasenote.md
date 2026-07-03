@@ -29,23 +29,3 @@
 * **Plugins**: Better plugin support for cover art and file uploads.
 * **Faster Builds**: Developer code builds run faster now.
 * **Android**: Better compatibility for newer Android versions.
-
-## [v1.3.5] - 2026-06-12
-
-### Highlights: Server Docker Support & Custom Server Integration
-
-* **Docker Support**: Official support for self-hosted libraries via Docker.
-* **Server Streaming**: Listen to your music library streamed directly from a custom server.
-* **Positional Syncing**: Playback syncs faster and more reliably when changing devices.
-
-### New Features & Enhancements
-
-* **Device Info**: Clearer names and information for active audio output devices.
-* **Music Streaming**: Faster connection handling when switching custom server accounts.
-* **Dashboard Libraries**: Upgraded audio playing libraries under the hood for a smoother experience.
-
-### Bug Fixes
-
-* **Cover Art**: Fixed errors when retrieving album covers from the server.
-* **Fullscreen Scroll**: Text and lyrics scroll smoothly in fullscreen mode.
-* **Android Builds**: Resolved errors when building the Android app.
