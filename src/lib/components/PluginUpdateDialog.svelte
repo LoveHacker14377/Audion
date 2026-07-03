@@ -115,7 +115,7 @@
     <div class="modal-content" on:click|stopPropagation role="presentation">
         <div class="modal-header">
             <h2>Plugin Updates Available</h2>
-            <button class="close-btn" on:click={close}>
+            <button class="close-btn" on:click={close} aria-label="Close">
                 <svg
                     viewBox="0 0 24 24"
                     fill="none"

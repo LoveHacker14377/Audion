@@ -41,6 +41,7 @@
     } from "$lib/stores/activity";
     import { fetchAllLatestCharts, type ChartData, type AudionApiTrack } from "$lib/api/audion-api";
     import { _, locale } from "svelte-i18n";
+    import EmptyState from "./EmptyState.svelte";
 
     $: currentMonthName = new Intl.DateTimeFormat($locale || 'en', { month: 'long' }).format(new Date());
 
@@ -701,33 +702,22 @@
 
     <!-- Empty state if no content -->
     {#if $tracks.length === 0 && $albums.length === 0}
-        <div class="empty-home">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="56" height="56">
-                <path
-                    d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM12.5 9.5v3H16v2h-3.5v3h-2v-3H7v-2h3.5v-3h2z"
-                />
-            </svg>
-            <h2>Welcome to Audion</h2>
-            <p>Add a music folder to start listening</p>
-            {#if $isScanning}
+        {#if $isScanning}
+            <div class="empty-home">
                 <div class="empty-scanning">
                     <div class="scanning-spinner large"></div>
                     <span>Scanning your music…</span>
                 </div>
-            {:else}
-                <button class="empty-cta" on:click={handleAddFolder}>
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                    >
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                    </svg>
-                    Add Music Folder
-                </button>
-            {/if}
-        </div>
+            </div>
+        {:else}
+            <EmptyState
+                icon="folder"
+                title="Welcome to Audion"
+                description="Add a music folder to start listening"
+                actionLabel="Add Music Folder"
+                onAction={handleAddFolder}
+            />
+        {/if}
     {/if}
 
     <!-- Bottom spacer for fixed nav + player -->

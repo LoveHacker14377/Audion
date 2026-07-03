@@ -638,132 +638,145 @@
         {/if}
     {/if}
 
-    {#if isSearching}
-        <div class="view-container">
-            <header class="view-header search-view-header">
-                <h1>Search Results</h1>
-                {#if $searchResults.hasResults}
-                    <div class="results-pills">
-                        {#each sectionOrder as key (key)}
-                            {@const hasResults =
-                                (key === "tracks"    && $searchResults.tracks.length > 0) ||
-                                (key === "albums"    && $searchResults.albums.length > 0) ||
-                                (key === "artists"   && $searchResults.artists.length > 0) ||
-                                (key === "playlists" && ($searchResults.playlists?.length ?? 0) > 0)}
-                            {#if hasResults}
-                                {@const count =
-                                    key === "tracks"    ? $searchResults.tracks.length :
-                                    key === "albums"    ? $searchResults.albums.length :
-                                    key === "artists"   ? $searchResults.artists.length :
-                                    ($searchResults.playlists?.length ?? 0)}
-                                <div class="pill-wrapper">
-                                    <button
-                                        class="section-pill"
-                                        class:pill-active={!hiddenSections.has(key)}
-                                        class:pill-inactive={hiddenSections.has(key)}
-                                        on:click={() => toggleSection(key)}
-                                    >
-                                        <span class="pill-label">{SECTION_LABELS[key]}</span>
-                                        <span class="pill-count">{count}</span>
-                                    </button>
-                                </div>
-                            {/if}
-                        {/each}
+    {#key $currentView.type + ($currentView.id ?? '') + isSearching}
+        <div class="transition-wrapper" in:fade={{ duration: 200 }} out:fade={{ duration: 150 }}>
+            {#if isSearching}
+                <div class="view-container">
+                    <header class="view-header search-view-header">
+                        <h1>Search Results</h1>
+                        {#if $searchResults.hasResults}
+                            <div class="results-pills">
+                                {#each sectionOrder as key (key)}
+                                    {@const hasResults =
+                                        (key === "tracks"    && $searchResults.tracks.length > 0) ||
+                                        (key === "albums"    && $searchResults.albums.length > 0) ||
+                                        (key === "artists"   && $searchResults.artists.length > 0) ||
+                                        (key === "playlists" && ($searchResults.playlists?.length ?? 0) > 0)}
+                                    {#if hasResults}
+                                        {@const count =
+                                            key === "tracks"    ? $searchResults.tracks.length :
+                                            key === "albums"    ? $searchResults.albums.length :
+                                            key === "artists"   ? $searchResults.artists.length :
+                                            ($searchResults.playlists?.length ?? 0)}
+                                        <div class="pill-wrapper">
+                                            <button
+                                                class="section-pill"
+                                                class:pill-active={!hiddenSections.has(key)}
+                                                class:pill-inactive={hiddenSections.has(key)}
+                                                on:click={() => toggleSection(key)}
+                                            >
+                                                <span class="pill-label">{SECTION_LABELS[key]}</span>
+                                                <span class="pill-count">{count}</span>
+                                            </button>
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+                        {/if}
+                    </header>
+                    <div class="view-content">
+                        <SearchResults {sectionOrder} {hiddenSections} />
                     </div>
-                {/if}
-            </header>
-            <div class="view-content">
-                <SearchResults {sectionOrder} {hiddenSections} />
-            </div>
-        </div>
-    {:else if $currentView.type === "tracks"}
-        <div class="view-container">
-            <header class="view-header">
-                <h1>All Tracks</h1>
-                {#if $isScanning}
-                    <div class="scan-status">Scanning... {$tracks.length} tracks found</div>
-                {/if}
-            </header>
-            <div class="view-content">
-                <TrackList tracks={$tracks} showAlbum={true} scrollKey="tracks" />
-            </div>
-        </div>
-    {:else if $currentView.type === "tracks-multiselect" && $currentView.id}
-        <div class="view-container no-padding">
-            <MultiSelectTrackView playlistId={$currentView.id} />
-        </div>
-    {:else if $currentView.type === "albums"}
-        <div class="view-container">
-            <header class="view-header">
-                <h1>Albums</h1>
-            </header>
-            <div class="view-content">
-                <AlbumGrid albums={$albums} />
-            </div>
-        </div>
-    {:else if $currentView.type === "album-detail" && $currentView.id}
-        <div class="view-container no-padding">
-            <AlbumDetail albumId={$currentView.id} />
-        </div>
-    {:else if $currentView.type === "artists"}
-        <div class="view-container">
-            <header class="view-header">
-                <h1>Artists</h1>
-            </header>
-            <div class="view-content">
-                <ArtistGrid artists={$artists} />
-            </div>
-        </div>
-    {:else if $currentView.type === "artist-detail" && $currentView.name}
-        <div class="view-container no-padding">
-            <ArtistDetail artistName={$currentView.name} />
-        </div>
-    {:else if $currentView.type === "playlists"}
-        <div class="view-container no-padding">
-            <PlaylistView />
-        </div>
-    {:else if $currentView.type === "playlist-detail" && $currentView.id}
-        <div class="view-container no-padding">
-            <PlaylistDetail playlistId={$currentView.id} />
-        </div>
-    {:else if $currentView.type === "plugins"}
-        <div class="view-container no-padding">
-            <PluginManager />
-        </div>
-    {:else if $currentView.type === "settings"}
-        <div class="view-container no-padding">
-            <Settings />
-        </div>
-    {:else if $currentView.type === "home"}
-        <div class="view-container no-padding">
-            {#if $isMobile}
-                <MobileHome />
+                </div>
+            {:else if $currentView.type === "tracks"}
+                <div class="view-container">
+                    <header class="view-header">
+                        <h1>All Tracks</h1>
+                        {#if $isScanning}
+                            <div class="scan-status">Scanning... {$tracks.length} tracks found</div>
+                        {/if}
+                    </header>
+                    <div class="view-content">
+                        <TrackList tracks={$tracks} showAlbum={true} scrollKey="tracks" />
+                    </div>
+                </div>
+            {:else if $currentView.type === "tracks-multiselect" && $currentView.id}
+                <div class="view-container no-padding">
+                    <MultiSelectTrackView playlistId={$currentView.id} />
+                </div>
+            {:else if $currentView.type === "albums"}
+                <div class="view-container">
+                    <header class="view-header">
+                        <h1>Albums</h1>
+                    </header>
+                    <div class="view-content">
+                        <AlbumGrid albums={$albums} />
+                    </div>
+                </div>
+            {:else if $currentView.type === "album-detail" && $currentView.id}
+                <div class="view-container no-padding">
+                    <AlbumDetail albumId={$currentView.id} />
+                </div>
+            {:else if $currentView.type === "artists"}
+                <div class="view-container">
+                    <header class="view-header">
+                        <h1>Artists</h1>
+                    </header>
+                    <div class="view-content">
+                        <ArtistGrid artists={$artists} />
+                    </div>
+                </div>
+            {:else if $currentView.type === "artist-detail" && $currentView.name}
+                <div class="view-container no-padding">
+                    <ArtistDetail artistName={$currentView.name} />
+                </div>
+            {:else if $currentView.type === "playlists"}
+                <div class="view-container no-padding">
+                    <PlaylistView />
+                </div>
+            {:else if $currentView.type === "playlist-detail" && $currentView.id}
+                <div class="view-container no-padding">
+                    <PlaylistDetail playlistId={$currentView.id} />
+                </div>
+            {:else if $currentView.type === "plugins"}
+                <div class="view-container no-padding">
+                    <PluginManager />
+                </div>
+            {:else if $currentView.type === "settings"}
+                <div class="view-container no-padding">
+                    <Settings />
+                </div>
+            {:else if $currentView.type === "home"}
+                <div class="view-container no-padding">
+                    {#if $isMobile}
+                        <MobileHome />
+                    {:else}
+                        <DesktopHome />
+                    {/if}
+                </div>
+            {:else if $currentView.type === "liked-songs"}
+                <div class="view-container no-padding">
+                    <LikedSongs />
+                </div>
+            {:else if $currentView.type === "listenbrainz"}
+                <div class="view-container no-padding">
+                    <Recommendations />
+                </div>
+            {:else if $currentView.type === "discover"}
+                <div class="view-container no-padding">
+                    <MbDiscover />
+                </div>
             {:else}
-                <DesktopHome />
+                <div class="view-container">
+                    <div class="empty-state">
+                        <h2>Select a view from the sidebar</h2>
+                    </div>
+                </div>
             {/if}
         </div>
-    {:else if $currentView.type === "liked-songs"}
-        <div class="view-container no-padding">
-            <LikedSongs />
-        </div>
-    {:else if $currentView.type === "listenbrainz"}
-        <div class="view-container no-padding">
-            <Recommendations />
-        </div>
-    {:else if $currentView.type === "discover"}
-        <div class="view-container no-padding">
-            <MbDiscover />
-        </div>
-    {:else}
-        <div class="view-container">
-            <div class="empty-state">
-                <h2>Select a view from the sidebar</h2>
-            </div>
-        </div>
-    {/if}
+    {/key}
 </main>
 
 <style>
+    .transition-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+
     .main-view {
         flex: 1;
         display: flex;

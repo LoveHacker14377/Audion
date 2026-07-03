@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade, fly } from "svelte/transition";
+  import { cubicInOut } from "svelte/easing";
   import { flip } from "svelte/animate";
   import { derived } from "svelte/store";
   import {
@@ -462,20 +463,23 @@
             on:click|stopPropagation
             transition:fly={{ y: 300, duration: 300 }}
             role="dialog"
+            tabindex="-1"
           >
             <div class="sheet-handle"></div>
 
             {#if $currentTrack}
               <div class="sheet-track-info">
-                {#if albumArt}
-                  <img class="sheet-art" src={albumArt} alt="Cover" />
-                {:else}
-                  <div class="sheet-art sheet-art-placeholder">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                    </svg>
-                  </div>
-                {/if}
+                {#key $currentTrack.id}
+                  {#if albumArt}
+                    <img class="sheet-art" in:fly={{ x: 20, duration: 250 }} src={albumArt} alt="Cover" />
+                  {:else}
+                    <div class="sheet-art sheet-art-placeholder" in:fly={{ x: 20, duration: 250 }}>
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                      </svg>
+                    </div>
+                  {/if}
+                {/key}
                 <div class="sheet-track-details">
                   <span class="sheet-track-title">{$currentTrack.title || "Unknown Title"}</span>
                   <span class="sheet-track-artist">{$currentTrack.artist || "Unknown Artist"}</span>
@@ -591,7 +595,24 @@
             }}
           >
             {#if albumArt}
-              <img src={albumArt} alt="Album Art" decoding="async" />
+              {#key albumArt}
+                <img
+                  src={albumArt}
+                  alt="Album Art"
+                  decoding="async"
+                  class="art-flip"
+                  in:fly={{
+                    x: 300,
+                    duration: 400,
+                    easing: cubicInOut,
+                  }}
+                  out:fly={{
+                    x: -300,
+                    duration: 300,
+                    easing: cubicInOut,
+                  }}
+                />
+              {/key}
             {:else}
               <div class="art-placeholder">
                 <svg
@@ -1568,6 +1589,12 @@
     transform: translate(-50%, -50%);
     pointer-events: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .desktop-progress-bar:hover .progress-thumb-dot {
+    box-shadow: 0 0 16px var(--accent-primary, #1DB954);
+    transform: translate(-50%, -50%) scale(1.4);
   }
 
   .time-row {

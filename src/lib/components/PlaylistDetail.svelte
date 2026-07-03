@@ -683,7 +683,7 @@
         bottom: 100%;
         left: 50%;
         transform: translateX(-50%);
-        padding: 6px 12px;
+        padding: var(--spacing-xs) var(--spacing-sm);
         background-color: var(--bg-surface);
         color: var(--text-primary);
         font-size: 0.75rem;

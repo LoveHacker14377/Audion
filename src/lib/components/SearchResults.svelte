@@ -35,6 +35,8 @@
     import { playlistCovers } from "$lib/stores/playlistCovers";
     import { confirm } from "$lib/stores/dialogs";
 
+    import EmptyState from "./EmptyState.svelte";
+
     // Props from MainView
     export let sectionOrder: SectionKey[];
     export let hiddenSections: Set<SectionKey>;
@@ -316,15 +318,11 @@
 
 <div class="search-results">
     {#if !$searchResults.hasResults && $searchQuery}
-        <div class="no-results">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                <path
-                    d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                />
-            </svg>
-            <h3>No results found</h3>
-            <p>Try searching for something else</p>
-        </div>
+        <EmptyState
+            icon="search"
+            title="No results found"
+            description="Try searching for something else"
+        />
     {:else}
         {#each sectionOrder as key (key)}
             {#if !hiddenSections.has(key)}
@@ -586,7 +584,7 @@
         display: inline-flex;
         align-items: center;
         gap: var(--spacing-xs);
-        padding: 6px 10px;
+        padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-full, 999px);
         background: var(--bg-surface);
         color: var(--text-secondary);
@@ -622,8 +620,8 @@
     .pill-count {
         display: inline-block;
         min-width: 24px;
-        padding: 2px 6px;
-        border-radius: 999px;
+        padding: var(--spacing-xs) var(--spacing-xs);
+        border-radius: var(--radius-full);
         background: var(--bg-elevated);
         color: var(--text-secondary);
         font-size: 0.8rem;
@@ -685,7 +683,7 @@
     .track-info {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
         min-width: 0;
     }
 
@@ -742,7 +740,7 @@
     .album-info {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
     }
 
     .album-name {
@@ -803,7 +801,7 @@
     .artist-info {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
         width: 100%;
     }
 
@@ -861,7 +859,7 @@
     .playlist-info {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
         width: 100%;
     }
 

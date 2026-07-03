@@ -261,6 +261,7 @@
                       class="icon-btn"
                       on:click|stopPropagation={() =>
                         handleRemoteCommand(device.deviceId, "previous")}
+                      aria-label="Previous"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -277,6 +278,7 @@
                           device.deviceId,
                           device.playerState?.isPlaying ? "pause" : "play",
                         )}
+                      aria-label={device.playerState?.isPlaying ? "Pause" : "Play"}
                     >
                       {#if device.playerState?.isPlaying}
                         <svg
@@ -299,6 +301,7 @@
                       class="icon-btn"
                       on:click|stopPropagation={() =>
                         handleRemoteCommand(device.deviceId, "next")}
+                      aria-label="Next"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -387,10 +390,10 @@
     width: 480px;
     max-width: 92vw;
     border-radius: 28px;
-    padding: 24px;
+    padding: var(--spacing-lg);
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-lg);
     max-height: 85vh;
   }
 
@@ -414,9 +417,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: var(--spacing-xs) 10px;
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 99px;
+    border-radius: var(--radius-full);
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -460,10 +463,10 @@
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
-    padding: 16px;
+    padding: var(--spacing-md);
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--spacing-md);
     position: relative;
     overflow: hidden;
   }
@@ -581,7 +584,7 @@
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
-    padding: 16px;
+    padding: var(--spacing-md);
     transition: 0.3s;
   }
 
@@ -605,7 +608,7 @@
   .platform-icon {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     background: rgba(255, 255, 255, 0.04);
     display: flex;
     align-items: center;
@@ -674,7 +677,7 @@
     color: #666;
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -693,12 +696,12 @@
   .card-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: var(--spacing-sm) 10px;
   }
 
   .btn {
     padding: 10px;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
@@ -741,13 +744,13 @@
     background: rgba(255, 215, 0, 0.05);
     border: 1px solid rgba(255, 215, 0, 0.15);
     color: #daa520;
-    padding: 8px 12px;
-    border-radius: 12px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-lg);
     font-size: 0.7rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-sm);
     margin-bottom: 12px;
   }
 

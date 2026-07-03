@@ -984,7 +984,7 @@
   }
 
   .category-chip {
-    padding: 6px 14px;
+    padding: var(--spacing-xs) var(--spacing-md);
     border-radius: var(--radius-full);
     background-color: var(--bg-elevated);
     color: var(--text-secondary);
@@ -1108,7 +1108,7 @@
     width: 100%;
     height: 100%;
     object-fit: contain; /* Shows entire icon without cropping */
-    padding: 8px; /* Adds breathing room around the icon */
+    padding: var(--spacing-sm); /* Adds breathing room around the icon */
     box-sizing: border-box;
     border-radius: inherit;
   }
@@ -1175,7 +1175,7 @@
   }
 
   .badge {
-    padding: 2px 8px;
+    padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-full);
     font-size: 0.6875rem;
     font-weight: 600;
@@ -1308,7 +1308,7 @@
     position: fixed;
     width: 7px;
     height: 7px;
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     pointer-events: none;
     z-index: 9999;
     animation: confetti-burst 1.2s ease-out forwards;
@@ -1526,7 +1526,7 @@
   }
 
   .method-badge {
-    padding: 2px 8px;
+    padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-sm);
     font-size: 0.6875rem;
     font-weight: 500;
@@ -1601,11 +1601,11 @@
     .tabs {
       overflow-x: auto;
       padding-bottom: 4px;
-      gap: 4px;
+      gap: var(--spacing-xs);
     }
 
     .tab {
-      padding: 6px 12px;
+      padding: var(--spacing-xs) var(--spacing-sm);
       font-size: 0.8125rem;
       white-space: nowrap;
     }

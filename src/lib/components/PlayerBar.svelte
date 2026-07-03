@@ -267,173 +267,15 @@
     });
 </script>
 
+{#if !$isMobile}
 <footer
     class="player-bar"
     class:hidden
-    class:mobile={$isMobile}
-    class:mobile-no-track={$isMobile && !$currentTrack}
 >
     <!-- Native audio backend handles playback in Rust -->
 
-    {#if $isMobile}
-        <!-- SPOTIFY-STYLE MOBILE MINI-PLAYER -->
-        <div
-            class="mini-player-tap"
-            on:click={toggleFullScreen}
-            role="button"
-            tabindex="0"
-            on:keydown={(e) => e.key === "Enter" && toggleFullScreen()}
-        >
-            <!-- Thin progress line at top edge -->
-            <div class="mini-progress">
-                <div class="mini-progress-bg"></div>
-                <div
-                    class="mini-progress-fill"
-                    style="width: {$progress * 100}%"
-                ></div>
-            </div>
-
-            <!-- Main content row -->
-            <div class="mini-content">
-                <!-- Left: Album art -->
-                {#if $currentTrack}
-                    <div class="mini-art">
-                        {#if albumArt && !imageLoadFailed}
-                            <img
-                                src={albumArt}
-                                alt="Album art"
-                                decoding="async"
-                                on:error={() => (imageLoadFailed = true)}
-                            />
-                        {:else}
-                            <div class="mini-art-placeholder">
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    width="20"
-                                    height="20"
-                                >
-                                    <path
-                                        d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                                    />
-                                </svg>
-                            </div>
-                        {/if}
-                    </div>
-
-                    <!-- Middle: Track info -->
-                    <div class="mini-info">
-                        <div class="mini-title-row">
-                            <span class="mini-title"
-                                >{$currentTrack.title || "Unknown Title"}</span
-                            >
-                            {#if isLive}
-                                <span class="live-badge mini">LIVE</span>
-                            {/if}
-                        </div>
-                        <span class="mini-artist"
-                            >{$currentTrack.artist || "Unknown Artist"}</span
-                        >
-                    </div>
-                {:else}
-                    <div class="mini-info">
-                        <span
-                            class="mini-title"
-                            style="color: var(--text-subdued)"
-                            >No track playing</span
-                        >
-                    </div>
-                {/if}
-
-                <!-- Like button (mobile) -->
-                {#if $currentTrack}
-                    <button
-                        class="mini-like-btn"
-                        class:liked={isCurrentLiked}
-                        on:click|stopPropagation={() =>
-                            $currentTrack && toggleLike($currentTrack.id)}
-                        title={isCurrentLiked
-                            ? "Remove from Liked Songs"
-                            : "Add to Liked Songs"}
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="20"
-                            height="20"
-                            fill={isCurrentLiked
-                                ? "var(--accent-color, #1db954)"
-                                : "none"}
-                            stroke={isCurrentLiked
-                                ? "var(--accent-color, #1db954)"
-                                : "currentColor"}
-                            stroke-width="2"
-                        >
-                            <path
-                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                            />
-                        </svg>
-                    </button>
-                {/if}
-
-                <!-- Right: Controls (stop propagation so taps don't open fullscreen) -->
-                <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-                <div
-                    class="mini-controls"
-                    on:click|stopPropagation
-                    on:keydown|stopPropagation
-                    role="group"
-                >
-                    <button
-                        class="mini-btn connect-btn"
-                        class:active={connectedDevices > 0}
-                        on:click|stopPropagation={() => (showConnectPanel = !showConnectPanel)}
-                        title="Connect to a device"
-                    >
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                            <path d="M19,2H5A3,3,0,0,0,2,5V15a3,3,0,0,0,3,3H9.17l-1.42,1.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.42,0L11,18.99,12.83,20.83a1,1,0,0,0,1.42,0,1,1,0,0,0,0-1.42L12.83,18H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2Zm1,13a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V5A1,1,0,0,1,5,4H19a1,1,0,0,1,1,1Z"/>
-                        </svg>
-                    </button>
-                    <button
-                        class="mini-btn"
-                        on:click={togglePlay}
-                        title={$isPlaying ? "Pause" : "Play"}
-                    >
-                        {#if $isPlaying}
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                width="28"
-                                height="28"
-                            >
-                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                            </svg>
-                        {:else}
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                width="28"
-                                height="28"
-                            >
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
-                        {/if}
-                    </button>
-                    <button class="mini-btn" on:click={nextTrack} title="Next">
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="24"
-                            height="24"
-                        >
-                            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-    {:else}
-        <!-- Track info -->
-        <div class="track-info desktop-track-info">
+    <!-- Track info -->
+    <div class="track-info desktop-track-info">
             {#if $currentTrack}
                 <div class="album-art">
                     {#if albumArt && !imageLoadFailed}
@@ -622,6 +464,7 @@
                     <span class="time">{formatDuration($currentTime)}</span>
                     <div
                         class="progress-bar"
+                        class:seeking={isSeeking}
                         bind:this={seekBarElement}
                         on:mousedown={handleSeekStart}
                         role="slider"
@@ -852,8 +695,8 @@
                 </button>
             </div>
         </div>
-    {/if}
 </footer>
+{/if}
 
 {#if showConnectPanel}
     <ConnectPanel on:close={() => showConnectPanel = false} />
@@ -1170,6 +1013,10 @@
         transition: background-color var(--transition-fast);
     }
 
+    .progress-bar:not(.seeking) .progress-fill {
+        transition: background-color var(--transition-fast), width 100ms linear;
+    }
+
     .progress-bar:hover .progress-fill,
     .volume-bar:hover .volume-fill {
         background-color: var(--accent-primary);
@@ -1189,7 +1036,8 @@
 
     .progress-bar:hover .progress-thumb,
     .volume-bar:hover .volume-thumb {
-        transform: translateX(-50%) scale(1);
+        transform: translateX(-50%) scale(1.25);
+        box-shadow: 0 0 12px var(--accent-primary);
     }
 
     /* LIVE badge */

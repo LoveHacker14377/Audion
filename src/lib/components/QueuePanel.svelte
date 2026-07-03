@@ -658,7 +658,7 @@
     .clear-btn {
         font-size: 0.75rem;
         color: var(--text-secondary);
-        padding: 4px 8px;
+        padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: var(--radius-sm);
         transition: all var(--transition-fast);
     }
@@ -709,7 +709,7 @@
 
     .section-title .count {
         background-color: var(--bg-surface);
-        padding: 2px 6px;
+        padding: var(--spacing-xs) var(--spacing-xs);
         border-radius: var(--radius-full);
         font-size: 0.625rem;
     }
@@ -717,7 +717,7 @@
     .queue-list {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
     }
 
     /* Virtualization - flexible height  */
@@ -743,7 +743,7 @@
         will-change: transform;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--spacing-xs);
     }
 
     .queue-track {
@@ -852,7 +852,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 2px;
+        gap: var(--spacing-xs);
     }
 
     .playing-indicator .bar {

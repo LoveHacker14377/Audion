@@ -42,6 +42,7 @@
   import { saveScroll, getScroll } from "$lib/stores/scrollMemory";
   import { setCustomArtwork } from "$lib/stores/customArtwork";
   import MetadataModal from "$lib/components/MetadataModal.svelte";
+  import EmptyState from "$lib/components/EmptyState.svelte";
   import { _, locale } from "svelte-i18n";
 
   // MetadataModal state
@@ -1309,14 +1310,12 @@
     </div>
   {:else}
     <div class="list-body">
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-          <path
-            d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-          />
-        </svg>
-        <h3>{$_('trackList.noTracksFound')}</h3>
-        <p>{$_('trackList.addFolderToGetStarted')}</p>
+      <div class="empty-state-wrapper">
+        <EmptyState
+          icon="music"
+          title={$_('trackList.noTracksFound')}
+          description={$_('trackList.addFolderToGetStarted')}
+        />
       </div>
     </div>
   {/if}

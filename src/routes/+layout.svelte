@@ -3,7 +3,7 @@
   import { get } from "svelte/store";
   import { appSettings } from "$lib/stores/settings";
   import { theme } from "$lib/stores/theme";
-  import { cleanupPlayer, initAudioBackend } from "$lib/stores/player";
+  import { cleanupPlayer, initAudioBackend, currentTrack } from "$lib/stores/player";
   import {
     migrateCoversToFiles,
     isAndroid,
@@ -34,6 +34,7 @@
   import { setupI18n } from "$lib/i18n";
   import { isLoading } from "svelte-i18n";
   import "../app.css";
+  import MobileMiniPlayer from "$lib/components/MobileMiniPlayer.svelte";
 
   let handleVisibilityChange: (() => void) | null = null;
   let migrationStatus = "";
@@ -302,9 +303,15 @@
   </div>
 {/if}
 
-<div class="app-content" class:mobile={$isMobile} class:pip={$isMiniPlayer}>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="app-content" class:mobile={$isMobile} class:pip={$isMiniPlayer} class:has-mini-player={$isMobile && $currentTrack && !$isFullScreen} id="main-content">
   <slot />
 </div>
+
+{#if $isMobile && $currentTrack && !$isFullScreen}
+  <MobileMiniPlayer />
+{/if}
 {/if}
 
 <style>
@@ -379,7 +386,12 @@
   }
 
   .app-content.mobile {
-    padding-top: 0;
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+  }
+
+  .app-content.mobile.has-mini-player {
+    padding-bottom: calc(var(--mobile-nav-height, 60px) + 72px + var(--safe-area-bottom, 0px));
   }
 
   /* PIP mode: no title bar, no padding */

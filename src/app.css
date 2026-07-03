@@ -14,9 +14,9 @@
   --accent-subtle: rgba(29, 185, 84, 0.15);
 
   --text-primary: #ffffff;
-  --text-secondary: #b3b3b3;
-  --text-subdued: #a0a0a0;
-  /* Higher contrast for WCAG compliance (4.5:1 on #121212) */
+  --text-secondary: #c8c8c8;  /* 7.2:1 AAA on #121212 */
+  --text-subdued: #8e8e8e;    /* 5.4:1 AA on #121212 */
+  --text-tertiary: #6a6a6a;   /* decorative only — not for body text */
 
   --border-color: #404040;
   --error-color: #f15e6c;
@@ -50,15 +50,48 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  /* Typography scale tokens */
+  --font-size-xs: 0.75rem;      /* 12px — captions */
+  --font-size-sm: 0.8125rem;    /* 13px — secondary */
+  --font-size-base: 0.875rem;   /* 14px — body (default) */
+  --font-size-md: 1rem;         /* 16px — emphasis */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Animation & easing tokens */
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 150ms var(--ease-in-out);
+  --transition-normal: 250ms var(--ease-in-out);
+  --transition-slow: 400ms var(--ease-out-expo);
 
   /* Safe Area Insets (for notches/status bars) */
   --safe-area-top: env(safe-area-inset-top, 24px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* Reduced motion — zero out all animations */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-normal: 0ms;
+    --transition-slow: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 * {
@@ -109,15 +142,34 @@ body {
   color: var(--text-primary);
 }
 
-/* Focus visible */
+/* Focus visible — strengthened outline */
 :focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  outline: 2.5px solid var(--accent-primary);
+  outline-offset: 3px;
+  border-radius: 2px;
   transition: outline-offset var(--transition-fast);
 }
 
 :focus-visible:hover {
   outline-offset: 4px;
+}
+
+/* Skip-to-content link (hidden until focused) */
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--accent-primary);
+  color: var(--bg-base);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  border-radius: 0 0 var(--radius-md) 0;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 0;
 }
 
 /* Button base styles */
@@ -247,18 +299,57 @@ a:hover {
   border-color: var(--text-secondary);
 }
 
-/* Card styles */
+/* Card styles — enhanced micro-animations */
 .card {
   background-color: var(--bg-elevated);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
-  transition: all var(--transition-normal);
+  transition: transform var(--transition-normal), background-color var(--transition-normal), box-shadow var(--transition-normal);
+  cursor: pointer;
 }
 
 .card:hover {
   background-color: var(--bg-surface);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.015);
   box-shadow: var(--shadow-md);
+}
+
+.card:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* Skeleton loading shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-highlight) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Ripple effect container */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 10%, transparent 10%);
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 300ms, transform 300ms;
+}
+.ripple:active::after {
+  opacity: 1;
+  transform: scale(5);
+  transition: 0s;
 }
 
 /* Animations */
@@ -296,6 +387,15 @@ a:hover {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn var(--transition-normal);
 }
@@ -306,6 +406,78 @@ a:hover {
 
 .animate-pulse {
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Ultrawide constraint — max readable line length */
+@media (min-width: 1920px) {
+  .main-view .view-content {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+/* ============================================
+   COMPONENT POLISH UTILITY CLASSES
+   ============================================ */
+
+/* Card hover micro-animation */
+.card {
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+.card:hover {
+  background-color: var(--bg-surface);
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.3));
+}
+.card:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* Skeleton loading placeholder */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-highlight, rgba(255,255,255,0.06)) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Ripple effect container */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 10%, transparent 10%);
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 300ms, transform 300ms;
+}
+.ripple:active::after {
+  opacity: 1;
+  transform: scale(6);
+  transition: 0s;
+}
+
+/* Seek bar glow on hover */
+.seek-bar-glow:hover::-webkit-slider-thumb,
+.seek-bar-glow:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+  box-shadow: 0 0 12px var(--accent-primary);
 }
 
 /* ============================================
@@ -375,4 +547,62 @@ a:hover {
   .carousel-container::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* =====================================================
+   Phase 3 — Card hover micro-animation
+   ===================================================== */
+.card {
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+.card:hover {
+  background-color: var(--bg-surface);
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: var(--shadow-md);
+}
+.card:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* =====================================================
+   Phase 3 — Skeleton loading shimmer
+   ===================================================== */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-highlight) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* =====================================================
+   Phase 3 — Ripple effect
+   ===================================================== */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 10%, transparent 10%);
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 300ms, transform 300ms;
+}
+.ripple:active::after {
+  opacity: 1;
+  transform: scale(0);
+  transition: 0s;
 }

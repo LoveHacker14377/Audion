@@ -319,7 +319,6 @@
         <header
             class="album-header"
             on:contextmenu={handleContextMenu}
-            role="banner"
             aria-label="Album Header"
         >
             <button

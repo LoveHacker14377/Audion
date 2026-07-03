@@ -980,14 +980,14 @@
     .genre-pills {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--spacing-sm);
     }
 
     .genre-pill {
         background: rgba(var(--accent-primary-rgb, 30 215 96) / 0.12);
         border: 1px solid rgba(var(--accent-primary-rgb, 30 215 96) / 0.3);
         color: var(--accent-primary);
-        padding: 4px 14px;
+        padding: var(--spacing-xs) var(--spacing-md);
         border-radius: var(--radius-full);
         font-size: 0.8rem;
         font-weight: 600;
@@ -1009,7 +1009,7 @@
         color: var(--text-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-full);
-        padding: 6px 16px;
+        padding: var(--spacing-xs) var(--spacing-md);
         width: fit-content;
         text-decoration: none;
         transition: all var(--transition-fast);
@@ -1091,7 +1091,7 @@
         color: var(--text-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-full);
-        padding: 4px 14px;
+        padding: var(--spacing-xs) var(--spacing-md);
         font-size: 0.72rem;
         font-weight: 600;
         cursor: pointer;
