@@ -638,8 +638,9 @@
         {/if}
     {/if}
 
-    {#key $currentView.type + ($currentView.id ?? '') + isSearching}
-        <div class="transition-wrapper" in:fade={{ duration: 200 }} out:fade={{ duration: 150 }}>
+    <div class="view-transition-container">
+        {#key $currentView.type + ($currentView.id ?? '') + isSearching}
+            <div class="transition-wrapper" in:fade={{ duration: 200 }} out:fade={{ duration: 150 }}>
             {#if isSearching}
                 <div class="view-container">
                     <header class="view-header search-view-header">
@@ -765,15 +766,22 @@
             {/if}
         </div>
     {/key}
+    </div>
 </main>
 
 <style>
-    .transition-wrapper {
+    .view-transition-container {
         flex: 1;
+        position: relative;
+        min-height: 0;
+        width: 100%;
+    }
+
+    .transition-wrapper {
+        position: absolute;
+        inset: 0;
         display: flex;
         flex-direction: column;
-        min-height: 0;
-        height: 100%;
         overflow: hidden;
     }
 

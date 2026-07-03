@@ -23,6 +23,11 @@ impl Database {
         // Initialize schema
         schema::init_schema(&conn)?;
 
+        // Initialize FTS search index
+        if let Err(e) = queries::init_fts(&conn) {
+            log::error!("[DB] Failed to initialize FTS search index: {}", e);
+        }
+
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
         };

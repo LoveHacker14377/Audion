@@ -76,7 +76,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         padding-left: 12px;
-        max-width: 300px;
+        max-width: 100%;
     }
 
     .item {

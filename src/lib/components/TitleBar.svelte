@@ -463,6 +463,7 @@
         align-items: center;
         height: 100%;
         min-width: 0;
+        overflow: hidden;
     }
 
     .titlebar-right {
@@ -526,6 +527,8 @@
         border-left: 1px solid var(--border-color);
         height: 20px; /* Separator height */
         padding-left: 4px;
+        min-width: 0;
+        overflow: hidden;
     }
 
     /* Drag Regions */

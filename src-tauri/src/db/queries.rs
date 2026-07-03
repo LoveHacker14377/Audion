@@ -325,6 +325,13 @@ pub fn init_fts(conn: &Connection) -> Result<()> {
             INSERT INTO tracks_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album);
         END;"
     )?;
+
+    // Populate FTS if empty
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks_fts", [], |r| r.get(0)).unwrap_or(0);
+    if count == 0 {
+        let _ = conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild');", []);
+    }
+
     Ok(())
 }
 
