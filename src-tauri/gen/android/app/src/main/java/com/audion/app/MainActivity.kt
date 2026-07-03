@@ -96,6 +96,33 @@ class MainActivity : TauriActivity() {
 
         // Convert the URI to a real filesystem path
         val realPath = resolveUriToPath(uri)
+
+        // Request MANAGE_EXTERNAL_STORAGE on Android 11+ if picking from external/removable media
+        if (Build.VERSION.SDK_INT >= 30 && !android.os.Environment.isExternalStorageManager()) {
+          val isExternal = realPath != null && !realPath.startsWith("/storage/emulated/") && !realPath.startsWith("/sdcard")
+          if (isExternal) {
+            try {
+              val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${packageName}")
+              }
+              startActivity(intent)
+
+              android.widget.Toast.makeText(
+                this,
+                "Please grant All Files Access to read music from external USB/SD card",
+                android.widget.Toast.LENGTH_LONG
+              ).show()
+
+              wv.post {
+                wv.evaluateJavascript("window.__onAndroidFolderPicked(null)", null)
+              }
+              return
+            } catch (e: Exception) {
+              e.printStackTrace()
+            }
+          }
+        }
+
         val jsPath = realPath?.replace("'", "\\'") ?: ""
 
         if (jsPath.isNotEmpty()) {
@@ -120,7 +147,7 @@ class MainActivity : TauriActivity() {
 
   /**
    * Resolve a content:// tree URI to a real /storage/... path.
-   * Works for primary and SD card volumes on Android 5+.
+   * Works for primary and SD card/USB volumes on Android 5+.
    */
   private fun resolveUriToPath(uri: Uri): String? {
     val docId = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, uri)?.uri
@@ -136,10 +163,31 @@ class MainActivity : TauriActivity() {
       // SD card or other volume: "XXXX-XXXX:Music" → /storage/XXXX-XXXX/Music
       docId.contains(":") -> {
         val parts = docId.split(":", limit = 2)
-        val volume = parts[0]
+        val volumeId = parts[0]
         val subPath = parts[1]
-        if (subPath.isEmpty()) "/storage/$volume"
-        else "/storage/$volume/$subPath"
+
+        val storageManager = getSystemService(Context.STORAGE_SERVICE) as android.os.storage.StorageManager
+        var volumePath: String? = null
+        for (volume in storageManager.storageVolumes) {
+          val uuid = volume.uuid
+          if (uuid != null && uuid.equals(volumeId, ignoreCase = true)) {
+            if (Build.VERSION.SDK_INT >= 30) {
+              volumePath = volume.directory?.absolutePath
+            } else {
+              try {
+                val getPathMethod = volume.javaClass.getMethod("getPath")
+                volumePath = getPathMethod.invoke(volume) as? String
+              } catch (e: Exception) {
+                e.printStackTrace()
+              }
+            }
+            break
+          }
+        }
+
+        val baseDir = volumePath ?: "/storage/$volumeId"
+        if (subPath.isEmpty()) baseDir
+        else "$baseDir/$subPath"
       }
       else -> null
     }
