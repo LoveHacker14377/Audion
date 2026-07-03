@@ -326,9 +326,10 @@ pub fn init_fts(conn: &Connection) -> Result<()> {
         END;"
     )?;
 
-    // Populate FTS if empty
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks_fts", [], |r| r.get(0)).unwrap_or(0);
-    if count == 0 {
+    // Populate FTS if count doesn't match tracks table count
+    let tracks_count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0)).unwrap_or(0);
+    let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks_fts", [], |r| r.get(0)).unwrap_or(0);
+    if fts_count != tracks_count {
         let _ = conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild');", []);
     }
 
@@ -1914,3 +1915,4 @@ pub fn enqueue_track_sync_change(conn: &Connection, track: &Track, operation: &s
 
     Ok(())
 }
+
