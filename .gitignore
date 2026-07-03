@@ -60,3 +60,6 @@ plugin-examples/
 
 #Implementation Plan
 implementation_plan.md
+
+tauri-signing.key
+tauri-signing.key.pub

@@ -77,9 +77,9 @@
       ]
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGOUJEQkM3NUVCMjAxMTIKUldRU0FiSmV4OXVicjg1U2JuL1pRdGlvWnhTbStucHF5aDVCYkMxZDFRQWRhRi93TGxlTTNqeDEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBCMUVDOTEzMzUyRkVCQUUKUldTdTZ5ODFFOGtlQzZYOHRMVXRDOElITW1qQVdiV3p3OGFUZ2R3YWFhbjNnb2JvcWZRY09QQlcK",
       "endpoints": [
-        "https://github.com/SmileofHaven/Audion-Changes/releases/latest/download/latest.json"
+        "https://github.com/dupitydumb/Audion/releases/latest/download/latest.json"
       ]
     }
   }
