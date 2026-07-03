@@ -55,10 +55,13 @@
     }
 
     // Calculate columns based on container width
-    $: columns = Math.max(1, Math.floor((containerWidth - (gridGap * 2) + gridGap) / (cardWidth + gridGap)));
+    $: columns = Math.max(1, Math.floor((containerWidth + gridGap) / (cardWidth + gridGap)));
 
     // Each row is cardHeight + gridGap
     $: ROW_HEIGHT = cardHeight > 0 ? cardHeight + gridGap : 1;
+
+    // Dynamic width of cards to fit exactly 1fr stretching
+    $: dynamicCardWidth = columns > 0 ? (containerWidth - (columns - 1) * gridGap) / columns : cardWidth;
 
     // Group items into rows
     type ItemRow = {
@@ -94,8 +97,10 @@
         startRow: 0,
         endRow: 0,
         offsetY: 0,
-        visibleRows: [] as ItemRow[],
+        visibleRows: [] as any[],
     };
+
+    let visibleItems: { item: T; index: number; key: string | number }[] = [];
 
     // virtual scrolling
     $: {
@@ -105,14 +110,22 @@
         const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - overscan);
         const endRow = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + overscan);
         
-        const visibleRows: ItemRow[] = [];
-        for (let rowIndex = startRow; rowIndex < endRow; rowIndex++) {
-            const startIdx = rowIndex * columns;
-            const rowItems = items.slice(startIdx, Math.min(startIdx + columns, items.length));
-            if (rowItems.length > 0) visibleRows.push({ rowIndex, items: rowItems });
+        const startIndex = startRow * columns;
+        const endIndex = Math.min(items.length, endRow * columns);
+        
+        const list: typeof visibleItems = [];
+        for (let i = startIndex; i < endIndex; i++) {
+            const item = items[i];
+            if (item) {
+                list.push({
+                    item,
+                    index: i,
+                    key: getItemKey(item),
+                });
+            }
         }
-
-        virtualScrollState = { totalHeight, startRow, endRow, offsetY: startRow * ROW_HEIGHT, visibleRows };
+        visibleItems = list;
+        virtualScrollState = { totalHeight, startRow, endRow, offsetY: 0, visibleRows: [] };
     }
 
     // Shared event delegation (one listener for the whole grid)
@@ -181,7 +194,10 @@
 
         const update = () => {
             containerHeight = containerElement.clientHeight;
-            containerWidth = containerElement.clientWidth;
+            const style = window.getComputedStyle(containerElement);
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            containerWidth = containerElement.clientWidth - paddingLeft - paddingRight;
         };
         update();
 
@@ -220,25 +236,25 @@
             class="virtual-spacer"
             style="height: {virtualScrollState.totalHeight}px;"
         >
-            <div
-                class="virtual-content"
-                style="transform: translateY({virtualScrollState.offsetY}px);"
-            >
-                {#each virtualScrollState.visibleRows as row (row.rowIndex)}
-                    <div 
-                        class="grid-row" 
+            <div class="virtual-content">
+                {#each visibleItems as {item, index, key} (key)}
+                    {@const row = Math.floor(index / columns)}
+                    {@const col = index % columns}
+                    {@const top = row * ROW_HEIGHT}
+                    {@const left = col * (dynamicCardWidth + gridGap)}
+                    <div
+                        class="grid-card"
+                        data-item-key={key}
                         style="
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: {dynamicCardWidth}px;
                             height: {cardHeight}px;
-                            margin-bottom: {gridGap}px;
-                            grid-template-columns: repeat({columns}, 1fr);
-                            gap: {gridGap}px;
+                            transform: translate3d({left}px, {top}px, 0);
                         "
                     >
-                        {#each row.items as item (getItemKey(item))}
-                            <div class="grid-card" data-item-key={getItemKey(item)}>
-                                <slot {item} />
-                            </div>
-                        {/each}
+                        <slot {item} />
                     </div>
                 {/each}
             </div>
@@ -276,21 +292,16 @@
         will-change: transform;
     }
 
-    /* Each row is a container with its own grid */
-    .grid-row {
-        display: grid;
-        width: 100%;
-        box-sizing: border-box;
-    }
-
     .grid-card {
         cursor: pointer;
-        width: 100%;
-        height: 100%;
         box-sizing: border-box;
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    height 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        will-change: transform, width, height;
     }
 
     .empty-state {
