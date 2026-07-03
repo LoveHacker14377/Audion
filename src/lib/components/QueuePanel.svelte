@@ -316,11 +316,12 @@
     }
 </script>
 
-{#if $isQueueVisible || forceVisible}
+{#if true}
     <aside
         class="queue-panel"
         class:mobile={$isMobile}
         class:android-lite={isAndroid && $isMobile}
+        class:closed={!$isQueueVisible && !forceVisible}
         transition:fly={{
             x: $isMobile ? 0 : 300,
             y: $isMobile ? (isAndroid ? 0 : 100) : 0,
@@ -632,6 +633,22 @@
         border-left: 1px solid var(--border-color);
         display: flex;
         flex-direction: column;
+        transition: width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    min-width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    max-width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    opacity 0.25s ease,
+                    border-left 0.3s ease;
+    }
+
+    .queue-panel.closed {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        opacity: 0;
+        padding: 0;
+        border-left: none;
+        overflow: hidden;
+        pointer-events: none;
     }
 
     .queue-header {

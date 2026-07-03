@@ -264,8 +264,8 @@
 <!-- Close source menu when clicking anywhere outside it -->
 <svelte:window on:click={closeSourceMenu} />
 
-{#if $lyricsVisible}
-    <aside class="lyrics-panel" class:mobile={$isMobile}>
+{#if true}
+    <aside class="lyrics-panel" class:mobile={$isMobile} class:closed={!$lyricsVisible}>
 
         <!-- Header --------------------------------------------------------- -->
         <header class="lyrics-header">
@@ -622,6 +622,11 @@
         display: flex;
         flex-direction: column;
         animation: slideIn 0.3s ease;
+        transition: width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    min-width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    max-width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                    opacity 0.25s ease,
+                    border-left 0.3s ease;
     }
 
     /* Dark theme overrides */
@@ -633,6 +638,17 @@
         --lyrics-past-near: rgba(255, 255, 255, 0.45);
         --lyrics-past-mid: rgba(255, 255, 255, 0.3);
         --lyrics-past-far: rgba(255, 255, 255, 0.2);
+    }
+
+    .lyrics-panel.closed {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        opacity: 0;
+        padding: 0;
+        border-left: none;
+        overflow: hidden;
+        pointer-events: none;
     }
 
     @keyframes slideIn {

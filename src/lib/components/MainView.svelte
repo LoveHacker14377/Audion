@@ -930,9 +930,11 @@
     .view-container {
         flex: 1;
         min-height: 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        transition: flex 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
     }
 
     :global(.view-container.no-padding .view-content) {
