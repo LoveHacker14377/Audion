@@ -389,7 +389,7 @@
   .connect-panel {
     width: 480px;
     max-width: 92vw;
-    border-radius: 28px;
+    border-radius: var(--radius-xl);
     padding: var(--spacing-lg);
     display: flex;
     flex-direction: column;
@@ -416,7 +416,7 @@
   .sync-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-xs);
     padding: var(--spacing-xs) 10px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-full);
@@ -462,7 +462,7 @@
   .status-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     padding: var(--spacing-md);
     display: flex;
     align-items: center;
@@ -481,7 +481,7 @@
     height: 48px;
     background: rgba(255, 255, 255, 0.05);
     color: white;
-    border-radius: 14px;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -518,7 +518,7 @@
     margin-left: auto;
     display: flex;
     align-items: flex-end;
-    gap: 3px;
+    gap: 2px;
     height: 18px;
   }
 
@@ -546,7 +546,7 @@
   .section-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--spacing-sm);
     margin-bottom: 16px;
   }
 
@@ -567,7 +567,7 @@
   .device-grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--spacing-sm);
     overflow-y: auto;
     padding-right: 4px;
   }
@@ -577,13 +577,13 @@
   }
   .device-grid::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
   }
 
   .device-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     padding: var(--spacing-md);
     transition: 0.3s;
   }
@@ -601,7 +601,7 @@
   .card-main {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: var(--spacing-md);
     margin-bottom: 16px;
   }
 
@@ -668,7 +668,7 @@
   .mini-controls {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-xs);
   }
 
   .icon-btn {
@@ -696,11 +696,11 @@
   .card-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm) 10px;
+    gap: var(--spacing-xs);
   }
 
   .btn {
-    padding: 10px;
+    padding: var(--spacing-sm);
     border-radius: var(--radius-lg);
     font-size: 0.85rem;
     font-weight: 700;

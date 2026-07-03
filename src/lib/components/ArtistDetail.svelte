@@ -1003,7 +1003,7 @@
     .wiki-link {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--spacing-xs);
         font-size: 0.8rem;
         font-weight: 600;
         color: var(--text-secondary);

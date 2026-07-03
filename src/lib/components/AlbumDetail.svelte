@@ -778,8 +778,8 @@
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 8px;
-        padding: 8px var(--spacing-lg);
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm) var(--spacing-lg);
         border-bottom: 1px solid var(--border-color);
         min-height: 38px;
     }
@@ -806,11 +806,11 @@
     .mb-chip {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--spacing-xs);
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: var(--radius-full);
-        padding: 2px 10px;
+        padding: var(--spacing-xs) 10px;
         font-size: 0.75rem;
         font-weight: 600;
         color: var(--text-secondary);

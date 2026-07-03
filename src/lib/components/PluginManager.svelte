@@ -1160,7 +1160,7 @@
   .stat-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-xs);
     color: var(--text-subdued);
     font-size: 0.75rem;
     font-weight: 500;
@@ -1224,7 +1224,7 @@
   .btn-secondary {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-xs);
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: var(--bg-highlight);
     color: var(--text-primary);
@@ -1259,7 +1259,7 @@
       transform 0.1s;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--spacing-xs);
     min-width: 130px;
     justify-content: center;
   }
