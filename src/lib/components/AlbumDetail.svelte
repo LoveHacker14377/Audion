@@ -65,7 +65,13 @@
                 getTracksByAlbum(albumId),
             ]);
             album = albumData;
-            tracks = trackData;
+            // Sort by disc number, then track number for proper album order
+            tracks = trackData.sort((a, b) => {
+                const discA = a.disc_number || 1;
+                const discB = b.disc_number || 1;
+                if (discA !== discB) return discA - discB;
+                return (a.track_number || 0) - (b.track_number || 0);
+            });
             groupedTracks = groupTracksByDisc(tracks);
             // Background MB fetch — don't await so it doesn't block the UI
             if (album) fetchMbRelease(album.name, album.artist || "");
