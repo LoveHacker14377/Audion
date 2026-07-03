@@ -27,6 +27,7 @@ export interface AppSettings {
     keyboardBindings: ShortcutBinding[] | null;
     /** master toggle for keyboard shortcuts (including showHelp / Shift+/) */
     shortcutsEnabled: boolean;
+    crossfadeSeconds: number;
 }
 
 const SETTINGS_STORAGE_KEY = 'audion_settings';
@@ -53,6 +54,7 @@ const defaultSettings: AppSettings = {
     streamServerTracks: true,
     keyboardBindings: null,
     shortcutsEnabled: true,
+    crossfadeSeconds: 0,
 };
 
 // Load settings from localStorage
@@ -204,6 +206,14 @@ function createSettingsStore() {
         setShortcutsEnabled(enabled: boolean) {
             update(state => {
                 const newState = { ...state, shortcutsEnabled: enabled };
+                saveSettings(newState);
+                return newState;
+            });
+        },
+
+        setCrossfadeSeconds(seconds: number) {
+            update(state => {
+                const newState = { ...state, crossfadeSeconds: seconds };
                 saveSettings(newState);
                 return newState;
             });

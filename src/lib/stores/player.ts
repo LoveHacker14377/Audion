@@ -60,6 +60,7 @@ import {
     html5Preload,
     html5SwapPreload,
     html5ClearPreload,
+    html5StartCrossfade,
 } from '$lib/services/html5-audio';
 
 // Interval for polling native playback state
@@ -134,6 +135,7 @@ function _reckoningTick(): void {
 // Still use rAF so position updates are frame-rate-aligned, not timer-based
 
 let _html5RafId: number | null = null;
+let _hasCrossfaded = false;
 
 function _startHtml5Ticker(): void {
     if (_html5RafId !== null) return;
@@ -157,7 +159,45 @@ function _html5Tick(): void {
     if (state.duration > 0 && !isNaN(state.duration)) duration.set(state.duration);
     pluginEvents.emit('timeUpdate', { currentTime: state.position, duration: state.duration });
     if (get(isPlaying)) updateMediaSessionPosition();
+
+    // Check for early crossfade trigger
+    const settings = get(appSettings);
+    if (settings.crossfadeSeconds > 0 && state.duration > settings.crossfadeSeconds && !_hasCrossfaded) {
+        const threshold = state.duration - settings.crossfadeSeconds;
+        if (state.position >= threshold) {
+            _hasCrossfaded = true;
+            _triggerHtml5Crossfade();
+        }
+    }
+
     _html5RafId = requestAnimationFrame(_html5Tick);
+}
+
+async function _triggerHtml5Crossfade(): Promise<void> {
+    const q = get(queue);
+    const nextIdx = _advanceQueueIndex(true);
+    if (nextIdx === null || nextIdx >= q.length) {
+        return;
+    }
+
+    const nextTrackObj = q[nextIdx];
+    if (!nextTrackObj) return;
+
+    const streaming = isStreaming(nextTrackObj) || !!(nextTrackObj as any).stream_url || (nextTrackObj.path && (nextTrackObj.path.startsWith('http://') || nextTrackObj.path.startsWith('https://')));
+    if (!streaming) {
+        return;
+    }
+
+    const settings = get(appSettings);
+    const vol = sliderToAudioVolume(get(volume));
+    console.log('[Player] Triggering HTML5 crossfade into next track:', nextTrackObj.title);
+
+    const started = await html5StartCrossfade(nextTrackObj.id, vol, settings.crossfadeSeconds);
+    if (started) {
+        handleGaplessAdvance();
+    } else {
+        _hasCrossfaded = false;
+    }
 }
 
 // Track which backend is currently active ('native', 'html5', 'remote', or 'none')
@@ -870,7 +910,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
         let swapped = false;
         if (startTime === 0) {
-            swapped = await html5SwapPreload(audioPath, sliderToAudioVolume(get(volume)));
+            swapped = await html5SwapPreload(track.id, sliderToAudioVolume(get(volume)));
         }
 
         if (swapped) {
@@ -937,6 +977,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
             }
         }
 
+        _hasCrossfaded = false;
         currentTrack.set(trackForPlugins);
         currentTime.set(startTime);
         duration.set(track.duration || 0);
@@ -1428,6 +1469,7 @@ async function _advanceUiToTrack(track: Track): Promise<void> {
     const fullTrack = await getFullTrack(track.id, true);
     const trackForPlugins = fullTrack || track;
 
+    _hasCrossfaded = false;
     currentTrack.set(trackForPlugins);
     currentTime.set(0);
     duration.set(track.duration || 0);
@@ -1547,7 +1589,7 @@ async function _scheduleHtml5Preload(): Promise<void> {
     }
 
     console.log('[Player] Preloading next HTML5 track:', nextTrackObj.title, audioPath);
-    html5Preload(audioPath).catch(e => {
+    html5Preload(audioPath, nextTrackObj.id).catch(e => {
         console.warn('[Player] HTML5 Preload failed (non-fatal):', e);
     });
 }

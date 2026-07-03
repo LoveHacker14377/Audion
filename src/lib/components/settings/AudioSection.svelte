@@ -293,6 +293,32 @@
           {/if}
         </div>
 
+        <div class="divider"></div>
+
+        <!-- Crossfade -->
+        <div class="inner-section">
+          <span class="setting-title">{$_('settings.crossfade', { default: 'Crossfade' })}</span>
+          <span class="setting-description">{$_('settings.crossfadeDesc', { default: 'Transition between tracks by fading out the current song and fading in the next' })}</span>
+          <div class="crossfade-slider">
+            <input
+              type="range"
+              min="0"
+              max="12"
+              step="1"
+              value={$appSettings.crossfadeSeconds}
+              style="--eq-fill: {($appSettings.crossfadeSeconds / 12 * 100).toFixed(1)}%"
+              on:input={(e) => {
+                const val = parseInt(e.currentTarget.value, 10);
+                appSettings.setCrossfadeSeconds(val);
+              }}
+              aria-label="Crossfade duration"
+            />
+            <span style="font-size: 0.85rem; color: var(--text-secondary); width: 32px; text-align: right; font-weight: 500;">
+              {$appSettings.crossfadeSeconds === 0 ? $_('settings.off', { default: 'Off' }) : `${$appSettings.crossfadeSeconds}s`}
+            </span>
+          </div>
+        </div>
+
         <!-- Equalizer -->
         <div class="inner-section">
           <div class="toggle-container">

@@ -4,6 +4,7 @@
 import { get } from 'svelte/store';
 import { equalizer, EQ_FREQUENCIES, type EqualizerState } from '$lib/stores/equalizer';
 import { addToast } from '$lib/stores/toast';
+import { appSettings } from '$lib/stores/settings';
 
 // =============================================================================
 // PUBLIC INTERFACE
@@ -70,10 +71,11 @@ export async function html5Play(path: string, volume: number, startTime = 0): Pr
     }
 }
 
-export async function html5Preload(path: string): Promise<void> {
+export async function html5Preload(path: string, trackId: string | number | null = null): Promise<void> {
     html5ClearPreload();
 
     preloadPath = path;
+    preloadTrackId = trackId;
     preloadReady = false;
 
     if (typeof window === 'undefined') return;
@@ -148,9 +150,9 @@ export async function html5Preload(path: string): Promise<void> {
     }, 10000);
 }
 
-export async function html5SwapPreload(path: string, volume: number): Promise<boolean> {
-    if (!preloadReady || !preloadAudio || !preloadPath || preloadPath !== path) {
-        console.log('[Html5Audio] Swap called but preload is not ready/matching path.');
+export async function html5SwapPreload(trackId: string | number | null, volume: number): Promise<boolean> {
+    if (!preloadReady || !preloadAudio || preloadTrackId === null || String(preloadTrackId) !== String(trackId)) {
+        console.log('[Html5Audio] Swap called but preload is not ready/matching trackId. preloadTrackId:', preloadTrackId, 'requested:', trackId);
         return false;
     }
 
@@ -184,7 +186,7 @@ export async function html5SwapPreload(path: string, volume: number): Promise<bo
     html5Audio.volume = volume;
 
     const eqEnabled = get(equalizer).enabled;
-    const canUseEq = canUseHtml5EqForPath(nextPath);
+    const canUseEq = nextPath ? canUseHtml5EqForPath(nextPath) : false;
 
     if (eqEnabled && canUseEq) {
         ensureHtml5EqGraph(html5Audio);
@@ -233,8 +235,145 @@ export function html5ClearPreload(): void {
         preloadDashPlayer = null;
     }
     preloadPath = null;
+    preloadTrackId = null;
     preloadReady = false;
     isPreloadDash = false;
+}
+
+export function cleanupFadeout(): void {
+    if (fadeoutTimer) {
+        clearTimeout(fadeoutTimer);
+        fadeoutTimer = null;
+    }
+    if (crossfadeRampTimer) {
+        clearInterval(crossfadeRampTimer);
+        crossfadeRampTimer = null;
+    }
+    if (fadeoutAudio) {
+        try {
+            fadeoutAudio.pause();
+            fadeoutAudio.src = '';
+        } catch (_) {}
+        fadeoutAudio = null;
+    }
+    if (fadeoutDashPlayer) {
+        try { fadeoutDashPlayer.destroy(); } catch (_) {}
+        fadeoutDashPlayer = null;
+    }
+    if (fadeoutSourceNode) {
+        try { fadeoutSourceNode.disconnect(); } catch (_) {}
+        fadeoutSourceNode = null;
+    }
+}
+
+export async function html5StartCrossfade(trackId: string | number | null, targetVolume: number, durationSecs: number): Promise<boolean> {
+    if (!preloadReady || !preloadAudio || preloadTrackId === null || String(preloadTrackId) !== String(trackId)) {
+        console.log('[Html5Audio] Crossfade requested but preload is not ready/matching trackId. preloadTrackId:', preloadTrackId, 'requested:', trackId);
+        return false;
+    }
+
+    console.log(`[Html5Audio] Starting crossfade transition: ${durationSecs}s`);
+
+    // Clean up any existing fadeout first
+    cleanupFadeout();
+
+    // 1. Move current primary audio to fadeout
+    fadeoutAudio = html5Audio;
+    fadeoutDashPlayer = dashPlayer;
+    fadeoutSourceNode = html5AudioSourceNode;
+
+    // 2. Promote preload to primary
+    html5Audio = preloadAudio;
+    dashPlayer = preloadDashPlayer;
+
+    const nextPath = preloadPath;
+
+    // Clear preload slots
+    preloadAudio = null;
+    preloadDashPlayer = null;
+    preloadPath = null;
+    preloadTrackId = null;
+    preloadReady = false;
+
+    if (preloadTimeoutId) {
+        clearTimeout(preloadTimeoutId);
+        preloadTimeoutId = null;
+    }
+    if (canplayFallbackTimer) {
+        clearTimeout(canplayFallbackTimer);
+        canplayFallbackTimer = null;
+    }
+
+    // Set up listeners on the new primary audio element
+    setupHtml5AudioListeners(html5Audio);
+
+    // Initial volumes for transition
+    const startVolume = fadeoutAudio ? fadeoutAudio.volume : targetVolume;
+    html5Audio.volume = 0;
+
+    // 3. Connect new audio to the EQ filters if EQ is enabled
+    const eqEnabled = get(equalizer).enabled;
+    const canUseEq = nextPath ? canUseHtml5EqForPath(nextPath) : false;
+
+    if (eqEnabled && canUseEq && html5AudioContext && html5EqFilters.length > 0) {
+        try {
+            // Keep fadeoutSourceNode connected to filters.
+            // Create a new source node for the new primary audio.
+            html5AudioSourceNode = html5AudioContext.createMediaElementSource(html5Audio);
+            html5AudioSourceElement = html5Audio;
+            html5AudioSourceNode.connect(html5EqFilters[0]);
+            await resumeHtml5AudioContext();
+        } catch (err) {
+            console.error('[Html5Audio] Failed to connect crossfade audio to EQ:', err);
+        }
+    } else {
+        html5AudioSourceNode = null;
+        html5AudioSourceElement = null;
+    }
+
+    // 4. Start play on the new primary audio
+    try {
+        if (isPreloadDash && dashPlayer) {
+            dashPlayer.play();
+        } else {
+            await html5Audio.play();
+        }
+    } catch (err) {
+        console.error('[Html5Audio] Crossfade start play failed:', err);
+        cleanupFadeout();
+        return false;
+    }
+
+    // 5. Volume ramping loop in Javascript
+    const startTime = performance.now();
+    const durationMs = durationSecs * 1000;
+    const intervalMs = 30;
+
+    crossfadeRampTimer = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / durationMs, 1.0);
+
+        if (fadeoutAudio) {
+            fadeoutAudio.volume = startVolume * (1.0 - progress);
+        }
+
+        if (html5Audio) {
+            html5Audio.volume = targetVolume * progress;
+        }
+
+        if (progress >= 1.0) {
+            clearInterval(crossfadeRampTimer);
+            crossfadeRampTimer = null;
+        }
+    }, intervalMs);
+
+    // 6. Schedule cleanup at end of crossfade
+    fadeoutTimer = setTimeout(() => {
+        cleanupFadeout();
+        console.log('[Html5Audio] Crossfade transition finished cleanly.');
+    }, durationMs);
+
+    return true;
 }
 
 export function html5Pause(): void {
@@ -248,6 +387,7 @@ export async function html5Resume(): Promise<void> {
 
 export function html5Stop(): void {
     html5ClearPreload();
+    cleanupFadeout();
     if (!html5Audio) return; // Don't create the element just to stop it
     const audio = html5Audio;
     audio.pause();
@@ -288,6 +428,7 @@ export function html5GetState(): { position: number; duration: number; isPlaying
 }
 
 export function html5Cleanup(): void {
+    cleanupFadeout();
     if (html5Audio) {
         html5Audio.pause();
         html5Audio.src = '';
@@ -323,11 +464,19 @@ let dashPlayer: any | null = null;
 // Preload state for gapless streaming
 let preloadAudio: HTMLAudioElement | null = null;
 let preloadPath: string | null = null;
+let preloadTrackId: string | number | null = null;
 let preloadReady = false;
 let preloadTimeoutId: any = null;
 let canplayFallbackTimer: any = null;
 let isPreloadDash = false;
 let preloadDashPlayer: any = null;
+
+// Fadeout state for crossfade
+let fadeoutAudio: HTMLAudioElement | null = null;
+let fadeoutDashPlayer: any | null = null;
+let fadeoutSourceNode: MediaElementAudioSourceNode | null = null;
+let fadeoutTimer: any = null;
+let crossfadeRampTimer: any = null;
 
 // =============================================================================
 // INTERNAL: AUDIO PATH CLASSIFICATION
