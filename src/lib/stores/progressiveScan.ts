@@ -58,9 +58,19 @@ function createProgressiveScanStore() {
             );
 
             const trackUpdateStart = performance.now();
-            tracks.update(existing => [...existing, ...batchTracks]);
+            // dedupe by id before merging: a batch can contain tracks that
+            // already exist in the store
+            // could happen when scanning a single folder
+            let mergedLength = 0;
+            tracks.update(existing => {
+                const batchIds = new Set(batchTracks.map(t => t.id));
+                const deduped = existing.filter(t => !batchIds.has(t.id));
+                const merged = [...deduped, ...batchTracks];
+                mergedLength = merged.length;
+                return merged;
+            });
 
-            trackCount.update(n => n + batchTracks.length);
+            trackCount.set(mergedLength);
             update(state => ({ ...state, progress }));
 
         });

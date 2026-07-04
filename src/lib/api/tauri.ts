@@ -241,8 +241,31 @@ export async function rescanMusic(): Promise<ScanResult> {
     return await invoke('rescan_music');
 }
 
+/**
+ * scan a single folder for new/updated/removed tracks
+ *  safe to call repeatedly on a folder that
+ * already has tracks in the db => existing tracks are updated
+ * emits scan-batch-ready / scan-complete events
+ */
+export async function scanFolder(folderPath: string): Promise<ScanResult> {
+    return await invoke('scan_folder', { folderPath });
+}
+
+/**
+ * remove a registered music folder and delete all tracks under it
+ * deletes from db , local files untouched
+ * returns the number of tracks removed
+ */
+export async function removeFolder(path: string): Promise<number> {
+    return await invoke('remove_folder', { path });
+}
+
 export async function getDefaultMusicDirs(): Promise<string[]> {
     return await invoke('get_default_music_dirs');
+}
+
+export async function getMusicFolders(): Promise<string[]> {
+    return await invoke('get_music_folders');
 }
 
 export async function getLibrary(): Promise<Library> {

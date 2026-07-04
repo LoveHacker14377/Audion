@@ -1177,6 +1177,32 @@ pub fn remove_music_folder(conn: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
+/// remove a registered music folder and delete every track under it
+/// plus albums left with no remaining tracks
+/// a single transaction with one bulk DELETE
+/// returns the number of tracks deleted
+pub fn remove_folder_with_tracks(conn: &Connection, folder_path: &str) -> Result<usize> {
+    let pattern = format!("{}%", folder_path);
+
+    let tx = conn.unchecked_transaction()?;
+
+    let deleted = tx.execute("DELETE FROM tracks WHERE path LIKE ?1", params![pattern])?;
+
+    tx.execute(
+        "DELETE FROM music_folders WHERE path = ?1",
+        params![folder_path],
+    )?;
+
+    tx.execute(
+        "DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks WHERE album_id IS NOT NULL)",
+        [],
+    )?;
+
+    tx.commit()?;
+
+    Ok(deleted)
+}
+
 pub fn update_folder_last_scanned(conn: &Connection, path: &str) -> Result<()> {
     conn.execute(
         "UPDATE music_folders SET last_scanned = CURRENT_TIMESTAMP WHERE path = ?1",

@@ -5,7 +5,6 @@ import type { ShortcutBinding } from '$lib/stores/shortcuts';
 
 export interface AppSettings {
     downloadLocation: string | null;
-    androidMusicFolder: string | null;
     autoAddToLibrary: boolean;
     developerMode: boolean;
     showDiscord: boolean;
@@ -35,7 +34,6 @@ const SETTINGS_STORAGE_KEY = 'audion_settings';
 // Default settings
 const defaultSettings: AppSettings = {
     downloadLocation: null,
-    androidMusicFolder: null,
     autoAddToLibrary: false,
     developerMode: false,
     showDiscord: true,
@@ -94,14 +92,6 @@ function createSettingsStore() {
         setDownloadLocation(path: string | null) {
             update(state => {
                 const newState = { ...state, downloadLocation: path };
-                saveSettings(newState);
-                return newState;
-            });
-        },
-
-        setAndroidMusicFolder(path: string | null) {
-            update(state => {
-                const newState = { ...state, androidMusicFolder: path };
                 saveSettings(newState);
                 return newState;
             });

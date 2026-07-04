@@ -2817,3 +2817,98 @@
       max-width: 90vw;
     }
   }
+
+.folder-section-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: var(--spacing-sm);
+width: 100%;
+}
+
+.folder-list {
+list-style: none;
+margin: var(--spacing-sm) 0 0 0;
+padding: 0;
+display: flex;
+flex-direction: column;
+max-height: 220px;
+overflow-y: auto;
+}
+
+.folder-item {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: var(--spacing-sm);
+padding: 8px 0;
+border-bottom: 1px solid var(--border-color);
+}
+
+.folder-item:last-child {
+border-bottom: none;
+}
+
+.folder-item-path {
+flex: 1;
+min-width: 0;
+font-size: 0.875rem;
+font-family: monospace;
+color: var(--text-secondary);
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+opacity: 0.8;
+}
+
+.folder-item-actions {
+display: flex;
+align-items: center;
+gap: 6px;
+flex-shrink: 0;
+}
+
+/* pill buttons for folder add/rescan/remove actions */
+.btn-folder-action {
+display: inline-flex;
+align-items: center;
+gap: 4px;
+padding: 6px 12px;
+border-radius: var(--radius-md);
+border: 1px solid var(--border-color);
+background: transparent;
+color: var(--text-primary);
+font-size: 0.75rem;
+font-weight: 600;
+cursor: pointer;
+transition: all var(--transition-fast);
+white-space: nowrap;
+}
+
+.btn-folder-action:hover:not(:disabled) {
+background: rgba(255, 255, 255, 0.05);
+border-color: var(--text-secondary);
+}
+
+.btn-folder-action:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+}
+
+.btn-folder-action.primary {
+border-color: var(--accent-primary);
+color: var(--accent-primary);
+}
+
+.btn-folder-action.primary:hover:not(:disabled) {
+background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+
+.btn-folder-action.danger {
+color: var(--error-color, #e25c5c);
+}
+
+.btn-folder-action.danger:hover:not(:disabled) {
+background: color-mix(in srgb, var(--error-color, #e25c5c) 12%, transparent);
+border-color: var(--error-color, #e25c5c);
+}
