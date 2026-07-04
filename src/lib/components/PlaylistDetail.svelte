@@ -959,9 +959,6 @@
         }
 
         .playlist-tracks {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
     }
 </style>

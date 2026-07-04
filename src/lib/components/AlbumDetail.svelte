@@ -212,7 +212,9 @@
             y: e.clientY,
             items: [
                 {
-                    label: pinned ? $_('contextMenu.unpinFromTop') : $_('contextMenu.pinToTop'),
+                    label: pinned
+                        ? $_("contextMenu.unpinFromTop")
+                        : $_("contextMenu.pinToTop"),
                     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2L4.5 9L9 9L9 22L15 22L15 9L19.5 9L12 2Z"/></svg>`,
                     action: () => {
                         if (pinned) {
@@ -224,10 +226,10 @@
                 },
                 { type: "separator" },
                 {
-                    label: $_('contextMenu.changeArtwork'),
+                    label: $_("contextMenu.changeArtwork"),
                     submenu: [
                         {
-                            label: $_('contextMenu.fromFile'),
+                            label: $_("contextMenu.fromFile"),
                             action: () => {
                                 const input = document.createElement("input");
                                 input.type = "file";
@@ -257,7 +259,7 @@
                             },
                         },
                         {
-                            label: $_('contextMenu.fromUrl'),
+                            label: $_("contextMenu.fromUrl"),
                             action: async () => {
                                 const url = await prompt("Enter image URL:", {
                                     title: "Change Artwork",
@@ -313,7 +315,7 @@
     {#if loading}
         <div class="loading">
             <div class="spinner"></div>
-            <span>{$_('album.loading')}</span>
+            <span>{$_("album.loading")}</span>
         </div>
     {:else if album && shouldShowAlbum}
         <header
@@ -360,7 +362,7 @@
                 {/if}
             </div>
             <div class="album-info">
-                <span class="album-type">{$_('album.type')}</span>
+                <span class="album-type">{$_("album.type")}</span>
                 <h1 class="album-title">{album.name}</h1>
                 <div class="album-meta">
                     <button
@@ -376,7 +378,11 @@
                         {album.artist || "Unknown Artist"}
                     </button>
                     <span class="separator">•</span>
-                    <span>{$_('album.songs', { values: { count: tracks.length } })}</span>
+                    <span
+                        >{$_("album.songs", {
+                            values: { count: tracks.length },
+                        })}</span
+                    >
                     <span class="separator">•</span>
                     <span>{formatDuration(totalDuration)}</span>
                 </div>
@@ -393,7 +399,7 @@
                         >
                             <path d="M8 5v14l11-7z" />
                         </svg>
-                        {$_('album.play')}
+                        {$_("album.play")}
                     </button>
 
                     {#if hasDownloadable}
@@ -419,7 +425,7 @@
                                         d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
                                     />
                                 </svg>
-                                <span>{$_('album.downloaded')}</span>
+                                <span>{$_("album.downloaded")}</span>
                             {:else}
                                 <svg
                                     viewBox="0 0 24 24"
@@ -431,7 +437,7 @@
                                         d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
                                     />
                                 </svg>
-                                <span>{$_('album.download')}</span>
+                                <span>{$_("album.download")}</span>
                             {/if}
                         </button>
                     {/if}
@@ -443,7 +449,9 @@
         {#if mbReleaseLoading}
             <div class="mb-info-bar mb-info-loading">
                 <span class="mb-info-spinner"></span>
-                <span class="mb-info-hint">{$_('album.fetchingReleaseInfo')}</span>
+                <span class="mb-info-hint"
+                    >{$_("album.fetchingReleaseInfo")}</span
+                >
             </div>
         {:else if mbRelease && (mbRelease.year || mbRelease.label || mbRelease.country || mbRelease.release_type)}
             <div class="mb-info-bar">
@@ -474,7 +482,8 @@
                 {#if mbRelease.country}
                     <span class="mb-chip">{mbRelease.country}</span>
                 {/if}
-                <span class="mb-source-label">{$_('album.viaMusicBrainz')}</span>
+                <span class="mb-source-label">{$_("album.viaMusicBrainz")}</span
+                >
             </div>
         {/if}
 
@@ -495,7 +504,11 @@
                                     />
                                 </svg>
                             </span>
-                            <h3>{$_('album.disc', { values: { number: group.disc } })}</h3>
+                            <h3>
+                                {$_("album.disc", {
+                                    values: { number: group.disc },
+                                })}
+                            </h3>
                         </div>
                         <TrackList
                             tracks={group.tracks}
@@ -524,9 +537,9 @@
         </section>
     {:else}
         <div class="not-found">
-            <h2>{$_('album.notFound')}</h2>
+            <h2>{$_("album.notFound")}</h2>
             <button class="btn-secondary" on:click={goToAlbums}>
-                {$_('album.backToAlbums')}
+                {$_("album.backToAlbums")}
             </button>
         </div>
     {/if}
@@ -881,9 +894,6 @@
         }
 
         .track-list-section {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
     }
 </style>

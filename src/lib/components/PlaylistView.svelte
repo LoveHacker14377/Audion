@@ -559,9 +559,6 @@
 
     @media (max-width: 768px) {
         .playlist-view {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
 
         .rename-label {

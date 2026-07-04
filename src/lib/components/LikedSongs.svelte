@@ -384,9 +384,6 @@
         }
 
         .liked-body {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
     }
 </style>
