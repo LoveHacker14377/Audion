@@ -1348,10 +1348,10 @@
   .desktop-content {
     flex: 1;
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 3rem;
+    grid-template-columns: minmax(360px, 440px) 1fr;
+    gap: clamp(2.5rem, 5vw, 5rem);
     align-items: center;
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     width: 100%;
     height: 100%;
@@ -1362,12 +1362,12 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: center; /* Center the entire block in the left column */
+    align-items: center;
     max-height: 100%;
-    gap: clamp(1rem, 2vh, 1.75rem);
+    gap: clamp(1rem, 2.5vh, 2rem);
     padding-left: 24px;
     padding-top: 0.75rem;
-    width: 25rem;
+    width: 100%;
   }
 
   /* Each section in the left panel shares the same max-width for uniformity */
@@ -1375,17 +1375,14 @@
   .desktop-track-details,
   .desktop-playback-area {
     width: 100%;
-    max-width: 500px;
+    max-width: 440px;
   }
 
   .desktop-art-section {
-    width: 240px;
-    height: 240px;
     aspect-ratio: 1;
     position: relative;
     flex-shrink: 0;
     margin-bottom: 26px;
-    align-self: flex-start;
   }
 
   .desktop-art-wrapper {
@@ -1691,9 +1688,8 @@
     }
 
     .desktop-art-section {
-    width: 240px;
-    height: 240px;
-  }
+      max-width: 240px;
+    }
 
     .desktop-title {
       font-size: clamp(2rem, 3.8vh, 2.35rem);
@@ -1809,10 +1805,10 @@
 
   /* Lyrics Content Styling */
   .desktop-lyrics-container {
-    height: 450px;
+    height: 100%;
     width: 100%;
     overflow: hidden;
-    padding: 225px 3rem 225px 0;
+    padding: 35vh 3rem 35vh 0;
     scrollbar-width: none;
     will-change: transform;
     mask-image: linear-gradient(
@@ -1868,7 +1864,7 @@
   }
 
   .desktop-lyric-line {
-    font-size: 22px;
+    font-size: clamp(20px, 2.2vh, 32px);
     font-weight: 800;
     color: rgba(255, 255, 255, 0.15);
     padding: 0.7rem 0;
@@ -1917,7 +1913,7 @@
 
   .desktop-lyric-line.active {
     color: #fff;
-    font-size: 24px;
+    font-size: clamp(22px, 2.5vh, 36px);
     transform: scale(1.04);
     margin: 0;
     text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);

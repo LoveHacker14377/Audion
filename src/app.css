@@ -459,8 +459,9 @@ a:hover {
 /* Ultrawide constraint — max readable line length */
 @media (min-width: 1920px) {
   .main-view .view-content {
-    max-width: 1400px;
-    margin: 0 auto;
+    max-width: 100%;
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 }
 

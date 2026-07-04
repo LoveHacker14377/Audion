@@ -193,11 +193,12 @@
         if (!containerElement) return;
 
         const update = () => {
-            containerHeight = containerElement.clientHeight;
+            if (!containerElement) return;
+            containerHeight = Math.max(0, containerElement.clientHeight);
             const style = window.getComputedStyle(containerElement);
-            const paddingLeft = parseFloat(style.paddingLeft) || 0;
-            const paddingRight = parseFloat(style.paddingRight) || 0;
-            containerWidth = containerElement.clientWidth - paddingLeft - paddingRight;
+            const paddingLeft = style ? parseFloat(style.paddingLeft) || 0 : 0;
+            const paddingRight = style ? parseFloat(style.paddingRight) || 0 : 0;
+            containerWidth = Math.max(0, containerElement.clientWidth - paddingLeft - paddingRight);
         };
         update();
 

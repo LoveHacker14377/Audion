@@ -67,6 +67,7 @@
   let scrollTop = 0;
   let scrollbarWidth = 0;
   let containerElement: HTMLDivElement;
+  let resizeObserver: ResizeObserver | undefined;
 
   // Cache structures
   let failedImages = new Set<string>();
@@ -308,6 +309,7 @@
 
     if (containerElement) {
       const updateHeight = () => {
+        if (!containerElement) return;
         containerHeight = containerElement.clientHeight;
         scrollbarWidth = Math.max(
           0,
@@ -323,10 +325,12 @@
         }
       }
 
-      window.addEventListener("resize", updateHeight);
-      return () => {
-        window.removeEventListener("resize", updateHeight);
-      };
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(updateHeight);
+        resizeObserver.observe(containerElement);
+      } else {
+        window.addEventListener("resize", updateHeight);
+      }
     }
   });
 
@@ -340,6 +344,9 @@
     trackAlbumArtCache.clear();
     albumMap.clear();
     availabilityCache.clear();
+
+    resizeObserver?.disconnect();
+    resizeObserver = undefined;
 
     if (cleanupInterval) {
       clearInterval(cleanupInterval);
