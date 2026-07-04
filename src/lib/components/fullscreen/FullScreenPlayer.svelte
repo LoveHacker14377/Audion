@@ -1612,16 +1612,40 @@
 
   .mobile-view .progress-bar {
     flex: 1;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    height: 28px; /* tall touch hit area */
+    background: transparent;
     border-radius: 2px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .mobile-view .progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: visible; /* don't clip thumb */
     position: relative;
   }
 
   .mobile-view .progress-fill {
     height: 100%;
-    background: #fff;
+    background: var(--accent-primary);
     border-radius: 2px;
+  }
+
+  .mobile-view .progress-thumb {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transform: translateX(-50%) scale(1);
+    top: 50%;
+    margin-top: -7px;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .mobile-view .time {
