@@ -98,7 +98,7 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         }
     };
 
-    let path = url.path().trim_start_matches('/');
+    let path = url.path().trim_matches('/');
     if path == "install-plugin" || path == "plugin/install" {
         let mut repo_url = None;
         for (key, value) in url.query_pairs() {
