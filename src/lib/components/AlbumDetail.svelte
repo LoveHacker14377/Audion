@@ -14,7 +14,7 @@
     import { playTracks, currentTrack, isPlaying } from "$lib/stores/player";
     import { goToAlbums, goToArtistDetail } from "$lib/stores/view";
     import { loadLibrary, getAlbumCoverFromTracks } from "$lib/stores/library";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import {
         downloadTracks,
         hasDownloadableTracks,

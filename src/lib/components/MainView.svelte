@@ -25,7 +25,7 @@
     import DesktopHome from "./DesktopHome.svelte";
     import LikedSongs from "./LikedSongs.svelte";
 
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import AlbumGrid from "./AlbumGrid.svelte";
     import AlbumDetail from "./AlbumDetail.svelte";
     import ArtistGrid from "./ArtistGrid.svelte";

@@ -27,8 +27,8 @@
     loadMoreTracks,
   } from "$lib/stores/library";
   import { pluginStore } from "$lib/stores/plugin-store";
-  import { goToAlbumDetail, goToArtistDetail } from "$lib/stores/view";
   import {
+
     canDownload,
     downloadTrack,
     needsDownloadLocation,
@@ -44,6 +44,8 @@
   import MetadataModal from "$lib/components/MetadataModal.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
   import { _, locale } from "svelte-i18n";
+  import TrackListHeader from "./TrackListHeader.svelte";
+  import TrackListRow from "./TrackListRow.svelte";
 
   // MetadataModal state
   let metadataModalTrack: Track | null = null;
@@ -887,46 +889,7 @@
     swipeDeltaX = 0;
   }
 
-  // Helper to handle album click from event delegation
-  function handleAlbumClick(e: MouseEvent) {
-    const albumButton = (e.target as HTMLElement).closest(".col-album-cell");
-    if (!albumButton) return;
 
-    e.stopPropagation();
-
-    const row = albumButton.closest(".track-row");
-    if (!row) return;
-
-    const trackId = parseInt(row.getAttribute("data-track-id") || "0");
-    const trackIndex = trackIndexMap.get(trackId);
-
-    if (trackIndex === undefined) return;
-
-    const track = sortedTracks[trackIndex];
-    if (track && track.album_id) {
-      goToAlbumDetail(track.album_id);
-    }
-  }
-
-  function handleArtistClick(e: MouseEvent) {
-    const artistButton = (e.target as HTMLElement).closest(".track-artist");
-    if (!artistButton) return;
-
-    e.stopPropagation();
-
-    const row = artistButton.closest(".track-row");
-    if (!row) return;
-
-    const trackId = parseInt(row.getAttribute("data-track-id") || "0");
-    const trackIndex = trackIndexMap.get(trackId);
-
-    if (trackIndex === undefined) return;
-
-    const track = sortedTracks[trackIndex];
-    if (track && track.artist) {
-      goToArtistDetail(track.artist);
-    }
-  }
 
   function formatDateAdded(dateAdded?: string | null): string {
     if (!dateAdded) return "Unknown";
@@ -980,79 +943,16 @@
   {/if}
 
   <!-- Header stays fixed -->
-  <header
-    class="list-header"
-    class:no-album={!showAlbum}
-    class:with-drag={playlistId !== null}
-    class:multiselect={multiSelectMode}
-    style={`--scrollbar-width: ${scrollbarWidth}px`}
-  >
-    {#if multiSelectMode}
-      <div class="col-header col-checkbox">
-        <input
-          type="checkbox"
-          on:change={(e) => {
-            if (e.currentTarget.checked) {
-              multiSelect.selectAll(sortedTracks.map((t) => t.id));
-            } else {
-              multiSelect.clearSelections();
-            }
-          }}
-          checked={$multiSelect.selectedTrackIds.size > 0 &&
-            $multiSelect.selectedTrackIds.size === sortedTracks.length}
-          indeterminate={$multiSelect.selectedTrackIds.size > 0 &&
-            $multiSelect.selectedTrackIds.size < sortedTracks.length}
-        />
-      </div>
-    {/if}
-    {#if playlistId !== null && !multiSelectMode}
-      <span class="col-header col-drag"></span>
-    {/if}
-    <button class="col-header col-num sortable" on:click={() => toggleSort("track_number")}>
-      #
-      {#if sortField === "track_number"}
-        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
-      {/if}
-    </button>
-    <button
-      class="col-header col-artist sortable"
-      on:click={() => toggleSort("title")}
-    >
-      {$_('trackList.title')}
-      {#if sortField === "title"}
-        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
-      {/if}
-    </button>
-    {#if showAlbum}
-      <button
-        class="col-header col-album sortable"
-        on:click={() => toggleSort("album")}
-      >
-        {$_('trackList.album')}
-        {#if sortField === "album"}
-          <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
-        {/if}
-      </button>
-    {/if}
-    <button
-      class="col-header col-duration sortable"
-      on:click={() => toggleSort("duration")}
-    >
-      {$_('trackList.duration')}
-      {#if sortField === "duration"}
-        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
-      {/if}
-    </button>
-    <button
-      class="col-header col-date-added sortable"
-      on:click={() => toggleSort("date_added")}
-    >
-      {$_('trackList.dateAdded')}
-      {#if sortField === "date_added"}
-        <span class="sort-icon">{sortDirection === "asc" ? "▲" : "▼"}</span>
-      {/if}
-    </button>
-  </header>
+  <TrackListHeader
+    {multiSelectMode}
+    {showAlbum}
+    {playlistId}
+    {scrollbarWidth}
+    {sortedTracks}
+    {sortField}
+    {sortDirection}
+    {toggleSort}
+  />
 
   <!-- Virtualized scrolling container -->
   {#if sortedTracks.length > 0}
@@ -1085,232 +985,24 @@
           {#each visibleTracksWithMetadata as { track, albumArt, unavailable }, index (track.id)}
             {@const actualIndex = virtualScrollState.startIndex + index}
             {@const isSelected = $multiSelect.selectedTrackIds.has(track.id)}
-            <div
-              class="track-row"
-              class:playing={playingTrackId === track.id}
-              class:unavailable
-              class:dragging={draggedIndex === actualIndex}
-              class:drag-over={dragOverIndex === actualIndex}
-              class:selected={multiSelectMode && isSelected}
-              data-track-id={track.id}
-              data-track-index={actualIndex}
-              role="button"
-              tabindex="0"
-            >
-              {#if multiSelectMode}
-                <div
-                  class="col-checkbox"
-                  on:click|stopPropagation={() =>
-                    multiSelect.toggleTrack(track.id)}
-                  role="checkbox"
-                  aria-checked={isSelected}
-                  tabindex="0"
-                >
-                  <div class="custom-checkbox" class:checked={isSelected}>
-                    {#if isSelected}
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="14"
-                        height="14"
-                      >
-                        <path
-                          d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                        />
-                      </svg>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-              {#if playlistId !== null && !multiSelectMode}
-                <div
-                  class="drag-handle"
-                  on:pointerdown={(e) => handlePointerDown(e, actualIndex)}
-                  on:click|stopPropagation
-                  on:dblclick|stopPropagation
-                  title="Drag to reorder"
-                  role="button"
-                  tabindex="-1"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="16"
-                    height="16"
-                  >
-                    <path
-                      d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"
-                    />
-                  </svg>
-                </div>
-              {/if}
-              <span class="col-num">
-                {#if playingTrackId === track.id && $isPlaying}
-                  <svg
-                    class="playing-icon"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="14"
-                    height="14"
-                  >
-                    <path
-                      d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                    />
-                  </svg>
-                  <span class="equalizer-bars">
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                  </span>
-                {:else}
-                  <span class="track-index">{actualIndex + 1}</span>
-                  <span class="hover-play" aria-hidden="true">▶</span>
-                {/if}
-              </span>
-
-              {#if $isMobile}
-                <span class="col-cover">
-                  <div class="cover-wrapper">
-                    {#if albumArt && !failedImages.has(albumArt)}
-                      <img
-                        src={albumArt}
-                        alt="Album cover"
-                        class="cover-image"
-                        loading="lazy"
-                        decoding="async"
-                        on:error={() => handleImageError(albumArt)}
-                      />
-                    {:else}
-                      <div class="cover-placeholder">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          width="16"
-                          height="16"
-                        >
-                          <path
-                            d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                          />
-                        </svg>
-                      </div>
-                    {/if}
-                    <div class="cover-play-overlay">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="18"
-                        height="18"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                </span>
-                <div class="col-title">
-                  <div class="title-row">
-                    <span class="track-name truncate"
-                      >{track.title || "Unknown Title"}</span
-                    >
-
-                    {#if !track.source_type || track.source_type === "local" || track.local_src}
-                      <span class="downloaded-icon" title="Downloaded">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          width="14"
-                          height="14"
-                        >
-                          <path
-                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
-                          />
-                        </svg>
-                      </span>
-                    {/if}
-
-                    {#if track.format}
-                      {@const formatUpper = track.format.toUpperCase()}
-                      {@const displayFormat =
-                        formatUpper.includes("HI_RES") ||
-                        formatUpper.includes("HIRES")
-                          ? "HI-RES"
-                          : formatUpper.includes("LOSSLESS")
-                            ? "LOSSLESS"
-                            : formatUpper.replace("MPEG", "MP3")}
-                      <span
-                        class="quality-tag"
-                        class:high-quality={formatUpper.includes("FLAC") ||
-                          formatUpper.includes("WAV") ||
-                          formatUpper.includes("HI_RES") ||
-                          formatUpper.includes("HIRES") ||
-                          (track.bitrate && track.bitrate >= 320)}
-                      >
-                        {displayFormat}
-                      </span>
-                    {/if}
-                  </div>
-                  <button
-                    class="track-artist truncate"
-                    on:click={handleArtistClick}
-                    >{track.artist || "Unknown Artist"}</button
-                  >
-                </div>
-              {:else}
-                <div class="col-artist">
-                  <span class="artist-thumb">
-                    {#if albumArt && !failedImages.has(albumArt)}
-                      <img
-                        src={albumArt}
-                        alt="Album cover"
-                        class="cover-image-small"
-                        loading="lazy"
-                        decoding="async"
-                        on:error={() => handleImageError(albumArt)}
-                      />
-                    {:else}
-                      <span class="cover-placeholder-small">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          width="12"
-                          height="12"
-                        >
-                          <path
-                            d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                          />
-                        </svg>
-                      </span>
-                    {/if}
-                  </span>
-                  <div class="artist-meta">
-                    <span class="track-name truncate"
-                      >{track.title || "Unknown Title"}</span
-                    >
-                    <button class="track-artist truncate" on:click={handleArtistClick}
-                      >{track.artist || "Unknown Artist"}</button
-                    >
-                    {#if showAdvancedMetadata}
-                      <span class="media-metadata truncate">
-                        {track.format ? track.format.toUpperCase() : "Unknown format"}
-                        {#if track.bitrate} • {track.bitrate} kbps{/if}
-                        {#if track.source_type} • {track.source_type}{/if}
-                      </span>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-              {#if showAlbum}
-                <button
-                  class="col-album-cell truncate"
-                  on:click={handleAlbumClick}
-                  disabled={!track.album_id}>{track.album || "-"}</button
-                >
-              {/if}
-              <span class="col-duration">{formatDuration(track.duration)}</span>
-              {#if !$isMobile}
-                <span class="col-date-added">{formatDateAdded(track.date_added)}</span>
-              {/if}
-            </div>
+            <TrackListRow
+              {track}
+              {albumArt}
+              {unavailable}
+              {actualIndex}
+              {isSelected}
+              {showAlbum}
+              {playlistId}
+              {multiSelectMode}
+              {playingTrackId}
+              isPlaying={$isPlaying}
+              {failedImages}
+              {showAdvancedMetadata}
+              isDragging={draggedIndex === actualIndex}
+              isDragOver={dragOverIndex === actualIndex}
+              onPointerDown={handlePointerDown}
+              onImageError={handleImageError}
+            />
           {/each}
         </div>
       </div>

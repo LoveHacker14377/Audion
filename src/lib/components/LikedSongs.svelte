@@ -2,7 +2,7 @@
     import { getLikedTracks, type Track } from "$lib/api/tauri";
     import { likedTrackIds } from "$lib/stores/liked";
     import { playTracks, shuffle } from "$lib/stores/player";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
 
     let tracks: Track[] = [];
     let loading = true;

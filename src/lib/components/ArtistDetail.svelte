@@ -19,7 +19,7 @@
         goToArtistDetail,
     } from "$lib/stores/view";
     import AlbumGrid from "./AlbumGrid.svelte";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import MediaCard from "./MediaCard.svelte";
     import {
         downloadTracks,
