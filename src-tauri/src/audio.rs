@@ -98,6 +98,8 @@ use symphonia::core::formats::probe::{Hint, ProbeOptions};
 use rubato::{Fft, FixedSync, Indexing, Resampler};
 use rubato::audioadapter_buffers::direct::SequentialSliceOfVecs;
 
+
+
 // =============================================================================
 // EQ TYPES  (serialisable — matches equalizer.ts / native-audio.ts)
 // =============================================================================
@@ -445,7 +447,106 @@ impl<S: Source<Item = f32>> Source for PausableQueue<S> {
 }
 
 // =============================================================================
-// EqSource — wraps PausableQueue, applies EQ in the audio callback
+// CrossfadeState — owned crossfade buffer, lives exclusively on the audio thread
+// while a crossfade is active.
+// =============================================================================
+
+struct CrossfadeState {
+    buffer: Vec<f32>,
+    pos: usize,
+    total_samples: usize,
+}
+
+// =============================================================================
+// CrossfadeSource — wraps inner Source, mixes with crossfade buffer when active
+//
+// Design: zero-lock hot path.
+//   - `active`  (AtomicBool, Release/Acquire) signals the audio thread that a
+//     new crossfade state has been placed into `pending`.
+//   - `pending` (Mutex) is locked at most ONCE per crossfade: the audio thread
+//     takes ownership of the state on the first `next()` call after `active`
+//     becomes true, then never touches the mutex again until the next crossfade.
+//   - `local`   (Option<CrossfadeState>, audio-thread exclusive) drives the
+//     actual per-sample computation with no synchronization cost.
+//
+// The command thread writes to `pending` then sets `active = true` (Release).
+// clear_crossfade() sets `active = false` and clears `pending` (both from the
+// command thread, safe because the audio thread only reads `local` while active).
+// =============================================================================
+
+struct CrossfadeSource<S: Source<Item = f32>> {
+    inner: S,
+    /// Set by the command thread after writing to `pending`. Checked inline.
+    active: Arc<AtomicBool>,
+    /// Written by command thread, consumed once by audio thread.
+    pending: Arc<Mutex<Option<CrossfadeState>>>,
+    /// Owned by the audio thread during an active crossfade. No sharing.
+    local: Option<CrossfadeState>,
+}
+
+impl<S: Source<Item = f32>> CrossfadeSource<S> {
+    fn new(
+        inner: S,
+        active: Arc<AtomicBool>,
+        pending: Arc<Mutex<Option<CrossfadeState>>>,
+    ) -> Self {
+        Self { inner, active, pending, local: None }
+    }
+}
+
+impl<S: Source<Item = f32>> Iterator for CrossfadeSource<S> {
+    type Item = f32;
+
+    #[inline]
+    fn next(&mut self) -> Option<f32> {
+        let sample = self.inner.next()?;
+
+        // Fast path: no crossfade active — zero locking, zero branching overhead.
+        if !self.active.load(Ordering::Acquire) {
+            return Some(sample);
+        }
+
+        // First sample after activation: extract state from shared pending (lock once).
+        if self.local.is_none() {
+            self.local = self.pending.lock().unwrap().take();
+        }
+
+        if let Some(ref mut cf) = self.local {
+            if cf.pos < cf.total_samples {
+                let progress = cf.pos as f32 / cf.total_samples as f32;
+                // Equal-power cosine crossfade
+                let fade_out = (progress * PI * 0.5).cos(); // 1 → 0
+                let fade_in  = (progress * PI * 0.5).sin(); // 0 → 1
+                let next_sample = cf.buffer[cf.pos];
+                cf.pos += 1;
+                return Some((sample * fade_out + next_sample * fade_in).clamp(-1.0, 1.0));
+            }
+            // Buffer exhausted — crossfade complete, revert to pass-through.
+            self.local = None;
+            self.active.store(false, Ordering::Relaxed);
+        }
+
+        Some(sample)
+    }
+}
+
+impl<S: Source<Item = f32>> Source for CrossfadeSource<S> {
+    fn current_span_len(&self) -> Option<usize> {
+        self.inner.current_span_len()
+    }
+    fn channels(&self) -> NonZero<u16> {
+        self.inner.channels()
+    }
+    fn sample_rate(&self) -> NonZero<u32> {
+        self.inner.sample_rate()
+    }
+    fn total_duration(&self) -> Option<Duration> {
+        None
+    }
+}
+
+// =============================================================================
+// EqSource — wraps inner Source (now CrossfadeSource), applies EQ in the audio callback
 // =============================================================================
 
 struct EqSource<S: Source<Item = f32>> {
@@ -1622,6 +1723,17 @@ struct AudioEngine {
     next_duration: Option<Option<Duration>>,
     next_generation: u64,
 
+    // ── crossfade state ─────────────────────────────────────────────────────
+    // `cf_active` and `cf_pending` are the two halves of the lock-free crossfade
+    // handshake (see CrossfadeSource for the full protocol).
+    cf_active: Arc<AtomicBool>,
+    cf_pending: Arc<Mutex<Option<CrossfadeState>>>,
+    // user-configured crossfade duration in seconds (0 = off)
+    crossfade_seconds: u32,
+    // pre-decoded head of the next track, set by preload result arm,
+    // consumed by trigger_crossfade()
+    next_preload_buffer: Option<Vec<f32>>,
+
     // worker thread for off-thread open_and_append
     // single persistent thread receives OpenTask, does all blocking I/O and FFT construction, then sends back an OpenResult
     // two separate abort flags with asymmetric cancellation rules:
@@ -1642,6 +1754,11 @@ struct AudioEngine {
     // set when TrackFinished fires while the preload worker is still in flight
     // open_result arm emits TrackAdvanced once the source is actually ready
     pending_track_advanced: bool,
+    // Some(generation) when trigger_crossfade was called before the preload
+    // worker finished; open_result arm applies the mix once the buffer arrives,
+    // but only if the arriving result's generation matches — prevents a stale
+    // preload for a different track from triggering the wrong crossfade.
+    pending_crossfade_gen: Option<u64>,
 
     _stream: rodio::MixerDeviceSink,
 }
@@ -1781,6 +1898,7 @@ impl AudioEngine {
                                 },
                                 duration: None,
                                 source: Err(e),
+                                preload_buffer: None,
                             });
                             continue;
                         }
@@ -1797,8 +1915,14 @@ impl AudioEngine {
                     }
 
                     // ── FFT resampler (expensive) ─────────────────────────────
+                    let src_rate = src.sample_rate();
+                    let needs_resample = src_rate != task.device_sample_rate;
                     let duration = src.duration;
-                    let needs_resample = src.sample_rate() != task.device_sample_rate;
+
+                    // checkpoint: abort before the expensive FFT construction
+                    if task.abort.load(Ordering::Relaxed) {
+                        continue;
+                    }
 
                     let ready = if needs_resample {
                         RubatoResampler::new(src, task.device_sample_rate)
@@ -1807,12 +1931,57 @@ impl AudioEngine {
                         Ok(ReadySource::Raw(src))
                     };
 
+                    // ── crossfade pre-decode ──────────────────────────────────
+                    // Pre-decode the first crossfade_seconds worth of samples
+                    // from the already-resampled ReadySource so the buffer is
+                    // always at device_rate — matching what CrossfadeSource sees.
+                    let (preload_buffer, ready) = if task.crossfade_seconds > 0 && task.is_preload {
+                        match ready {
+                            Err(e) => {
+                                // propagate error
+                                let _ = open_result_tx.send(OpenResult {
+                                    generation: task.generation,
+                                    seek_tx: task.seek_tx,
+                                    repeat_one_tx: task.repeat_one_tx,
+                                    duration,
+                                    source: Err(e),
+                                    preload_buffer: None,
+                                });
+                                continue;
+                            }
+                            Ok(mut ready_src) => {
+                                let ch = ready_src.channels().get() as usize;
+                                let samples_needed = (task.crossfade_seconds as u64
+                                    * task.device_sample_rate.get() as u64) as usize
+                                    * ch;
+                                let mut buf = Vec::with_capacity(samples_needed);
+                                for _ in 0..samples_needed {
+                                    match ready_src.next() {
+                                        Some(s) => buf.push(s),
+                                        None => break,
+                                    }
+                                }
+
+                                    tracing::info!(
+                                        "[AUDIO] Pre-decoded {} samples at device rate (crossfade seconds: {})",
+                                        buf.len(),
+                                        task.crossfade_seconds
+                                    );
+                                let preload = if buf.is_empty() { None } else { Some(buf) };
+                                (preload, Ok(ready_src))
+                            }
+                        }
+                    } else {
+                        (None, ready)
+                    };
+
                     let _ = open_result_tx.send(OpenResult {
                         generation: task.generation,
                         seek_tx: task.seek_tx,
                         repeat_one_tx: task.repeat_one_tx,
                         duration,
                         source: ready,
+                        preload_buffer,
                     });
                 }
             });
@@ -1823,7 +1992,10 @@ impl AudioEngine {
             paused: Arc::clone(&paused_flag),
             frame_pos: 0,
         };
-        let eq_src = EqSource::new(pq, eq_settings, eq_rx);
+        let cf_active = Arc::new(AtomicBool::new(false));
+        let cf_pending: Arc<Mutex<Option<CrossfadeState>>> = Arc::new(Mutex::new(None));
+        let cf_src = CrossfadeSource::new(pq, Arc::clone(&cf_active), Arc::clone(&cf_pending));
+        let eq_src = EqSource::new(cf_src, eq_settings, eq_rx);
 
         stream.mixer().add(eq_src);
 
@@ -1850,6 +2022,10 @@ impl AudioEngine {
                 next_path: None,
                 next_duration: None,
                 next_generation: 0,
+                cf_active,
+                cf_pending,
+                crossfade_seconds: 0,
+                next_preload_buffer: None,
                 worker_tx,
                 play_abort: Arc::new(AtomicBool::new(false)),
                 preload_abort: Arc::new(AtomicBool::new(false)),
@@ -1857,6 +2033,7 @@ impl AudioEngine {
                 pending_seek_fraction: None,
                 pending_paused: false,
                 pending_track_advanced: false,
+                pending_crossfade_gen: None,
                 _stream: stream,
             },
             event_rx,
@@ -1875,6 +2052,8 @@ impl AudioEngine {
         replay_gain_db: Option<f32>,
         abort_flag: Arc<AtomicBool>,
         initial_seek: Option<Duration>,
+        is_preload: bool,
+        crossfade_seconds: u32,
     ) -> u64 {
         self.generation_counter += 1;
         let generation = self.generation_counter;
@@ -1898,6 +2077,8 @@ impl AudioEngine {
             seek_tx,
             repeat_one_tx,
             initial_seek,
+            crossfade_seconds,
+            is_preload,
         });
 
         generation
@@ -1917,6 +2098,9 @@ impl AudioEngine {
     // dispatches the open to the worker and returns immediately
     // when the worker result arrives (select! open_result arm), the source is appended and engine state is updated
     fn play(&mut self, path: &str, replay_gain_db: Option<f32>) {
+        // Abort any active crossfade immediately
+        self.clear_crossfade();
+
         // Clear all pending sources from the queue instantly.
         self.queue_input.clear();
 
@@ -1959,14 +2143,14 @@ impl AudioEngine {
         let new_play_abort = Arc::new(AtomicBool::new(false));
         self.play_abort = Arc::clone(&new_play_abort);
 
-        let generation = self.dispatch_open(path, replay_gain_db, new_play_abort, None);
+        let generation = self.dispatch_open(path, replay_gain_db, new_play_abort, None, false, 0);
         self.current_generation = generation;
 
         tracing::info!("[AUDIO] Play dispatched (gen {}): {}", generation, path);
     }
 
     // ── preload ───────────────────────────────────────────────────────────────
-    fn preload(&mut self, path: &str, replay_gain_db: Option<f32>) -> Result<(), String> {
+    fn preload(&mut self, path: &str, replay_gain_db: Option<f32>, crossfade_seconds: u32) -> Result<(), String> {
         if self.next_path.as_deref() == Some(path) {
             tracing::info!("[AUDIO] Preload skipped (same path): {}", path);
             return Ok(());
@@ -1998,7 +2182,7 @@ impl AudioEngine {
         // we tag it with a negative sentinel by storing the path now so the result arm knows this was a preload, not a play
         self.next_path = Some(path.to_string());
         self.next_duration = None;
-        let generation = self.dispatch_open(path, replay_gain_db, new_preload_abort, None);
+        let generation = self.dispatch_open(path, replay_gain_db, new_preload_abort, None, true, crossfade_seconds);
         self.next_generation = generation;
         tracing::debug!("[AUDIO] Preload dispatched (gen {}): {}", generation, path);
         Ok(())
@@ -2006,6 +2190,7 @@ impl AudioEngine {
 
     // ── seek ─────────────────────────────────────────────────────────────────
     fn seek(&mut self, position_fraction: f64) -> Result<(), String> {
+        self.clear_crossfade();
         let info = self.current_info.as_mut().ok_or("No track loaded")?;
 
         // worker hasn't finished yet means no seek_tx and no duration
@@ -2046,6 +2231,7 @@ impl AudioEngine {
     }
 
     fn stop(&mut self) {
+        self.clear_crossfade();
         self.queue_input.clear();
         if let Some(ref tx) = self.seek_tx {
             let _ = tx.send(Duration::MAX);
@@ -2178,7 +2364,7 @@ impl AudioEngine {
             new_engine.play_abort = Arc::clone(&abort);
             new_engine.preload_abort = Arc::clone(&abort);
 
-            let generation = new_engine.dispatch_open(&path, None, abort, Some(position));
+            let generation = new_engine.dispatch_open(&path, None, abort, Some(position), false, 0);
             new_engine.current_generation = generation;
 
             // re-pause on the new engine once the source is appended
@@ -2211,6 +2397,112 @@ impl AudioEngine {
         if let Some(ref tx) = self.repeat_one_tx {
             let _ = tx.send(enabled);
         }
+    }
+
+    // ── set crossfade seconds ────────────────────────────────────────────────
+    fn set_crossfade_seconds(&mut self, secs: u32) {
+        self.crossfade_seconds = secs;
+        tracing::info!("[AUDIO] Crossfade set to {}s", secs);
+    }
+
+    // ── trigger crossfade ────────────────────────────────────────────────────
+    // Called by the frontend when the current track is within crossfadeSeconds
+    // of its end. Swaps preloaded state, sets the crossfade mixing buffer, and
+    // emits TrackAdvanced so the UI updates immediately.
+    fn trigger_crossfade(&mut self) {
+        let preload_buf = match self.next_preload_buffer.take() {
+            Some(buf) if !buf.is_empty() => buf,
+            _ => {
+
+                tracing::warn!("[AUDIO] trigger_crossfade: buffer not ready, waiting for preload result (gen {})", self.next_generation);
+                // Preload worker still in flight — tag the pending crossfade with
+                // the expected next_generation so the open_result arm only fires
+                // it when the correct preload result arrives.
+                self.pending_crossfade_gen = Some(self.next_generation);
+                return;
+            }
+        };
+
+        let total = preload_buf.len();
+
+        tracing::info!(
+            "[AUDIO] trigger_crossfade: starting crossfade mixing with {} samples ({:.1}s)",
+            total,
+            total as f64 / (self.device_sample_rate.get() as f64 * self.device_channels.get() as f64)
+        );
+        let path = self.next_path.take().unwrap_or_default();
+        let duration = self.next_duration.take().flatten();
+
+        // Arm the lock-free crossfade: write state into pending then set active.
+        // CrossfadeSource picks it up on the next audio callback without a lock.
+        *self.cf_pending.lock().unwrap() = Some(CrossfadeState {
+            buffer: preload_buf,
+            pos: 0,
+            total_samples: total,
+        });
+        self.cf_active.store(true, Ordering::Release);
+
+        // Swap preloaded source into current position (like gapless handoff)
+        self.seek_tx = self.next_seek_tx.take();
+        self.repeat_one_tx = self.next_repeat_one_tx.take();
+        self.current_generation = self.next_generation;
+        self.current_info = Some(TrackInfo {
+            path: path.clone(),
+            duration,
+            started: Instant::now(),
+            offset: Duration::ZERO,
+        });
+        self.next_seek_tx = None;
+        self.next_repeat_one_tx = None;
+        self.next_duration = None;
+        self.next_generation = 0;
+
+        // Notify frontend that the next track is now active
+        let _ = self.event_tx.try_send(AudioEvent::TrackAdvanced {
+            generation: self.current_generation,
+            new_path: path,
+            duration,
+        });
+
+        tracing::info!(
+            "[AUDIO] Crossfade triggered: {} samples ({:.1}s)",
+            total,
+            total as f64 / (self.device_sample_rate.get() as f64 * self.device_channels.get() as f64)
+        );
+    }
+
+    // ── gapless handoff (no crossfade) ───────────────────────────────────────
+    // Shared logic used by trigger_crossfade when no buffer is available,
+    // and by the TrackFinished handler when the preloaded source is ready.
+    fn perform_gapless_handoff(&mut self) {
+        self.seek_tx = self.next_seek_tx.take();
+        self.repeat_one_tx = self.next_repeat_one_tx.take();
+        self.current_generation = self.next_generation;
+        let duration = self.next_duration.take().flatten();
+        let path = self.next_path.take().unwrap_or_default();
+        self.current_info = Some(TrackInfo {
+            path: path.clone(),
+            duration,
+            started: Instant::now(),
+            offset: Duration::ZERO,
+        });
+        let _ = self.event_tx.try_send(AudioEvent::TrackAdvanced {
+            generation: self.current_generation,
+            new_path: path,
+            duration,
+        });
+    }
+
+    // ── clear crossfade state ────────────────────────────────────────────────
+    // called by play(), stop(), seek() to abort any active crossfade
+    fn clear_crossfade(&mut self) {
+        // Disarm the audio thread first: store false so CrossfadeSource stops
+        // mixing immediately. Then clear the shared pending buffer so the audio
+        // thread cannot pick it up even if it races between the two stores.
+        self.cf_active.store(false, Ordering::Relaxed);
+        *self.cf_pending.lock().unwrap() = None;
+        self.next_preload_buffer = None;
+        self.pending_crossfade_gen = None;
     }
 
 }
@@ -2256,12 +2548,60 @@ struct OpenTask {
     // before it is ever appended to the queue => used for device switches so audio
     // resumes from the exact position with zero frames decoded from position 0
     initial_seek: Option<Duration>,
+    // crossfade duration in seconds (0 = off). worker pre-decodes this many
+    // seconds of the source into a buffer when it's a preload task.
+    crossfade_seconds: u32,
+    // true when this is a preload task (not a play task). used to skip
+    // crossfade pre-decode for play tasks where it would shift the start position.
+    is_preload: bool,
 }
 
 // fully built source ready to be appended to the queue, returned by the worker
 enum ReadySource {
     Raw(SymphoniaSource),
     Resampled(RubatoResampler),
+}
+
+impl Iterator for ReadySource {
+    type Item = f32;
+
+    #[inline]
+    fn next(&mut self) -> Option<f32> {
+        match self {
+            ReadySource::Raw(s) => s.next(),
+            ReadySource::Resampled(s) => s.next(),
+        }
+    }
+}
+
+impl Source for ReadySource {
+    fn current_span_len(&self) -> Option<usize> {
+        match self {
+            ReadySource::Raw(s) => s.current_span_len(),
+            ReadySource::Resampled(s) => s.current_span_len(),
+        }
+    }
+
+    fn channels(&self) -> NonZero<u16> {
+        match self {
+            ReadySource::Raw(s) => s.channels(),
+            ReadySource::Resampled(s) => s.channels(),
+        }
+    }
+
+    fn sample_rate(&self) -> NonZero<u32> {
+        match self {
+            ReadySource::Raw(s) => s.sample_rate(),
+            ReadySource::Resampled(s) => s.sample_rate(),
+        }
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        match self {
+            ReadySource::Raw(s) => s.total_duration(),
+            ReadySource::Resampled(s) => s.total_duration(),
+        }
+    }
 }
 
 // Result sent back from the worker to the command thread
@@ -2271,6 +2611,8 @@ struct OpenResult {
     repeat_one_tx: Sender<bool>,
     duration: Option<Duration>,
     source: Result<ReadySource, String>,
+    // pre-decoded head of the next track for crossfade (None when crossfade is off)
+    preload_buffer: Option<Vec<f32>>,
 }
 
 // =============================================================================
@@ -2279,7 +2621,7 @@ struct OpenResult {
 
 enum AudioCommand {
     Play(String, Option<f32>),
-    Preload(String, Option<f32>),
+    Preload(String, Option<f32>, u32),
     Pause,
     Resume,
     Stop,
@@ -2289,6 +2631,8 @@ enum AudioCommand {
     SetRepeatOne(bool),
     SetReplayGainEnabled(bool),
     SetOutputDevice(Option<String>),
+    SetCrossfadeSeconds(u32),
+    TriggerCrossfade,
 }
 
 // =============================================================================
@@ -2362,8 +2706,8 @@ impl PlaybackStateSync {
                                 // non-blocking: dispatches to worker, returns immediately
                                 engine.play(&path, rg);
                             }
-                            AudioCommand::Preload(path, rg) => {
-                                if let Err(e) = engine.preload(&path, rg) {
+                            AudioCommand::Preload(path, rg, crossfade_seconds) => {
+                                if let Err(e) = engine.preload(&path, rg, crossfade_seconds) {
                                     tracing::warn!("[AUDIO] preload error: {}", e);
                                 }
                             }
@@ -2397,6 +2741,12 @@ impl PlaybackStateSync {
                                         emit(AudioEvent::Error { message: e });
                                     }
                                 }
+                            }
+                            AudioCommand::SetCrossfadeSeconds(secs) => {
+                                engine.set_crossfade_seconds(secs);
+                            }
+                            AudioCommand::TriggerCrossfade => {
+                                engine.trigger_crossfade();
                             }
                         }
                     }
@@ -2522,10 +2872,59 @@ impl PlaybackStateSync {
                                     engine.next_seek_tx = Some(result.seek_tx);
                                     engine.next_repeat_one_tx = Some(result.repeat_one_tx);
                                     engine.next_duration = Some(result.duration);
+                                    engine.next_preload_buffer = result.preload_buffer;
                                     tracing::debug!(
                                         "[AUDIO] Preloaded source ready and appended (gen {})",
                                         result.generation
                                     );
+
+                                    // ── deferred crossfade ────────────────────────────────
+                                    // If trigger_crossfade was called before the worker
+                                    // finished, apply the crossfade mix now that we have
+                                    // the preload buffer — but ONLY if the arriving result
+                                    // matches the generation we were waiting for. A stale
+                                    // preload for a different track must not hijack the mix.
+                                    if engine.pending_crossfade_gen == Some(result.generation) {
+                                        engine.pending_crossfade_gen = None;
+                                        if let Some(buf) = engine.next_preload_buffer.take() {
+                                            let total = buf.len();
+                                            tracing::info!(
+                                                "[AUDIO] Deferred crossfade: starting mix with {} samples ({:.1}s)",
+                                                total,
+                                                total as f64 / (engine.device_sample_rate.get() as f64 * engine.device_channels.get() as f64)
+                                            );
+                                            let path = engine.next_path.take().unwrap_or_default();
+                                            let duration = engine.next_duration.take().flatten();
+                                            // Arm lock-free crossfade (same as trigger_crossfade)
+                                            *engine.cf_pending.lock().unwrap() = Some(CrossfadeState {
+                                                buffer: buf,
+                                                pos: 0,
+                                                total_samples: total,
+                                            });
+                                            engine.cf_active.store(true, Ordering::Release);
+                                            engine.seek_tx = engine.next_seek_tx.take();
+                                            engine.repeat_one_tx = engine.next_repeat_one_tx.take();
+                                            engine.current_generation = engine.next_generation;
+                                            engine.current_info = Some(TrackInfo {
+                                                path: path.clone(),
+                                                duration,
+                                                started: Instant::now(),
+                                                offset: Duration::ZERO,
+                                            });
+                                            engine.next_seek_tx = None;
+                                            engine.next_repeat_one_tx = None;
+                                            engine.next_generation = 0;
+                                            let _ = engine.event_tx.try_send(AudioEvent::TrackAdvanced {
+                                                generation: engine.current_generation,
+                                                new_path: path,
+                                                duration,
+                                            });
+                                        } else {
+                                            // buffer was None even after preload — fallback to gapless
+                                            tracing::warn!("[AUDIO] Deferred crossfade: preload_buffer still empty, using gapless handoff");
+                                            engine.perform_gapless_handoff();
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2544,6 +2943,8 @@ impl PlaybackStateSync {
                                     // only act if this signal belongs to the current generation
                                     // a stale finish from a source killed by Play() is discarded
                                     AudioEvent::TrackFinished { generation } => {
+
+
                                         if generation != engine.current_generation {
                                             tracing::debug!(
                                                 "[AUDIO] Discarding stale TrackFinished \
@@ -2820,13 +3221,15 @@ pub async fn audio_preload(
     path: String,
     track_id: Option<i64>,
     replay_gain_db: Option<f32>,
+    crossfade_seconds: u32,
     state: tauri::State<'_, PlaybackStateSync>,
     db: tauri::State<'_, Database>,
     sync_state: tauri::State<'_, SyncState>,
 ) -> Result<(), String> {
-    tracing::info!("[AUDIO] Preload requested: {}", path);
+    tracing::info!("[AUDIO] Preload requested: {} (crossfade: {}s)", path, crossfade_seconds);
+
     let resolved_path = resolve_audio_path(&path, track_id, &db, &sync_state).await?;
-    state.send(AudioCommand::Preload(resolved_path, replay_gain_db))
+    state.send(AudioCommand::Preload(resolved_path, replay_gain_db, crossfade_seconds))
 }
 
 #[tauri::command]
@@ -2884,6 +3287,22 @@ pub fn audio_set_replay_gain_enabled(
 #[tauri::command]
 pub fn native_audio_available(_state: tauri::State<'_, PlaybackStateSync>) -> bool {
     true
+}
+
+#[tauri::command]
+pub fn audio_set_crossfade_seconds(
+    seconds: f64,
+    state: tauri::State<'_, PlaybackStateSync>,
+) -> Result<(), String> {
+    let secs = seconds.max(0.0).round() as u32;
+    state.send(AudioCommand::SetCrossfadeSeconds(secs))
+}
+
+#[tauri::command]
+pub fn audio_trigger_crossfade(
+    state: tauri::State<'_, PlaybackStateSync>,
+) -> Result<(), String> {
+    state.send(AudioCommand::TriggerCrossfade)
 }
 
 #[tauri::command]
