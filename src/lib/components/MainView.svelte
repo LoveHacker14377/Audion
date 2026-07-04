@@ -949,6 +949,7 @@
     .view-header h1 {
         font-size: 2rem;
         font-weight: var(--font-weight-bold);
+        margin: 0;
     }
 
     .view-content {
