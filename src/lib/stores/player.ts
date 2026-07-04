@@ -41,6 +41,8 @@ import {
     nativeAudioSetEq,
     nativeAudioSetReplayGainEnabled,
     nativeAudioSetOutputDevice,
+    nativeAudioSetCrossfadeSeconds,
+    nativeAudioTriggerCrossfade,
     shouldUseNativeAudio,
 } from '$lib/services/native-audio';
 
@@ -127,6 +129,16 @@ function _reckoningTick(): void {
         updateMediaSessionPosition();
     }
 
+    // Check for early crossfade trigger (native backend)
+    const settings = get(appSettings);
+    if (settings.crossfadeSeconds > 0 && dur > settings.crossfadeSeconds && !_hasCrossfaded && _nativePreloadScheduled) {
+        const threshold = dur - settings.crossfadeSeconds;
+        if (position >= threshold) {
+            _hasCrossfaded = true;
+            _triggerNativeCrossfade();
+        }
+    }
+
     _reckoningRafId = requestAnimationFrame(_reckoningTick);
 }
 
@@ -136,6 +148,11 @@ function _reckoningTick(): void {
 
 let _html5RafId: number | null = null;
 let _hasCrossfaded = false;
+// True when nativeAudioPreload was dispatched for the next track.
+let _nativePreloadScheduled = false;
+// Consecutive native backend errors. After 3, we downgrade to html5.
+let _nativeErrorCount = 0;
+const NATIVE_ERROR_FALLBACK_THRESHOLD = 3;
 
 function _startHtml5Ticker(): void {
     if (_html5RafId !== null) return;
@@ -196,6 +213,24 @@ async function _triggerHtml5Crossfade(): Promise<void> {
     if (started) {
         handleGaplessAdvance();
     } else {
+        _hasCrossfaded = false;
+    }
+}
+
+/**
+ * Trigger native crossfade by sending a command to the Rust backend.
+ * The backend has the pre-decoded buffer of the next track's head and will
+ * swap to it with a smooth mix.
+ */
+async function _triggerNativeCrossfade(): Promise<void> {
+    console.log('[Player] Triggering native crossfade');
+    try {
+        await nativeAudioTriggerCrossfade();
+        // Do NOT call handleGaplessAdvance() here — the backend emits
+        // TrackAdvanced which the audio://event listener picks up and calls
+        // handleGaplessAdvance(). Calling it here causes double advance (skip).
+    } catch (err) {
+        console.warn('[Player] Native crossfade failed:', err);
         _hasCrossfaded = false;
     }
 }
@@ -336,6 +371,14 @@ equalizer.subscribe((state) => {
     }, 200);
 });
 
+// Sync changes to replayGainEnabled and crossfadeSeconds to native backend when settings change
+appSettings.subscribe((settings) => {
+    if (get(activeBackend) === 'native') {
+        nativeAudioSetReplayGainEnabled(settings.replayGainEnabled).catch(console.error);
+        nativeAudioSetCrossfadeSeconds(settings.crossfadeSeconds).catch(console.error);
+    }
+});
+
 // =============================================================================
 // BACKEND INITIALIZATION
 // =============================================================================
@@ -386,14 +429,27 @@ export async function initAudioBackend(): Promise<void> {
                 console.log('[Player] Device list updated');
             } else if (event.type === 'Error') {
                 console.error('[Player] Backend error:', event.data.message);
-                addToast(`Audio error: ${event.data.message}`, 'error');
-                // backend is now silent
-                // reset UI state so player doesn't show stale track info
-                // setting activeBackend to 'none' ensures resume() does a full reopen via playTrack
+                _nativeErrorCount++;
                 _stopReckoning(get(currentTime));
                 isPlaying.set(false);
-                activeBackend.set('none');
                 updateMediaSessionPlaybackState('paused');
+
+                if (_nativeErrorCount >= NATIVE_ERROR_FALLBACK_THRESHOLD) {
+                    // Repeated native failures — downgrade to html5 for this session.
+                    nativeAudioUsed = false;
+                    activeBackend.set('none');
+                    addToast('Native audio failed repeatedly — switched to HTML5 audio', 'warning');
+                    console.warn('[Player] Native backend downgraded to HTML5 after repeated errors');
+                } else {
+                    // Single error: could be a bad file. Try skipping to next track.
+                    activeBackend.set('none');
+                    addToast(`Audio error: ${event.data.message}`, 'error');
+                    const track = get(currentTrack);
+                    if (track) {
+                        console.warn('[Player] Native error on track, attempting skip to next');
+                        nextTrack();
+                    }
+                }
             }
         }).catch(err => {
             console.error('[Player] Failed to register audio event listener:', err);
@@ -457,6 +513,7 @@ export async function initAudioBackend(): Promise<void> {
             nativeAudioSetRepeatOne(get(repeat) === 'one').catch(console.error);
             await nativeAudioSetEq(state);
             nativeAudioSetReplayGainEnabled(get(appSettings).replayGainEnabled).catch(console.error);
+            nativeAudioSetCrossfadeSeconds(get(appSettings).crossfadeSeconds).catch(console.error);
             console.log('[Player] Applied initial EQ settings to native backend');
         } catch (err) {
             console.warn('[Player] Failed to apply initial EQ settings:', err);
@@ -956,6 +1013,9 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                     html5Stop();
 
                     await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
+                    // Set backend AFTER play resolves — if play throws, backend stays 'none'
+                    // so resume() retries via playTrack() rather than assuming native is active.
+                    activeBackend.set('native');
 
                     const vol = sliderToAudioVolume(get(volume));
                     await nativeAudioSetVolume(vol);
@@ -965,8 +1025,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                     }
 
                     _schedulePreload();
-
-                    activeBackend.set('native');
+                    _nativeErrorCount = 0; // successful play resets error count
                     console.log('[Player] Native playback started:', track.title);
                 } else {
                     activeBackend.set('html5');
@@ -978,6 +1037,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
         }
 
         _hasCrossfaded = false;
+        _nativePreloadScheduled = false;
         currentTrack.set(trackForPlugins);
         currentTime.set(startTime);
         duration.set(track.duration || 0);
@@ -1470,6 +1530,7 @@ async function _advanceUiToTrack(track: Track): Promise<void> {
     const trackForPlugins = fullTrack || track;
 
     _hasCrossfaded = false;
+    _nativePreloadScheduled = false;
     currentTrack.set(trackForPlugins);
     currentTime.set(0);
     duration.set(track.duration || 0);
@@ -1519,7 +1580,9 @@ function _schedulePreload(): void {
     const nextPath = nextTrackObj.local_src || nextTrackObj.path;
     if (!nextPath) return;
 
-    nativeAudioPreload(nextPath, nextTrackObj.id, (nextTrackObj as any).replay_gain_db ?? null).catch(e => {
+    _nativePreloadScheduled = true;
+    nativeAudioPreload(nextPath, nextTrackObj.id, (nextTrackObj as any).replay_gain_db ?? null, get(appSettings).crossfadeSeconds).catch(e => {
+        _nativePreloadScheduled = false;
         console.warn('[Player] Preload failed (non-fatal):', e);
     });
 }

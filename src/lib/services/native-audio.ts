@@ -138,8 +138,8 @@ export type AudioEventType =
  * The backend will decode and buffer it so the transition is seamless.
  * @param replayGainDb — pass DB value if available, null otherwise.
  */
-export async function nativeAudioPreload(path: string, trackId: number | null = null, replayGainDb: number | null = null): Promise<void> {
-    await invoke('audio_preload', { path, trackId, replayGainDb });
+export async function nativeAudioPreload(path: string, trackId: number | null = null, replayGainDb: number | null = null, crossfadeSeconds: number = 0): Promise<void> {
+    await invoke('audio_preload', { path, trackId, replayGainDb, crossfadeSeconds });
 }
 
 /**
@@ -156,6 +156,14 @@ export async function nativeAudioSetEq(settings: EqSettings): Promise<void> {
  */
 export async function nativeAudioSetReplayGainEnabled(enabled: boolean): Promise<void> {
     await invoke('audio_set_replay_gain_enabled', { enabled });
+}
+
+export async function nativeAudioSetCrossfadeSeconds(seconds: number): Promise<void> {
+    await invoke('audio_set_crossfade_seconds', { seconds });
+}
+
+export async function nativeAudioTriggerCrossfade(): Promise<void> {
+    await invoke('audio_trigger_crossfade');
 }
 
 export interface AudioDeviceInfo {
