@@ -1609,5 +1609,17 @@
       font-size: var(--font-size-sm);
       white-space: nowrap;
     }
+
+    .category-filters {
+      padding-left: var(--spacing-sm);
+      padding-right: var(--spacing-sm);
+    }
+
+    .category-chip {
+      min-height: unset;
+      min-width: unset;
+      padding: 6px var(--spacing-sm);
+      font-size: var(--font-size-xs);
+    }
   }
 </style>
