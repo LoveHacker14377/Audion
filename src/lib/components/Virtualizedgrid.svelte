@@ -24,6 +24,9 @@
     export let cardHeightMobile = 210;
     export let overscan = 2;
     export let padding = 'var(--spacing-md)';
+    // Force a fixed column count when containerWidth < columnsBreakpoint (0 = disabled)
+    export let columnsBreakpoint = 0;
+    export let columnsBelow = 2;
 
     // Infinite scroll
     export let onLoadMore: (() => Promise<boolean>) | undefined = undefined;
@@ -55,7 +58,8 @@
     }
 
     // Calculate columns based on container width
-    $: columns = Math.max(1, Math.floor((containerWidth + gridGap) / (cardWidth + gridGap)));
+    $: autoColumns = Math.max(1, Math.floor((containerWidth + gridGap) / (cardWidth + gridGap)));
+    $: columns = (columnsBreakpoint > 0 && containerWidth < columnsBreakpoint) ? columnsBelow : autoColumns;
 
     // Each row is cardHeight + gridGap
     $: ROW_HEIGHT = cardHeight > 0 ? cardHeight + gridGap : 1;
