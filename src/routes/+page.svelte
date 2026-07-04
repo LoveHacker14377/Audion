@@ -27,7 +27,6 @@
   import { isMobile, mobileSearchOpen } from "$lib/stores/mobile";
   import MobileBottomNav from "$lib/components/MobileBottomNav.svelte";
   import { searchQuery, clearSearch } from "$lib/stores/search";
-  import { currentView, goToHome } from "$lib/stores/view";
   import PluginUpdateDialog from "$lib/components/PluginUpdateDialog.svelte";
   import { isStatsWrappedOpen } from "$lib/stores/ui";
   import PluginDrawer from "$lib/components/PluginDrawer.svelte";
@@ -66,12 +65,12 @@
     tick().then(() => mobileSearchInputEl?.focus());
   }
 
-  // On mobile, default to home view on first load
-  let mobileInitialized = false;
-  $: if ($isMobile && !mobileInitialized && !isLoading) {
-    mobileInitialized = true;
-    goToHome();
-  }
+  // startup page is now resolved synchronously in view.ts's getInitialView
+  // runs at module-load time (before any component mounts) 
+  // by reading appSettings.startupPage and, for last-visited, a localStorage cache
+  // kept fresh on every app close.
+  // see view.ts and +layout.svelte's app://request-last-view handler
+  // currentView is already correct by the time MainView mounts
 
   onMount(async () => {
     // Initialize persisted state (volume, lyrics visibility, etc.)

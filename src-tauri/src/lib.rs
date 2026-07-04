@@ -439,6 +439,17 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
     }
 
+    // autostart (launch on startup) is desktop-only
+    // not enabled by default
+    // driven entirely by the settings toggle via get/set_autostart_enabled
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ));
+    }
+
     // Updater is desktop-only (not available on Android/iOS)
     #[cfg(desktop)]
     {
@@ -488,6 +499,7 @@ pub fn run() {
 
             app.manage(database.clone());
             app.manage(commands::listenbrainz::ListenBrainzState::new());
+            app.manage(commands::window::CloseConfirmed::default());
 
             // OTA install-on-close gate => starts un-armed; see ota_set_close_intercept
             #[cfg(desktop)]
@@ -1007,6 +1019,11 @@ pub fn run() {
                     // OTA install-on-close
                     ota_set_close_intercept,
                     ota_confirm_exit,
+                    // launch on startup (desktop only)
+                    commands::window::get_autostart_enabled,
+                    commands::window::set_autostart_enabled,
+                    // last visited view (startup page = last-visited)
+                    commands::window::confirm_close,
                 ]
             }
             #[cfg(mobile)]
@@ -1201,6 +1218,43 @@ pub fn run() {
                     tracing::info!("Close requested, notifying frontend for OTA install-on-close");
                     let _ = window.emit(OTA_BEFORE_EXIT_EVENT, ());
                 }
+
+                // if we already confirmed the close and are closing for real
+                // (see confirm_close), let this CloseRequested through
+                let confirmed = window
+                    .app_handle()
+                    .state::<commands::window::CloseConfirmed>();
+                if confirmed.0.load(std::sync::atomic::Ordering::SeqCst) {
+                    return;
+                }
+
+                // first close attempt: hold the window open,
+                // let the frontend react to app://request-last-view (e.g.
+                // cache the current view to localStorage), then it calls
+                // confirm_close to re-trigger the real close
+                api.prevent_close();
+
+                let app_handle = window.app_handle().clone();
+                let window_clone = window.clone();
+                let _ = window.emit("app://request-last-view", ());
+                tracing::info!("CloseRequested: notifying frontend before close");
+
+                // fallback in case the frontend never responds
+                // without this the app would become unclosable
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    let confirmed = app_handle.state::<commands::window::CloseConfirmed>();
+                    if !confirmed.0.load(std::sync::atomic::Ordering::SeqCst) {
+                        tracing::warn!(
+                            "No response from frontend for close notification, closing anyway"
+                        );
+                        confirmed.0.store(true, std::sync::atomic::Ordering::SeqCst);
+                        let close_target = window_clone.clone();
+                        let _ = window_clone.run_on_main_thread(move || {
+                            let _ = close_target.close();
+                        });
+                    }
+                });
             }
         })
         .run(tauri::generate_context!())

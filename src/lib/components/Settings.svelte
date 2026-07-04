@@ -1,6 +1,7 @@
 <script lang="ts">
   import AudioSection from "./settings/AudioSection.svelte";
   import AppearanceSection from "./settings/AppearanceSection.svelte";
+  import StartupSection from "./settings/StartupSection.svelte";
   import PlaybackSection from "./settings/PlaybackSection.svelte";
   import SyncSection from "./settings/SyncSection.svelte";
   import AccountSection from "./settings/AccountSection.svelte";
@@ -31,6 +32,7 @@
     <div class="settings-container">
       <AudioSection open={openSections['audio'] ?? false} on:toggle={() => toggle('audio')} />
       <AppearanceSection open={openSections['appearance'] ?? false} on:toggle={() => toggle('appearance')} />
+      <StartupSection open={openSections['startup'] ?? false} on:toggle={() => toggle('startup')} />
       <PlaybackSection open={openSections['playback'] ?? false} on:toggle={() => toggle('playback')} />
       <SyncSection open={openSections['sync'] ?? false} on:toggle={() => toggle('sync')} />
       <AccountSection open={openSections['account'] ?? false} on:toggle={() => toggle('account')} />

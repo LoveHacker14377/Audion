@@ -2,6 +2,22 @@
 import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import type { ShortcutBinding } from '$lib/stores/shortcuts';
+import type { ViewType } from '$lib/stores/view';
+
+/**
+ * which page to show when the app starts
+ * last visited restores whatever view was open when the app last closed
+ * including detail views (album/artist/playlist) => the full ViewState
+ * (type + id/name) is persisted separately to localStorage on app close
+ * (see +layout.svelte onDestroy) and restored via navigateTo
+ *
+ * detail views (albumdetail, artistdetail, playlistdetail,
+ * tracksmultiselect) are excluded from this type
+ */
+export type StartupPage = Exclude<
+    ViewType,
+    'album-detail' | 'artist-detail' | 'playlist-detail' | 'tracks-multiselect'
+> | 'last-visited';
 
 export interface AppSettings {
     downloadLocation: string | null;
@@ -27,6 +43,8 @@ export interface AppSettings {
     /** master toggle for keyboard shortcuts (including showHelp / Shift+/) */
     shortcutsEnabled: boolean;
     crossfadeSeconds: number;
+    /** which page to show on app launch; see StartupPage for details */
+    startupPage: StartupPage;
 }
 
 const SETTINGS_STORAGE_KEY = 'audion_settings';
@@ -53,6 +71,7 @@ const defaultSettings: AppSettings = {
     keyboardBindings: null,
     shortcutsEnabled: true,
     crossfadeSeconds: 0,
+    startupPage: 'home',
 };
 
 // Load settings from localStorage
@@ -204,6 +223,13 @@ function createSettingsStore() {
         setCrossfadeSeconds(seconds: number) {
             update(state => {
                 const newState = { ...state, crossfadeSeconds: seconds };
+                saveSettings(newState);
+                return newState;
+            });
+        },
+        setStartupPage(page: StartupPage) {
+            update(state => {
+                const newState = { ...state, startupPage: page };
                 saveSettings(newState);
                 return newState;
             });

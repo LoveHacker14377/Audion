@@ -1342,3 +1342,24 @@ export async function audioResolvePath(path: string, trackId?: number | null): P
 export async function audioGetStreamUrl(path: string, trackId?: number | null): Promise<string> {
     return await invoke('audio_get_stream_url', { path, trackId });
 }
+
+// ====================================================================
+// autostart (launch on startup) => desktop only
+// ====================================================================
+
+/**
+ * whether the app is currently registered to launch on system startup.
+ * always resolves to false on android
+ */
+export async function getAutostartEnabled(): Promise<boolean> {
+    if (isAndroid()) return false;
+    return await invoke('get_autostart_enabled');
+}
+
+/**
+ * enable or disable launch on system startup(desktop only))
+ */
+export async function setAutostartEnabled(enabled: boolean): Promise<void> {
+    if (isAndroid()) return;
+    return await invoke('set_autostart_enabled', { enabled });
+}

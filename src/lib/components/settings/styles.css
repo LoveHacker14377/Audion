@@ -2912,3 +2912,9 @@ color: var(--error-color, #e25c5c);
 background: color-mix(in srgb, var(--error-color, #e25c5c) 12%, transparent);
 border-color: var(--error-color, #e25c5c);
 }
+
+/* startup page has more options than output devices typically do; scroll instead of overflowing the card */
+.startup-page-dropdown-menu {
+max-height: 280px;
+overflow-y: auto;
+}

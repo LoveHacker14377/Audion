@@ -1,5 +1,6 @@
 // View store - manages current view/navigation state
 import { writable, get, derived } from 'svelte/store';
+import { appSettings } from './settings';
 
 export type ViewType =
     | 'home'
@@ -32,15 +33,65 @@ const historyUpdate = writable(0);
 let currentIndex = -1;
 let isNavigating = false;
 
-export const currentView = writable<ViewState>({ type: 'tracks' });
+const LAST_VIEW_STORAGE_KEY = 'audion_last_view_cache';
+
+/**
+ * resolves the view to show on launch, synchronously, before any component mounts
+ *
+ * if startupPage is a fixed page use that
+ * if startupPage is last-visited, read the cached last view
+ * written to localStorage by the app://request-last-view handler
+ * in +layout.svelte right before the app closes (see confirm_close in window.rs)
+ * falls back to tracks if nothing usable is cached yet
+ */
+function getInitialView(): ViewState {
+    if (typeof window === 'undefined') return { type: 'tracks' };
+
+    const startupPage = get(appSettings).startupPage;
+
+    if (startupPage && startupPage !== 'last-visited') {
+        return { type: startupPage as ViewType };
+    }
+
+    if (startupPage === 'last-visited') {
+        try {
+            const raw = localStorage.getItem(LAST_VIEW_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw) as ViewState;
+                if (parsed && parsed.type) return parsed;
+            }
+        } catch (error) {
+            console.warn('[View] Failed to read cached last view:', error);
+        }
+    }
+
+    return { type: 'tracks' };
+}
+
+export const currentView = writable<ViewState>(getInitialView());
+
+/**
+ * mirrors the given view into the synchronous localStorage cache
+ * getInitialView reads on next launch
+ * called from +layout.svelte's app://request-last-view handler, right before it calls
+ * invoke('confirm_close') to let the app actually close
+ */
+export function cacheLastViewForNextLaunch(view: ViewState): void {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(LAST_VIEW_STORAGE_KEY, JSON.stringify(view));
+    } catch (error) {
+        console.warn('[View] Failed to cache last view:', error);
+    }
+}
 
 export const navigationHistory = derived(historyUpdate, () => ({
     canGoBack: currentIndex > 0,
     canGoForward: currentIndex < history.length - 1
 }));
 
-// Initialize history with default view
-history.push({ type: 'tracks' });
+// Initialize history with the same view currentView actually starts on
+history.push(get(currentView));
 currentIndex = 0;
 
 function notifyHistoryUpdate() {
