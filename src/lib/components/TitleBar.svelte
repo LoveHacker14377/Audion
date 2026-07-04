@@ -457,16 +457,20 @@
         border-bottom: 1px solid var(--border-color);
     }
 
-    .titlebar-left,
+    .titlebar-left {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        min-width: 0;
+        overflow: visible;
+    }
+
     .titlebar-right {
         display: flex;
         align-items: center;
         height: 100%;
         min-width: 0;
         overflow: hidden;
-    }
-
-    .titlebar-right {
         justify-content: flex-end;
     }
 
