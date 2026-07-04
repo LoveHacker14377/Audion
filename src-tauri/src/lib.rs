@@ -76,6 +76,14 @@ fn ota_confirm_exit(window: tauri::Window) {
     let _ = window.close();
 }
 
+struct PendingPluginInstall(pub std::sync::Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_pending_plugin_install(state: tauri::State<'_, PendingPluginInstall>) -> Option<String> {
+    let mut pending = state.0.lock().unwrap();
+    pending.take()
+}
+
 /// Handle a deep link URL — extract tokens, store them, fetch profile, trigger sync.
 /// Called from both the deep-link event listener (macOS) and the single-instance
 /// callback (Windows/Linux).
@@ -100,6 +108,9 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         }
         if let Some(repo) = repo_url {
             tracing::info!("Deep link plugin install request: {}", repo);
+            if let Some(pending_state) = app_handle.try_state::<PendingPluginInstall>() {
+                *pending_state.0.lock().unwrap() = Some(repo.clone());
+            }
             let _ = app_handle.emit("plugin://install-request", repo);
         } else {
             tracing::error!("Deep link plugin install missing 'url' or 'repo' query parameter");
@@ -415,6 +426,8 @@ pub fn run() {
                 notified: AtomicBool::new(false),
                 confirmed: AtomicBool::new(false),
             });
+
+            app.manage(PendingPluginInstall(std::sync::Mutex::new(None)));
 
             // Initialize Discord RPC state (desktop only)
             #[cfg(desktop)]
@@ -782,6 +795,7 @@ pub fn run() {
                     // OTA install-on-close
                     ota_set_close_intercept,
                     ota_confirm_exit,
+                    get_pending_plugin_install,
                 ]
             }
             #[cfg(mobile)]

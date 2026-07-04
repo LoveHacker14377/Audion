@@ -208,6 +208,26 @@ function createPluginStore() {
                         await self.installPluginFromRepo(repoUrl);
                     }
                 });
+
+                // Check if there was a pending plugin install from cold start
+                try {
+                    const pendingUrl = await invoke<string | null>('get_pending_plugin_install');
+                    if (pendingUrl) {
+                        console.log('[PluginStore] Found pending deep link install request on startup:', pendingUrl);
+                        const { confirm } = await import('./dialogs');
+                        const confirmed = await confirm(`Do you want to install the plugin from repository:\n\n${pendingUrl}?`, {
+                            title: 'Install Plugin',
+                            confirmLabel: 'Install',
+                            cancelLabel: 'Cancel'
+                        });
+
+                        if (confirmed) {
+                            await self.installPluginFromRepo(pendingUrl);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[PluginStore] Failed to check for pending deep link install:', err);
+                }
             } catch (err) {
                 // Critical error: couldn't initialize plugin system at all
                 setCriticalError('Failed to initialize plugin system', err);
