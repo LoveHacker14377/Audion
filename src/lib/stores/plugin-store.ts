@@ -128,6 +128,7 @@ function createPluginStore() {
                 console.warn('[PluginStore] init() called more than once — ignoring');
                 return;
             }
+            const self = this;
             update(s => ({ ...s, loading: true, error: null, failedPlugins: [] }));
 
             try {
@@ -189,6 +190,24 @@ function createPluginStore() {
 
                 // Check for plugin updates in background
                 this.checkAndApplyUpdates();
+
+                // Listen to plugin deep-link install requests
+                const { listen } = await import('@tauri-apps/api/event');
+                listen<string>('plugin://install-request', async (event) => {
+                    const repoUrl = event.payload;
+                    console.log('[PluginStore] Received deep link install request for:', repoUrl);
+
+                    const { confirm } = await import('./dialogs');
+                    const confirmed = await confirm(`Do you want to install the plugin from repository:\n\n${repoUrl}?`, {
+                        title: 'Install Plugin',
+                        confirmLabel: 'Install',
+                        cancelLabel: 'Cancel'
+                    });
+
+                    if (confirmed) {
+                        await self.installPluginFromRepo(repoUrl);
+                    }
+                });
             } catch (err) {
                 // Critical error: couldn't initialize plugin system at all
                 setCriticalError('Failed to initialize plugin system', err);
@@ -380,6 +399,40 @@ function createPluginStore() {
                 return true;
             } catch (err) {
                 const errorMsg = `Failed to install ${plugin.manifest.name}`;
+                console.error(`[PluginStore] ${errorMsg}:`, err);
+                setCriticalError(errorMsg, err);
+                return false;
+            }
+        },
+
+        // Install a plugin directly from repository URL
+        async installPluginFromRepo(repoUrl: string): Promise<boolean> {
+            update(s => ({ ...s, loading: true, error: null }));
+
+            try {
+                const info = await invoke<PluginInfo>('install_plugin', {
+                    repoUrl,
+                    pluginDir
+                });
+
+                update(s => ({
+                    ...s,
+                    installed: [...s.installed, info],
+                    loading: false
+                }));
+
+                // Auto-enable the newly installed plugin
+                try {
+                    await this.enablePlugin(info.name);
+                    clearPluginFailure(info.name);
+                } catch (err) {
+                    recordPluginFailure(info.name, err);
+                    console.error(`[PluginStore] Failed to auto-enable ${info.name}:`, err);
+                }
+
+                return true;
+            } catch (err: any) {
+                const errorMsg = `Failed to install plugin from repository`;
                 console.error(`[PluginStore] ${errorMsg}:`, err);
                 setCriticalError(errorMsg, err);
                 return false;

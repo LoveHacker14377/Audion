@@ -90,9 +90,26 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         }
     };
 
-    if url.path() != "/auth/callback" && url.path() != "auth/callback" {
+    let path = url.path().trim_start_matches('/');
+    if path == "install-plugin" || path == "plugin/install" {
+        let mut repo_url = None;
+        for (key, value) in url.query_pairs() {
+            if key == "url" || key == "repo" {
+                repo_url = Some(value.into_owned());
+            }
+        }
+        if let Some(repo) = repo_url {
+            tracing::info!("Deep link plugin install request: {}", repo);
+            let _ = app_handle.emit("plugin://install-request", repo);
+        } else {
+            tracing::error!("Deep link plugin install missing 'url' or 'repo' query parameter");
+        }
+        return;
+    }
+
+    if path != "auth/callback" {
         tracing::info!(
-            "Deep link is not an auth callback, ignoring: {}",
+            "Deep link is not an auth callback or plugin install, ignoring: {}",
             url.path()
         );
         return;
