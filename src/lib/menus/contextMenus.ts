@@ -26,7 +26,7 @@ import {
     getTracksByArtist,
 } from '$lib/api/tauri';
 import { playTracks, addToQueue } from '$lib/stores/player';
-import { playlists, loadLibrary, loadPlaylists } from '$lib/stores/library';
+import { playlists, loadLibrary, loadPlaylists, adjustPlaylistTrackCount } from '$lib/stores/library';
 import { get } from 'svelte/store';
 import { goToAlbumDetail, goToArtistDetail } from '$lib/stores/view';
 import { pinItem, unpinItem, isPinned, pinnedItems } from '$lib/stores/pinned';
@@ -201,6 +201,30 @@ function buildAddToPlaylistItem(
     };
 }
 
+/**
+ * mov to playlist submenu: excludes the playlist the track currently lives in (sourcePlaylistId)
+ * onSelect is responsible for the add+remove pair against the target id
+ */
+function buildMoveToPlaylistItem(
+    t: Tfn,
+    sourcePlaylistId: number,
+    onSelect: (targetPlaylistId: number) => void,
+): ContextMenuItem {
+    const items = get(playlists)
+        .filter((p) => p.id !== sourcePlaylistId)
+        .map((p) => ({
+            label: p.name,
+            action: () => onSelect(p.id),
+        }));
+
+    return {
+        label: t('contextMenu.moveToPlaylist'),
+        submenu: items.length > 0
+            ? items
+            : [{ label: t('contextMenu.noPlaylists'), action: () => {}, disabled: true }],
+    };
+}
+
 // public option types==========================================================================
 
 export interface TrackMenuOptions {
@@ -212,6 +236,11 @@ export interface TrackMenuOptions {
      * pass isTrackUnavailable(track) from the component
      */
     isUnavailable: boolean;
+    /**
+     * id of the playlist this menu instance is rendered within
+     * when set (full variant only), adds Move to Playlist and
+     * Remove from Playlist items scoped to this playlist
+     */
     playlistId?: number | null;
     queueTracks?: Track[] | null;
     playbackContext?: PlaybackContext;
@@ -361,6 +390,7 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
     const addToPlaylistItem = buildAddToPlaylistItem(t, async (pid) => {
         try {
             await addTrackToPlaylist(pid, track.id);
+            adjustPlaylistTrackCount(pid, 1);
         } catch (err) {
             console.error('[contextMenus] addTrackToPlaylist failed:', err);
         }
@@ -500,17 +530,36 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
     ];
 
     if (playlistId) {
-        items.push({
-            label: t('contextMenu.removeFromPlaylist'),
-            action: async () => {
+        items.push(
+            buildMoveToPlaylistItem(t, playlistId, async (targetPlaylistId) => {
                 try {
+                    // add first so a failed remove doesn't lose the track entirely
+                    await addTrackToPlaylist(targetPlaylistId, track.id);
                     await removeTrackFromPlaylist(playlistId, track.id);
                     opts.onTracksUpdated?.(sortedTracks.filter((t) => t.id !== track.id));
+                    // in memory only:
+                    // every subscriber (sidebar etc) reading the shared playlistTrackCounts
+                    adjustPlaylistTrackCount(targetPlaylistId, 1);
+                    adjustPlaylistTrackCount(playlistId, -1);
+                    addToast(t('contextMenu.trackMoved'), 'success');
                 } catch (err) {
-                    console.error('[contextMenus] removeTrackFromPlaylist failed:', err);
+                    console.error('[contextMenus] moveTrackToPlaylist failed:', err);
+                    addToast(t('contextMenu.trackMoveFailed'), 'error');
                 }
+            }),
+            {
+                label: t('contextMenu.removeFromPlaylist'),
+                action: async () => {
+                    try {
+                        await removeTrackFromPlaylist(playlistId, track.id);
+                        opts.onTracksUpdated?.(sortedTracks.filter((t) => t.id !== track.id));
+                        adjustPlaylistTrackCount(playlistId, -1);
+                    } catch (err) {
+                        console.error('[contextMenus] removeTrackFromPlaylist failed:', err);
+                    }
+                },
             },
-        });
+        );
     }
 
     items.push(
@@ -620,6 +669,7 @@ export function buildArtistContextMenu<A extends Artist | { name: string } = Art
             const tracks = await getTracksByArtist(artist.name);
             if (tracks.length === 0) return;
             await Promise.all(tracks.map((track) => addTrackToPlaylist(pid, track.id)));
+            adjustPlaylistTrackCount(pid, tracks.length);
         } catch (err) {
             console.error('[contextMenus] addArtistToPlaylist failed:', err);
         }

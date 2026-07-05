@@ -9,6 +9,7 @@
         loadAlbumsAndArtists,
         getTrackAlbumCover,
         getAlbumCoverFromTracks,
+        playlistTrackCounts,
     } from "$lib/stores/library";
     import { getAlbum } from "$lib/api/tauri";
     import {
@@ -124,9 +125,6 @@
 
     import { addToast } from "$lib/stores/toast";
 
-    // Track counts for each playlist
-    let playlistTrackCounts = new Map<number, number>();
-
     // Extract store values at top level for reactivity
     $: currentPlaylistIdValue = $currentPlaylistId;
     $: isPlayingValue = $isPlaying;
@@ -172,29 +170,6 @@
     function handleImageError(e: Event, playlist: Playlist) {
         const img = e.target as HTMLImageElement;
         img.src = generateSvgCover(playlist.name || "Playlist", 512);
-    }
-
-    // Load track counts for all playlists
-    async function loadPlaylistTrackCounts() {
-        const counts = new Map<number, number>();
-        for (const playlist of $playlists) {
-            try {
-                const tracks = await getPlaylistTracks(playlist.id);
-                counts.set(playlist.id, tracks.length);
-            } catch (error) {
-                console.error(
-                    `Failed to get track count for playlist ${playlist.id}:`,
-                    error,
-                );
-                counts.set(playlist.id, 0);
-            }
-        }
-        playlistTrackCounts = counts;
-    }
-
-    // Reload track counts when playlists change
-    $: if ($playlists.length > 0) {
-        loadPlaylistTrackCounts();
     }
 
     async function handleAddFolder() {
@@ -716,11 +691,11 @@
                                     </svg>
                                 </span>
                             {/if}
-                            {#if playlistTrackCounts.has(playlist.id)}
+                            {#if $playlistTrackCounts[playlist.id] !== undefined}
                                 <span class="nav-count"
-                                    >{playlistTrackCounts.get(
-                                        playlist.id,
-                                    )}</span
+                                    >{$playlistTrackCounts[
+                                        playlist.id
+                                    ]}</span
                                 >
                             {/if}
                         </button>
