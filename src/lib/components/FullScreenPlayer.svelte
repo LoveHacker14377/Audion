@@ -570,6 +570,19 @@
             >
               {$currentTrack?.artist || "Unknown Artist"}
             </button>
+            {#if $currentTrack?.album}
+              <button
+                class="track-album"
+                on:click={() => {
+                  if ($currentTrack?.album_id) {
+                    toggleFullScreen();
+                    goToAlbumDetail($currentTrack.album_id);
+                  }
+                }}
+              >
+                {$currentTrack.album}
+              </button>
+            {/if}
           </div>
         {:else}
           <!-- In-place Lyrics for Mobile -->
@@ -893,9 +906,16 @@
               </div>
 
               {#if $currentTrack?.album}
-                <p class="desktop-album-context" title={$currentTrack.album}>
+                <button
+                  class="desktop-album-context"
+                  on:click={() => {
+                    $currentTrack?.album_id &&
+                      (toggleFullScreen(),
+                      goToAlbumDetail($currentTrack.album_id));
+                  }}
+                >
                   {$currentTrack.album}
-                </p>
+                </button>
               {/if}
 
               <div class="action-buttons">
@@ -1349,6 +1369,16 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .desktop-album-context:hover {
+    color: #fff;
   }
 
   .track-info-header {
@@ -1384,7 +1414,6 @@
 
   .desktop-subtitle:hover {
     color: #fff;
-    text-decoration: underline;
   }
 
   /* Marquee Styles */
@@ -1972,6 +2001,16 @@
     background: none;
     border: none;
     padding: 0;
+  }
+
+  .mobile-view .track-album {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.4);
+    background: none;
+    border: none;
+    padding: 0;
+    margin-top: 2px;
+    cursor: pointer;
   }
 
   .mobile-view .player-controls {
