@@ -18,6 +18,7 @@
         getAlbumArtSrc,
         getTrackCoverSrc,
         getAlbumCoverSrc,
+        formatDuration,
     } from "$lib/api/tauri";
     import {
         albums,
@@ -276,6 +277,16 @@
                                             >{track.artist || "Unknown Artist"}</button
                                         >
                                     </div>
+                                    <button
+                                        class="track-album truncate"
+                                        on:click|stopPropagation={() =>
+                                            track.album_id && handleAlbumClick(track.album_id)}
+                                        disabled={!track.album_id}
+                                        >{track.album || "-"}</button
+                                    >
+                                    <span class="track-duration"
+                                        >{formatDuration(track.duration)}</span
+                                    >
                                 </div>
                             {/each}
                             {#if $searchResults.tracks.length > visibleTracks}
@@ -590,6 +601,7 @@
         flex-direction: column;
         gap: var(--spacing-xs);
         min-width: 0;
+        flex: 1 1 0;
     }
 
     .track-title {
@@ -601,6 +613,43 @@
     .track-artist {
         font-size: var(--font-size-sm);
         color: var(--text-secondary);
+    }
+
+    .track-album {
+        flex: 1 1 0;
+        min-width: 0;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        background: none;
+        border: none;
+        padding: 0;
+        text-align: left;
+        line-height: 1.2;
+        cursor: pointer;
+    }
+
+    .track-album:hover:not(:disabled) {
+        color: var(--text-primary);
+        text-decoration: underline;
+        cursor: pointer;
+    }
+
+    .track-album:disabled {
+        cursor: default;
+    }
+
+    .track-duration {
+        flex-shrink: 0;
+        font-size: 0.875rem;
+        color: var(--text-subdued);
+        min-width: 40px;
+        text-align: right;
+    }
+
+    @media (max-width: 640px) {
+        .track-album {
+            display: none;
+        }
     }
 
     .load-more {
