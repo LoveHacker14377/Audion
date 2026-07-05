@@ -2912,6 +2912,106 @@ color: var(--error-color, #e25c5c);
 background: color-mix(in srgb, var(--error-color, #e25c5c) 12%, transparent);
 border-color: var(--error-color, #e25c5c);
 }
+/* ------------------------------------------------------------------ */
+/* lyrics settings section                                              */
+/* ------------------------------------------------------------------ */
+@keyframes spin {
+to { transform: rotate(360deg); }
+}
+
+.lyrics-text-input {
+padding: 10px 14px;
+background-color: var(--bg-surface);
+border: 1px solid var(--border-color);
+border-radius: var(--radius-sm);
+color: var(--text-primary);
+font-size: 0.875rem;
+font-family: monospace;
+}
+.lyrics-text-input:focus {
+outline: none;
+border-color: var(--accent-primary);
+}
+.lyrics-text-input:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+}
+
+.lyrics-priority-row {
+display: flex;
+align-items: center;
+gap: var(--spacing-sm);
+margin-top: var(--spacing-sm);
+}
+.lyrics-priority-row .lyrics-text-input {
+flex: 1;
+min-width: 0;
+}
+
+.lyrics-priority-clear {
+align-self: flex-start;
+margin-top: 6px;
+background: none;
+border: none;
+color: var(--text-subdued);
+font-size: 0.75rem;
+text-decoration: underline;
+cursor: pointer;
+padding: 0;
+}
+.lyrics-priority-clear:hover { color: var(--text-primary); }
+
+.lyrics-delete-row {
+display: flex;
+align-items: center;
+gap: 8px;
+margin-top: var(--spacing-sm);
+flex-wrap: wrap;
+}
+
+.lyrics-delete-label {
+font-size: 0.875rem;
+color: var(--text-secondary);
+white-space: nowrap;
+}
+
+.lyrics-token-input {
+width: 120px;
+text-align: center;
+}
+
+.lyrics-delete-btn {
+display: flex;
+align-items: center;
+justify-content: center;
+width: 38px;
+height: 38px;
+flex-shrink: 0;
+border-radius: var(--radius-sm);
+border: 1px solid #dc3545;
+background: rgba(220, 53, 69, 0.1);
+color: #dc3545;
+cursor: pointer;
+transition: all var(--transition-fast);
+margin-left: auto;
+}
+.lyrics-delete-btn:hover:not(:disabled) {
+background: #dc3545;
+color: #fff;
+}
+.lyrics-delete-btn:disabled {
+opacity: 0.4;
+cursor: not-allowed;
+}
+
+.lyrics-delete-spinner {
+width: 14px;
+height: 14px;
+border: 2px solid rgba(220, 53, 69, 0.3);
+border-top-color: currentColor;
+border-radius: 50%;
+animation: spin 0.8s linear infinite;
+}
 
 /* startup page has more options than output devices typically do; scroll instead of overflowing the card */
 .startup-page-dropdown-menu {

@@ -895,6 +895,7 @@ pub fn run() {
                     commands::save_user_lyrics_file,
                     commands::load_user_lyrics_file,
                     commands::delete_user_lyrics_file,
+                    commands::delete_lyrics_by_token,
                     commands::musixmatch_request,
                     commands::get_lyrics,
                     commands::get_current_lyric,
