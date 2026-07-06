@@ -445,6 +445,21 @@ mod windows_impl {
         clear_progress(HWND(hwnd_raw))
     }
 
+    /// windows returns E_ACCESSDENIED (0x80070005) for jump list writes when the user
+    /// has disabled "Show recently opened items in Jump Lists" under
+    /// Settings > Personalization > Start
+    ///  we tag it distinctly and skip re-logging it as a real error
+    const E_ACCESSDENIED: i32 = 0x80070005u32 as i32;
+    const JUMP_LIST_DISABLED_MARKER: &str = "JUMPLIST_DISABLED_BY_SETTINGS";
+
+    fn jump_list_err(context: &str, e: windows::core::Error) -> String {
+        if e.code().0 == E_ACCESSDENIED {
+            JUMP_LIST_DISABLED_MARKER.to_string()
+        } else {
+            format!("{context} failed: {e}")
+        }
+    }
+
     pub(crate) fn update_jump_list(_app: &AppHandle, items: Vec<JumpListItem>) -> Result<(), String> {
         use windows::Win32::UI::Shell::{
             ICustomDestinationList, DestinationList,
@@ -456,7 +471,7 @@ mod windows_impl {
         use windows::Win32::Storage::EnhancedStorage::{PKEY_Title, PKEY_AppUserModel_ID};
         use windows::Win32::System::Com::{
             StructuredStorage::PROPVARIANT,
-            CoCreateInstance, CLSCTX_INPROC_SERVER,
+            CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
         };
         use windows::core::{HSTRING, PCWSTR, Interface};
 
@@ -465,15 +480,18 @@ mod windows_impl {
         let exe_hstring = HSTRING::from(exe_path.as_os_str());
 
         unsafe {
+            // required or else :
+            // AppendCategory fails with E_ACCESSDENIED (0x80070005)
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let cdl: ICustomDestinationList =
                 CoCreateInstance(&DestinationList, None, CLSCTX_INPROC_SERVER)
-                    .map_err(|e| format!("ICustomDestinationList failed: {e}"))?;
+                    .map_err(|e| jump_list_err("ICustomDestinationList", e))?;
 
             let mut max_slots: u32 = 0;
             // beginList returns the removed items array (ignored) and tells us max slots
             let _: IObjectArray = cdl
                 .BeginList(&mut max_slots)
-                .map_err(|e| format!("BeginList failed: {e}"))?;
+                .map_err(|e| jump_list_err("BeginList", e))?;
 
             let collection: IObjectCollection =
                 CoCreateInstance(&EnumerableObjectCollection, None, CLSCTX_INPROC_SERVER)
@@ -494,7 +512,7 @@ mod windows_impl {
                     .map_err(|e| format!("SetArguments failed: {e}"))?;
 
                 let display_name = match &item.artist {
-                    Some(a) if !a.is_empty() => format!("{} \u{2014} {}", item.title, a),
+                    Some(a) if !a.is_empty() => format!("{} \u{b7} {}", item.title, a),
                     _ => item.title.clone(),
                 };
 
@@ -523,10 +541,10 @@ mod windows_impl {
             // IObjectCollection implements From<IObjectCollection> for IObjectArray
             let obj_array = IObjectArray::from(collection);
             cdl.AppendCategory(PCWSTR(category.as_ptr()), &obj_array)
-                .map_err(|e| format!("AppendCategory failed: {e}"))?;
+                .map_err(|e| jump_list_err("AppendCategory", e))?;
 
             cdl.CommitList()
-                .map_err(|e| format!("CommitList failed: {e}"))?;
+                .map_err(|e| jump_list_err("CommitList", e))?;
         }
 
         Ok(())
@@ -534,15 +552,19 @@ mod windows_impl {
 
     pub(crate) fn clear_jump_list() -> Result<(), String> {
         use windows::Win32::UI::Shell::{ICustomDestinationList, DestinationList};
-        use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+        };
         use windows::core::PCWSTR;
 
         unsafe {
+            // see update_jump_list for why this is required
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let cdl: ICustomDestinationList =
                 CoCreateInstance(&DestinationList, None, CLSCTX_INPROC_SERVER)
-                    .map_err(|e| format!("ICustomDestinationList failed: {e}"))?;
+                    .map_err(|e| jump_list_err("ICustomDestinationList", e))?;
             cdl.DeleteList(PCWSTR::null())
-                .map_err(|e| format!("DeleteList failed: {e}"))?;
+                .map_err(|e| jump_list_err("DeleteList", e))?;
         }
         Ok(())
     }

@@ -102,7 +102,11 @@ export function savePersistedState(): void {
 }
 
 // Initialize stores from persisted state
-export function initializeFromPersistedState(): void {
+//
+// pendingJumpListTrackId: if the app was cold-started via a jump list click, pass the target track id here
+// we still restore the queue/shuffle/context
+// skip others. since the jump list track will go through the normal play track path, it wil updated there
+export function initializeFromPersistedState(pendingJumpListTrackId: number | null = null): void {
     const state = loadPersistedState();
 
     console.log('[Persist] Restoring state:', state);
@@ -129,6 +133,11 @@ export function initializeFromPersistedState(): void {
         // Restore context
         if (state.playbackContext) {
             playbackContext.set(state.playbackContext);
+        }
+
+        if (pendingJumpListTrackId !== null) {
+            // jump list track is about to take over. don't display anything
+            return;
         }
 
         // Restore current track based on queue and index

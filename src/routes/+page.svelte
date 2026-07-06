@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { get } from "svelte/store";
   import "../app.css";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import MainView from "$lib/components/MainView.svelte";
@@ -13,13 +14,15 @@
   import KeyboardShortcutsHelp from "$lib/components/KeyboardShortcutsHelp.svelte";
   import StatsWrapped from "$lib/components/StatsWrapped.svelte";
 
-  import { loadLibrary, loadPlaylists } from "$lib/stores/library";
+  import { loadLibrary, loadPlaylists, getTrackByIdSync } from "$lib/stores/library";
   import ToastContainer from "$lib/components/ToastContainer.svelte";
   import { isTauri } from "$lib/api/tauri";
+  import { invoke } from "@tauri-apps/api/core";
   import {
     initializeFromPersistedState,
     setupAutoSave,
   } from "$lib/stores/persist";
+  import { playTrack, playFromQueue, queue } from "$lib/stores/player";
   import { theme } from "$lib/stores/theme";
   import { isMiniPlayer } from "$lib/stores/ui";
   import { pluginStore } from "$lib/stores/plugin-store";
@@ -73,8 +76,23 @@
   // currentView is already correct by the time MainView mounts
 
   onMount(async () => {
+    // check for a jump-list cold-start deep link before restoring persisted playback state
+    // it stashes the track id (get_pending_play_track) we resolve it here
+    let pendingJumpListTrackId: number | null = null;
+    if (isTauri()) {
+      try {
+        const pendingId = await invoke<string | null>("get_pending_play_track");
+        if (pendingId) {
+          const parsed = Number(pendingId);
+          if (parsed && !isNaN(parsed)) pendingJumpListTrackId = parsed;
+        }
+      } catch (error) {
+        console.error("[Player] Failed to check pending play-track:", error);
+      }
+    }
+
     // Initialize persisted state (volume, lyrics visibility, etc.)
-    initializeFromPersistedState();
+    initializeFromPersistedState(pendingJumpListTrackId);
     setupAutoSave();
 
     // Check if we're in Tauri environment
@@ -87,6 +105,24 @@
     try {
       const dataLoadStart = performance.now();
       await Promise.all([loadLibrary(), loadPlaylists()]);
+
+      if (pendingJumpListTrackId !== null) {
+        const track = getTrackByIdSync(pendingJumpListTrackId);
+        if (track) {
+          // jump list entries come from the queue itself
+          const idxInQueue = get(queue).findIndex((t) => t.id === pendingJumpListTrackId);
+          if (idxInQueue !== -1) {
+            playFromQueue(idxInQueue);
+          } else {
+            void playTrack(track);
+          }
+        } else {
+          console.warn(
+            "[Player] cold-start jump-list track not found in library:",
+            pendingJumpListTrackId,
+          );
+        }
+      }
     } catch (error) {
       console.error("Failed to load library:", error);
     } finally {

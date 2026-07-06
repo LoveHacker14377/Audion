@@ -39,7 +39,7 @@ import {
 import { handleRemoteCommand, handleRemotePlayerState, transferPlayback } from './remote';
 import { registerRemoteCallbacks } from './remote';
 import { seek, setVolume, toggleShuffle } from './playback';
-import { playTrack } from './playback';
+import { playTrack, playFromQueue } from './playback';
 import { updateMediaSessionPosition } from './media-session';
 import { getTrackByIdSync } from '$lib/stores/library';
 import { isFullScreen, toggleFullScreen } from '$lib/stores/ui';
@@ -273,6 +273,27 @@ export async function initAudioBackend(): Promise<void> {
 
     // queue and queueIndex stores are subscribed so the jump list updates when
     // the track changes or when tracks are added/removed from the queue
+    let jumpListDisabledToastShown = false;
+    const JUMP_LIST_DISABLED_MARKER = 'JUMPLIST_DISABLED_BY_SETTINGS';
+
+    const handleJumpListError = (action: 'update' | 'clear', e: unknown) => {
+        if (e === JUMP_LIST_DISABLED_MARKER) {
+            // windows blocks jump list writes when the user
+            // has "Show recently opened items in Jump Lists" turned off
+            // surface it once per session
+            if (!jumpListDisabledToastShown) {
+                jumpListDisabledToastShown = true;
+                addToast(
+                    'Jump list is disabled in Windows settings. To enable "Next Up" in the taskbar, turn on Settings > Personalization > Start > "Show recently opened items in Jump Lists..."',
+                    'info',
+                    8000,
+                );
+            }
+            return;
+        }
+        console.error(`[JumpList] ${action} failed:`, e);
+    };
+
     const syncJumpList = () => {
         const $queue = get(queue);
         const currentIdx = get(queueIndex);
@@ -287,27 +308,38 @@ export async function initAudioBackend(): Promise<void> {
         if (nextItems.length > 0) {
             invoke('windows_update_jump_list', { tracks: nextItems })
                 .then(() => console.log('[JumpList] Updated with', nextItems))
-                .catch((e) => console.error('[JumpList] update failed:', e));
+                .catch((e) => handleJumpListError('update', e));
         } else {
             invoke('windows_clear_jump_list')
                 .then(() => console.log('[JumpList] Cleared'))
-                .catch((e) => console.error('[JumpList] clear failed:', e));
+                .catch((e) => handleJumpListError('clear', e));
         }
     };
     queue.subscribe(syncJumpList);
     queueIndex.subscribe(syncJumpList);
 
-    // listen for audion://play/<id> deep links routed from lib.rs
+    // listen for audion://play/<id> deep links routed from lib.rs (already running case)
     await listen<string>('app://play-track', ({ payload }) => {
         const trackId = Number(payload);
         if (!trackId || isNaN(trackId)) return;
         const track = getTrackByIdSync(trackId);
-        if (track) {
-            void playTrack(track);
-        } else {
+        if (!track) {
             console.warn('[Player] jump list play-track: id not found in library:', trackId);
+            return;
+        }
+        // jump list entries are sourced from the current queue (see syncJumpList
+        // below)
+        // playFromQueue handles the index update, userQueueCount, and shuffle pointer sync
+        const idxInQueue = get(queue).findIndex((t) => t.id === trackId);
+        if (idxInQueue !== -1) {
+            playFromQueue(idxInQueue);
+        } else {
+            // queue has changed since the jump list was built (or cleared)
+            // fall back to just playing the track on its own
+            void playTrack(track);
         }
     });
+    // cold-start case (app launched via jump list click) is handled in +page.svelte, coordinated with initializeFromPersistedState
 }
 
 export function cleanupPlayer(): void {

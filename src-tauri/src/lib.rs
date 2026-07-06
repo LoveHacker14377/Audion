@@ -104,6 +104,18 @@ fn get_pending_plugin_install(state: tauri::State<'_, PendingPluginInstall>) -> 
     pending.take()
 }
 
+// mirrors PendingPluginInstall: on a cold start via jump list
+// a bare emit is silently dropped on cold start 
+// it only works when the app is already running and the listener is live
+// stashing the track id here lets the frontend pull it once it's actually ready to play it
+struct PendingPlayTrack(pub std::sync::Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_pending_play_track(state: tauri::State<'_, PendingPlayTrack>) -> Option<String> {
+    let mut pending = state.0.lock().unwrap();
+    pending.take()
+}
+
 /// Handle a deep link URL — extract tokens, store them, fetch profile, trigger sync.
 /// Called from both the deep-link event listener (macOS) and the single-instance
 /// callback (Windows/Linux).
@@ -144,6 +156,11 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
     if url.host_str() == Some("play") {
         let track_id = url.path().trim_start_matches('/');
         tracing::info!("Deep link: play track id={}", track_id);
+        // always stash it => covers the cold-start race
+        // emit still fires for the already running case where the listener is live
+        if let Some(pending_state) = app_handle.try_state::<PendingPlayTrack>() {
+            *pending_state.0.lock().unwrap() = Some(track_id.to_string());
+        }
         let _ = app_handle.emit("app://play-track", track_id.to_string());
         // focus the window so the user sees playback start (desktop only)
         #[cfg(not(target_os = "android"))]
@@ -540,6 +557,7 @@ pub fn run() {
             });
 
             app.manage(PendingPluginInstall(std::sync::Mutex::new(None)));
+            app.manage(PendingPlayTrack(std::sync::Mutex::new(None)));
 
             // Initialize Discord RPC state (desktop only)
             #[cfg(desktop)]
@@ -1060,6 +1078,7 @@ pub fn run() {
                     // last visited view (startup page = last-visited)
                     commands::window::confirm_close,
                     get_pending_plugin_install,
+                    get_pending_play_track,
                 ]
             }
             #[cfg(mobile)]
