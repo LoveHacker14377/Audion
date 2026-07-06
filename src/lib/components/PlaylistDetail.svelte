@@ -16,7 +16,7 @@
     import { playTracks, addToQueue } from "$lib/stores/player";
     import { goToPlaylists, goToTracksMultiSelect } from "$lib/stores/view";
     import { loadPlaylists, playlists, playlistPendingTracks, drainPendingTracks } from "$lib/stores/library";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import {
         playlistCovers,
         setPlaylistCover,
@@ -1009,9 +1009,6 @@
         }
 
         .playlist-tracks {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
     }
 </style>

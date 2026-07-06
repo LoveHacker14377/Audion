@@ -5,7 +5,7 @@
   import MainView from "$lib/components/MainView.svelte";
   import PlayerBar from "$lib/components/PlayerBar.svelte";
   import LyricsPanel from "$lib/components/LyricsPanel.svelte";
-  import FullScreenPlayer from "$lib/components/FullScreenPlayer.svelte";
+  import FullScreenPlayer from "$lib/components/fullscreen/FullScreenPlayer.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import QueuePanel from "$lib/components/QueuePanel.svelte";
   import MiniPlayer from "$lib/components/MiniPlayer.svelte";

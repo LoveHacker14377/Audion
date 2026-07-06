@@ -96,6 +96,14 @@ pub struct TrayState {
     pub current_artist: std::sync::Mutex<String>,
 }
 
+struct PendingPluginInstall(pub std::sync::Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_pending_plugin_install(state: tauri::State<'_, PendingPluginInstall>) -> Option<String> {
+    let mut pending = state.0.lock().unwrap();
+    pending.take()
+}
+
 /// Handle a deep link URL — extract tokens, store them, fetch profile, trigger sync.
 /// Called from both the deep-link event listener (macOS) and the single-instance
 /// callback (Windows/Linux).
@@ -110,10 +118,31 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         }
     };
 
+    // audion://install-plugin?url=... or audion://plugin/install?url=...
+    if url.host_str() == Some("install-plugin")
+        || (url.host_str() == Some("plugin") && url.path().trim_matches('/') == "install")
+    {
+        let mut repo_url = None;
+        for (key, value) in url.query_pairs() {
+            if key == "url" || key == "repo" {
+                repo_url = Some(value.into_owned());
+            }
+        }
+        if let Some(repo) = repo_url {
+            tracing::info!("Deep link plugin install request: {}", repo);
+            if let Some(pending_state) = app_handle.try_state::<PendingPluginInstall>() {
+                *pending_state.0.lock().unwrap() = Some(repo.clone());
+            }
+            let _ = app_handle.emit("plugin://install-request", repo);
+        } else {
+            tracing::error!("Deep link plugin install missing 'url' or 'repo' query parameter");
+        }
+        return;
+    }
+
     // audion://play/<track_id> => emitted by jump list entries
-    let path = url.path().trim_start_matches('/');
-    if path.starts_with("play/") {
-        let track_id = path.trim_start_matches("play/");
+    if url.host_str() == Some("play") {
+        let track_id = url.path().trim_start_matches('/');
         tracing::info!("Deep link: play track id={}", track_id);
         let _ = app_handle.emit("app://play-track", track_id.to_string());
         // focus the window so the user sees playback start (desktop only)
@@ -126,10 +155,11 @@ fn handle_deep_link_url(app_handle: &tauri::AppHandle, url_str: &str) {
         return;
     }
 
-    if url.path() != "/auth/callback" && url.path() != "auth/callback" {
+    // audion://auth/callback
+    if url.host_str() != Some("auth") || url.path().trim_matches('/') != "callback" {
         tracing::info!(
-            "Deep link is not an auth callback, ignoring: {}",
-            url.path()
+            "Deep link is not an auth callback or plugin install, ignoring: {}",
+            url
         );
         return;
     }
@@ -508,6 +538,8 @@ pub fn run() {
                 notified: AtomicBool::new(false),
                 confirmed: AtomicBool::new(false),
             });
+
+            app.manage(PendingPluginInstall(std::sync::Mutex::new(None)));
 
             // Initialize Discord RPC state (desktop only)
             #[cfg(desktop)]
@@ -993,6 +1025,8 @@ pub fn run() {
                     audio::audio_set_repeat_one,
                     audio::audio_set_eq,
                     audio::audio_set_replay_gain_enabled,
+                    audio::audio_set_crossfade_seconds,
+                    audio::audio_trigger_crossfade,
                     audio::audio_list_output_devices,
                     audio::audio_set_output_device,
                     audio::audio_get_device_info,
@@ -1025,6 +1059,7 @@ pub fn run() {
                     commands::window::set_autostart_enabled,
                     // last visited view (startup page = last-visited)
                     commands::window::confirm_close,
+                    get_pending_plugin_install,
                 ]
             }
             #[cfg(mobile)]
@@ -1182,6 +1217,8 @@ pub fn run() {
                     audio::audio_seek,
                     audio::audio_set_eq,
                     audio::audio_set_replay_gain_enabled,
+                    audio::audio_set_crossfade_seconds,
+                    audio::audio_trigger_crossfade,
                     audio::audio_list_output_devices,
                     audio::audio_set_output_device,
                     audio::audio_get_device_info,

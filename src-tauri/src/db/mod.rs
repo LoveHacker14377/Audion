@@ -1,6 +1,15 @@
 // Database module for SQLite operations
+pub mod models;
+pub mod tracks;
+pub mod albums;
+pub mod playlists;
+pub mod folders;
+pub mod likes;
+pub mod stats;
+pub mod sync;
 pub mod queries;
 pub mod schema;
+
 
 use rusqlite::Connection;
 use std::path::PathBuf;

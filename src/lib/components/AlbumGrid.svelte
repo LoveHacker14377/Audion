@@ -121,6 +121,8 @@
     onItemContextMenu={handleAlbumContextMenu}
     onLoadMore={handleLoadMore}
     emptyStateConfig={emptyState}
+    columnsBreakpoint={924}
+    columnsBelow={2}
     let:item={album}
 >
     {@const cover = getAlbumCoverFromTracks(album.id)}

@@ -1,0 +1,355 @@
+<script lang="ts">
+  import { get } from "svelte/store";
+  import {
+    progress,
+    currentTime,
+    duration,
+    shuffle,
+    repeat,
+    isPlaying,
+    volume,
+    toggleShuffle,
+    previousTrack,
+    togglePlay,
+    nextTrack,
+    cycleRepeat,
+    seek,
+  } from "$lib/stores/player";
+  import { formatDuration } from "$lib/api/tauri";
+
+  let isSeeking = false;
+
+  function handleSeekPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return; // primary button only
+    isSeeking = true;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    handleSeekPointerMove(e);
+  }
+
+  function handleSeekPointerMove(e: PointerEvent) {
+    if (!isSeeking) return;
+    const bar = e.currentTarget as HTMLDivElement;
+    const rect = bar.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    seek(Math.max(0, Math.min(1, pos)));
+  }
+
+  function handleSeekPointerUp(e: PointerEvent) {
+    if (isSeeking) {
+      isSeeking = false;
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }
+
+  function handleVolumeChange(e: Event) {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    volume.set(val);
+  }
+</script>
+
+<div class="desktop-playback-area">
+  <div class="desktop-progress-container">
+    <div
+      class="desktop-progress-bar"
+      on:pointerdown={handleSeekPointerDown}
+      on:pointermove={handleSeekPointerMove}
+      on:pointerup={handleSeekPointerUp}
+      role="slider"
+      aria-label="Seek track"
+      aria-valuenow={Math.round($progress * 100)}
+      tabindex="0"
+    >
+      <div class="progress-track">
+        <div
+          class="progress-fill"
+          style="width: {$progress * 100}%"
+        ></div>
+      </div>
+      <div
+        class="progress-thumb-dot"
+        style="left: {$progress * 100}%"
+      ></div>
+    </div>
+    <div class="time-row">
+      <span>{formatDuration($currentTime)}</span>
+      <span>{formatDuration($duration)}</span>
+    </div>
+  </div>
+
+  <div class="desktop-controls">
+    <button
+      class="control-btn"
+      class:track-active={$shuffle}
+      on:click={toggleShuffle}
+      aria-label="Shuffle"
+      ><svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        width="18"
+        height="18"
+        ><path
+          d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
+        /></svg
+      ></button
+    >
+    <button
+      class="control-btn secondary"
+      on:click={previousTrack}
+      aria-label="Previous"
+      ><svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        width="22"
+        height="22"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg
+      ></button
+    >
+    <button
+      class="control-btn play-pause-main"
+      on:click={togglePlay}
+      aria-label={$isPlaying ? "Pause" : "Play"}
+    >
+      {#if $isPlaying}
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="32"
+          height="32"
+          ><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg
+        >
+      {:else}
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="32"
+          height="32"><path d="M8 5v14l11-7z" /></svg
+        >
+      {/if}
+    </button>
+    <button
+      class="control-btn secondary"
+      on:click={nextTrack}
+      aria-label="Next"
+      ><svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        width="22"
+        height="22"
+        ><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg
+      ></button
+    >
+    <button
+      class="control-btn"
+      class:track-active={$repeat !== "none"}
+      on:click={cycleRepeat}
+      aria-label="Repeat"
+      ><svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        width="18"
+        height="18"
+        ><path
+          d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"
+        /></svg
+      >{#if $repeat === "one"}<span class="repeat-indicator">1</span>{/if}</button
+    >
+  </div>
+
+  <div class="desktop-volume-row">
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      width="18"
+      height="18"
+      class="volume-icon"
+      ><path
+        d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+      /></svg
+    >
+    <input
+      type="range"
+      min="0"
+      max="1"
+      step="0.01"
+      value={$volume}
+      on:input={handleVolumeChange}
+      class="volume-slider"
+      style="background: linear-gradient(to right, rgba(255, 255, 255, 0.6) {$volume * 100}%, rgba(255, 255, 255, 0.15) {$volume * 100}%);"
+      aria-label="Volume"
+    />
+  </div>
+</div>
+
+<style>
+  .desktop-playback-area {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .desktop-progress-container {
+    margin-bottom: 1rem;
+    width: 100%;
+  }
+
+  .desktop-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+    margin-bottom: 0.75rem;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 2px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: #ffffff;
+    border-radius: 2px;
+    transition: width 0.1s linear;
+  }
+
+  .desktop-progress-bar:hover .progress-fill {
+    background: #fff;
+  }
+
+  .progress-thumb-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .desktop-progress-bar:hover .progress-thumb-dot {
+    box-shadow: 0 0 16px var(--accent-primary, #1DB954);
+    transform: translate(-50%, -50%) scale(1.4);
+  }
+
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .desktop-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    margin-bottom: 0.6rem;
+  }
+
+  .control-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 44px;
+    height: 44px;
+  }
+
+  .control-btn:hover {
+    color: #fff;
+    transform: scale(1.1);
+  }
+
+  .control-btn.secondary {
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .control-btn.play-pause-main {
+    width: 56px;
+    height: 56px;
+    background: #fff;
+    color: #000;
+    border-radius: 50%;
+  }
+
+  .control-btn.play-pause-main:hover {
+    transform: scale(1.08);
+  }
+
+  .control-btn.track-active {
+    color: #1ed760;
+  }
+
+  .repeat-indicator {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    background: #1ed760;
+    color: #000;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .desktop-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    width: 100%;
+    max-width: 280px;
+    margin: 1rem auto 0;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+
+  .desktop-volume-row:hover {
+    opacity: 1;
+  }
+
+  .volume-icon {
+    color: rgba(255, 255, 255, 0.6);
+    flex-shrink: 0;
+  }
+
+  .volume-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 1.5px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+  }
+
+  .volume-slider:hover::-webkit-slider-thumb {
+    transform: scale(1.2);
+  }
+</style>

@@ -15,7 +15,7 @@
         "title": "Audion",
         "width": 1600,
         "height": 900,
-        "minWidth": 1280,
+        "minWidth": 1040,
         "minHeight": 720,
         "backgroundColor": "#121212",
         "visible": true,
@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' blob: asset: http://asset.localhost https://asset.localhost; connect-src * asset: http://asset.localhost https://asset.localhost; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost http: https:; media-src 'self' asset: http://asset.localhost https://asset.localhost file: blob: http: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' blob: asset: http://asset.localhost https://asset.localhost; connect-src * asset: ipc: ipc://localhost http://asset.localhost https://asset.localhost; img-src 'self' data: blob: asset: http://asset.localhost https://asset.localhost http: https:; media-src 'self' asset: http://asset.localhost https://asset.localhost file: blob: http: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com",
       "assetProtocol": {
         "enable": true,
         "scope": [

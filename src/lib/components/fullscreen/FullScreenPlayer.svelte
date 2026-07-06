@@ -39,17 +39,12 @@
   import { _ } from "svelte-i18n";
   import { buildTrackContextMenu } from "$lib/menus/contextMenus";
   import { addToast } from "$lib/stores/toast";
-  import QueuePanel from "./QueuePanel.svelte";
-  import ConnectPanel from "./ConnectPanel.svelte";
+  import QueuePanel from "../QueuePanel.svelte";
+  import ConnectPanel from "../ConnectPanel.svelte";
   import { wsStore } from "$lib/stores/websocket";
-  import {
-    sleepTimerActive,
-    sleepTimerRemainingMs,
-    SLEEP_TIMER_PRESETS,
-    startSleepTimer,
-    stopSleepTimer,
-  } from "$lib/stores/sleepTimer";
-  import MeshGradientBg from "./MeshGradientBg.svelte";
+  import MeshGradientBg from "../MeshGradientBg.svelte";
+  import FullScreenMobileBottomSheet from "./FullScreenMobileBottomSheet.svelte";
+  import FullScreenPlaybackControls from "./FullScreenPlaybackControls.svelte";
 
   let showConnectPanel = false;
   let showMobileMenu = false;
@@ -374,140 +369,11 @@
 
       <!-- Mobile three-dot bottom-sheet menu -->
       {#if showMobileMenu}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div
-          class="mobile-menu-backdrop"
-          on:click={() => (showMobileMenu = false)}
-          transition:fade={{ duration: 200 }}
-          role="presentation"
-        >
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <div
-            class="mobile-menu-sheet"
-            on:click|stopPropagation
-            transition:fly={{ y: 300, duration: 300 }}
-            role="dialog"
-            tabindex="-1"
-          >
-            <div class="sheet-handle"></div>
-
-            {#if $currentTrack}
-              <div class="sheet-track-info">
-                {#key $currentTrack.id}
-                  {#if albumArt}
-                    <img class="sheet-art" in:fly={{ x: 20, duration: 250 }} src={albumArt} alt="Cover" />
-                  {:else}
-                    <div class="sheet-art sheet-art-placeholder" in:fly={{ x: 20, duration: 250 }}>
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                      </svg>
-                    </div>
-                  {/if}
-                {/key}
-                <div class="sheet-track-details">
-                  <span class="sheet-track-title">{$currentTrack.title || "Unknown Title"}</span>
-                  <span class="sheet-track-artist">{$currentTrack.artist || "Unknown Artist"}</span>
-                </div>
-              </div>
-            {/if}
-
-            <div class="sheet-divider"></div>
-
-            <!-- Go to Artist -->
-            {#if $currentTrack?.artist}
-              {@const artist = $currentTrack.artist}
-              <button
-                class="sheet-item"
-                on:click={() => {
-                  showMobileMenu = false;
-                  toggleFullScreen();
-                  goToArtistDetail(artist);
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-                <span>Go to Artist</span>
-              </button>
-            {/if}
-
-            <!-- Go to Album -->
-            {#if $currentTrack?.album_id}
-              {@const albumId = $currentTrack.album_id}
-              <button
-                class="sheet-item"
-                on:click={() => {
-                  showMobileMenu = false;
-                  toggleFullScreen();
-                  goToAlbumDetail(albumId);
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z" />
-                </svg>
-                <span>Go to Album</span>
-              </button>
-            {/if}
-
-            <!-- Sleep Timer -->
-            <div class="sheet-item-group">
-              <div class="sheet-item-header">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                  <path d="M9.37 5.51A7 7 0 0 0 18.5 14.63a8 8 0 1 1-9.13-9.12z" />
-                </svg>
-                <span>Sleep Timer</span>
-                {#if $sleepTimerActive}
-                  <span class="sheet-timer-badge">
-                    {Math.ceil($sleepTimerRemainingMs / 60000)}m left
-                  </span>
-                {/if}
-              </div>
-              <div class="sheet-timer-presets">
-                {#each SLEEP_TIMER_PRESETS as minutes}
-                  <button
-                    class="sheet-timer-btn"
-                    on:click={() => { startSleepTimer(minutes); showMobileMenu = false; }}
-                  >
-                    {minutes}m
-                  </button>
-                {/each}
-                {#if $sleepTimerActive}
-                  <button
-                    class="sheet-timer-btn cancel"
-                    on:click={() => { stopSleepTimer(); showMobileMenu = false; }}
-                  >
-                    Cancel
-                  </button>
-                {/if}
-              </div>
-            </div>
-
-            <!-- Connect to Device -->
-            <button
-              class="sheet-item"
-              on:click={() => { showMobileMenu = false; showConnectPanel = true; }}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                <path d="M19,2H5A3,3,0,0,0,2,5V15a3,3,0,0,0,3,3H9.17l-1.42,1.41a1,1,0,0,0,0,1.42,1,1,0,0,0,1.42,0L11,18.99,12.83,20.83a1,1,0,0,0,1.42,0,1,1,0,0,0,0-1.42L12.83,18H19a3,3,0,0,0,3-3V5A3,3,0,0,0,19,2Zm1,13a1,1,0,0,1-1,1H5a1,1,0,0,1-1-1V5A1,1,0,0,1,5,4H19a1,1,0,0,1,1,1Z"/>
-              </svg>
-              <span>Connect to a Device</span>
-              {#if connectedDevices > 0}
-                <span class="sheet-connected-badge">{connectedDevices}</span>
-              {/if}
-            </button>
-
-            <!-- Add to Playlist -->
-            <button
-              class="sheet-item"
-              on:click={(e) => { showMobileMenu = false; showTrackMenu(e, true); }}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z" />
-              </svg>
-              <span>Add to Playlist</span>
-            </button>
-          </div>
-        </div>
+        <FullScreenMobileBottomSheet
+          bind:showMobileMenu
+          bind:showConnectPanel
+          {albumArt}
+        />
       {/if}
 
       <div class="player-content mobile-view">
@@ -996,138 +862,7 @@
               </div>
             </div>
 
-            <div class="desktop-playback-area">
-              <div class="desktop-progress-container">
-                <div
-                  class="desktop-progress-bar"
-                  on:pointerdown={handleSeekPointerDown}
-                  on:pointermove={handleSeekPointerMove}
-                  on:pointerup={handleSeekPointerUp}
-                  role="slider"
-                  aria-label="Seek track"
-                  aria-valuenow={Math.round($progress * 100)}
-                  tabindex="0"
-                >
-                  <div class="progress-track">
-                    <div
-                      class="progress-fill"
-                      style="width: {$progress * 100}%"
-                    ></div>
-                  </div>
-                  <div
-                    class="progress-thumb-dot"
-                    style="left: {$progress * 100}%"
-                  ></div>
-                </div>
-                <div class="time-row">
-                  <span>{formatDuration($currentTime)}</span>
-                  <span>{formatDuration($duration)}</span>
-                </div>
-              </div>
-
-              <div class="desktop-controls">
-                <button
-                  class="control-btn"
-                  class:track-active={$shuffle}
-                  on:click={toggleShuffle}
-                  aria-label="Shuffle"
-                  ><svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="18"
-                    height="18"
-                    ><path
-                      d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
-                    /></svg
-                  ></button
-                >
-                <button
-                  class="control-btn secondary"
-                  on:click={previousTrack}
-                  aria-label="Previous"
-                  ><svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="22"
-                    height="22"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg
-                  ></button
-                >
-                <button
-                  class="control-btn play-pause-main"
-                  on:click={togglePlay}
-                  aria-label={$isPlaying ? "Pause" : "Play"}
-                >
-                  {#if $isPlaying}
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      width="32"
-                      height="32"
-                      ><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg
-                    >
-                  {:else}
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      width="32"
-                      height="32"><path d="M8 5v14l11-7z" /></svg
-                    >
-                  {/if}
-                </button>
-                <button
-                  class="control-btn secondary"
-                  on:click={nextTrack}
-                  aria-label="Next"
-                  ><svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="22"
-                    height="22"
-                    ><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg
-                  ></button
-                >
-                <button
-                  class="control-btn"
-                  class:track-active={$repeat !== "none"}
-                  on:click={cycleRepeat}
-                  aria-label="Repeat"
-                  ><svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="18"
-                    height="18"
-                    ><path
-                      d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"
-                    /></svg
-                  >{#if $repeat === "one"}<span class="repeat-indicator">1</span
-                    >{/if}</button
-                >
-              </div>
-
-              <div class="desktop-volume-row">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  width="18"
-                  height="18"
-                  class="volume-icon"
-                  ><path
-                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
-                  /></svg
-                >
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={$volume}
-                  on:input={handleVolumeChange}
-                  class="volume-slider"
-                  style="background: linear-gradient(to right, rgba(255, 255, 255, 0.6) {$volume * 100}%, rgba(255, 255, 255, 0.15) {$volume * 100}%);"
-                  aria-label="Volume"
-                />
-              </div>
-            </div>
+            <FullScreenPlaybackControls />
           </div>
 
           <!-- Right Area: Tabbed Content (Lyrics/Queue) -->
@@ -1294,10 +1029,10 @@
   .desktop-content {
     flex: 1;
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 3rem;
+    grid-template-columns: minmax(360px, 440px) 1fr;
+    gap: clamp(2.5rem, 5vw, 5rem);
     align-items: center;
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     width: 100%;
     height: 100%;
@@ -1308,12 +1043,12 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: center; /* Center the entire block in the left column */
+    align-items: center;
     max-height: 100%;
-    gap: clamp(1rem, 2vh, 1.75rem);
+    gap: clamp(1rem, 2.5vh, 2rem);
     padding-left: 24px;
     padding-top: 0.75rem;
-    width: 25rem;
+    width: 100%;
   }
 
   /* Each section in the left panel shares the same max-width for uniformity */
@@ -1321,17 +1056,14 @@
   .desktop-track-details,
   .desktop-playback-area {
     width: 100%;
-    max-width: 500px;
+    max-width: 440px;
   }
 
   .desktop-art-section {
-    width: 240px;
-    height: 240px;
     aspect-ratio: 1;
     position: relative;
     flex-shrink: 0;
     margin-bottom: 26px;
-    align-self: flex-start;
   }
 
   .desktop-art-wrapper {
@@ -1496,149 +1228,6 @@
     color: #ff4d4d;
   }
 
-  .desktop-playback-area {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .desktop-progress-container {
-    margin-bottom: 1rem;
-    width: 100%;
-  }
-
-  .desktop-progress-bar {
-    width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-    position: relative;
-    cursor: pointer;
-    margin-bottom: 0.75rem;
-  }
-
-  .progress-track {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    border-radius: 2px;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: #ffffff;
-    border-radius: 2px;
-    transition: width 0.1s linear;
-  }
-
-  .desktop-progress-bar:hover .progress-fill {
-    background: #fff;
-  }
-
-  .progress-thumb-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #ffffff;
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-  }
-
-  .desktop-progress-bar:hover .progress-thumb-dot {
-    box-shadow: 0 0 16px var(--accent-primary, #1DB954);
-    transform: translate(-50%, -50%) scale(1.4);
-  }
-
-  .time-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.4);
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: 0.05em;
-  }
-
-  .desktop-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 28px;
-    margin-bottom: 0.6rem;
-  }
-
-  .control-btn {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.35);
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    width: 44px;
-    height: 44px;
-  }
-
-  .control-btn:hover {
-    color: #fff;
-    transform: scale(1.1);
-  }
-
-  .control-btn.secondary {
-    color: rgba(255, 255, 255, 0.75);
-  }
-
-  .control-btn.play-pause-main {
-    width: 56px;
-    height: 56px;
-    background: #fff;
-    color: #000;
-    border-radius: 50%;
-  }
-
-  .control-btn.play-pause-main:hover {
-    transform: scale(1.08);
-  }
-
-  .control-btn.track-active {
-    color: #1ed760;
-  }
-
-  .repeat-indicator {
-    position: absolute;
-    top: 0;
-    right: -4px;
-    font-size: 0.6rem;
-    font-weight: 800;
-    background: #1ed760;
-    color: #000;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .desktop-volume-row {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    width: 100%;
-    max-width: 280px;
-    margin: 0;
-    opacity: 0.5;
-    transition: opacity 0.3s;
-  }
-
-  .desktop-volume-row:hover {
-    opacity: 1;
-  }
-
   @media (max-height: 900px) {
     .desktop-left {
       gap: 0.9rem;
@@ -1646,9 +1235,8 @@
     }
 
     .desktop-art-section {
-    width: 240px;
-    height: 240px;
-  }
+      max-width: 240px;
+    }
 
     .desktop-title {
       font-size: clamp(2rem, 3.8vh, 2.35rem);
@@ -1657,43 +1245,6 @@
     .desktop-subtitle {
       font-size: 1.1rem;
     }
-
-    .desktop-progress-container {
-      margin-bottom: 0.8rem;
-    }
-
-    .desktop-controls {
-      margin-bottom: 0.35rem;
-    }
-  }
-
-  .volume-icon {
-    color: rgba(255, 255, 255, 0.6);
-    flex-shrink: 0;
-  }
-
-  .volume-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 3px;
-    border-radius: 1.5px;
-    outline: none;
-    cursor: pointer;
-    transition: background 0.1s ease;
-  }
-
-  .volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform 0.2s;
-  }
-
-  .volume-slider:hover::-webkit-slider-thumb {
-    transform: scale(1.2);
   }
 
   /* Right column styles (Tabs & Content) */
@@ -1764,10 +1315,10 @@
 
   /* Lyrics Content Styling */
   .desktop-lyrics-container {
-    height: 450px;
+    height: 100%;
     width: 100%;
     overflow: hidden;
-    padding: 225px 3rem 225px 0;
+    padding: 35vh 3rem 35vh 0;
     scrollbar-width: none;
     will-change: transform;
     mask-image: linear-gradient(
@@ -1823,7 +1374,7 @@
   }
 
   .desktop-lyric-line {
-    font-size: 22px;
+    font-size: clamp(20px, 2.2vh, 32px);
     font-weight: 800;
     color: rgba(255, 255, 255, 0.15);
     padding: 0.7rem 0;
@@ -1872,7 +1423,7 @@
 
   .desktop-lyric-line.active {
     color: #fff;
-    font-size: 24px;
+    font-size: clamp(22px, 2.5vh, 36px);
     transform: scale(1.04);
     margin: 0;
     text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
@@ -2026,16 +1577,40 @@
 
   .mobile-view .progress-bar {
     flex: 1;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    height: 28px; /* tall touch hit area */
+    background: transparent;
     border-radius: 2px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .mobile-view .progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: visible; /* don't clip thumb */
     position: relative;
   }
 
   .mobile-view .progress-fill {
     height: 100%;
-    background: #fff;
+    background: var(--accent-primary);
     border-radius: 2px;
+  }
+
+  .mobile-view .progress-thumb {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transform: translateX(-50%) scale(1);
+    top: 50%;
+    margin-top: -7px;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .mobile-view .time {
@@ -2231,190 +1806,5 @@
     line-height: 1.3;
     padding: 0.5rem 0;
     word-break: break-word;
-  }
-  /* =========================================
-     MOBILE THREE-DOT BOTTOM-SHEET MENU
-     ========================================= */
-  .mobile-menu-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 200;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-  }
-
-  .mobile-menu-sheet {
-    width: 100%;
-    max-width: 480px;
-    background: #282828;
-    border-radius: 16px 16px 0 0;
-    padding: 8px 0 calc(20px + env(safe-area-inset-bottom));
-    max-height: 75vh;
-    overflow-y: auto;
-    scrollbar-width: none;
-  }
-
-  .mobile-menu-sheet::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sheet-handle {
-    width: 36px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 2px;
-    margin: 6px auto 12px;
-  }
-
-  .sheet-track-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 20px 12px;
-  }
-
-  .sheet-art {
-    width: 44px;
-    height: 44px;
-    border-radius: 6px;
-    object-fit: cover;
-    flex-shrink: 0;
-  }
-
-  .sheet-art-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #404040;
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  .sheet-track-details {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .sheet-track-title {
-    font-size: 0.95rem;
-    font-weight: var(--font-weight-semibold);
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .sheet-track-artist {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-  }
-
-  .sheet-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.08);
-    margin: 0 20px 4px;
-  }
-
-  .sheet-item {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    width: 100%;
-    padding: 14px 20px;
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 0.95rem;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s ease;
-  }
-
-  .sheet-item:active {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .sheet-item svg {
-    color: rgba(255, 255, 255, 0.6);
-    flex-shrink: 0;
-  }
-
-  .sheet-item span {
-    flex: 1;
-    text-align: left;
-  }
-
-  .sheet-connected-badge {
-    background: var(--accent-color, #1db954);
-    color: #000;
-    font-size: 0.7rem;
-    font-weight: var(--font-weight-bold);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .sheet-item-group {
-    padding: 6px 20px 10px;
-  }
-
-  .sheet-item-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    color: #fff;
-    font-size: 0.95rem;
-    margin-bottom: 10px;
-  }
-
-  .sheet-item-header svg {
-    color: rgba(255, 255, 255, 0.6);
-    flex-shrink: 0;
-  }
-
-  .sheet-timer-badge {
-    margin-left: auto;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--accent-color, #1db954);
-  }
-
-  .sheet-timer-presets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-left: 36px;
-  }
-
-  .sheet-timer-btn {
-    padding: 6px 16px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.82rem;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.15s ease;
-  }
-
-  .sheet-timer-btn:active {
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  .sheet-timer-btn.cancel {
-    border-color: #e53935;
-    color: #e53935;
   }
 </style>

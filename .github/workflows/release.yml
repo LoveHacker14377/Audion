@@ -236,8 +236,16 @@ jobs:
           # Bazzite and other immutable distros may have Wayland-only or broken EGL.
           # ---------------------------------------------------------------------------
 
+          # APPDIR must be set so WebKit can find its helper processes (WebKitNetworkProcess etc.)
+          export APPDIR="$HERE"
+
           # Always disable dmabuf renderer — it is the most common cause of blank screens on Mesa/NVIDIA
           export WEBKIT_DISABLE_DMABUF_RENDERER=1
+
+          # Disable GVfs modules that have broken symbols on some distros (e.g. Mint 22 / Ubuntu 24)
+          # This prevents "undefined symbol: g_task_set_static_name" from libgvfscommon.so
+          export GIO_USE_VFS=local
+          export GIO_MODULE_DIR="$HERE/usr/lib/gio/modules"
 
           # Wayland detection — prefer X11 fallback for WebKitGTK 4.x stability
           if [ -n "$WAYLAND_DISPLAY" ] && [ -z "$FORCE_WAYLAND" ]; then

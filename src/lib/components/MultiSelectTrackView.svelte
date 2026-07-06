@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import { tracks as allTracks } from "$lib/stores/library";
     import { multiSelect } from "$lib/stores/multiselect";
     import { goToPlaylistDetail } from "$lib/stores/view";

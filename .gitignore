@@ -55,6 +55,7 @@ plugin-examples/
 /audion-server-vps
 /audion-api
 /audion-server-docker
+/audion-web
 
 /Resonate
 
@@ -63,3 +64,6 @@ implementation_plan.md
 
 tauri-signing.key
 tauri-signing.key.pub
+
+src-tauri/target_check
+src-tauri/target_validate

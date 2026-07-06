@@ -5,7 +5,7 @@
         goToAlbums,
         goToArtists,
         goToPlaylists,
-        type ViewState
+        type ViewState,
     } from "$lib/stores/view";
     import {
         tracks,
@@ -25,7 +25,7 @@
     import DesktopHome from "./DesktopHome.svelte";
     import LikedSongs from "./LikedSongs.svelte";
 
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
     import AlbumGrid from "./AlbumGrid.svelte";
     import AlbumDetail from "./AlbumDetail.svelte";
     import ArtistGrid from "./ArtistGrid.svelte";
@@ -49,7 +49,12 @@
     import { isDragging, dragCounter, isDraggingLyrics } from "$lib/stores/dnd";
     import { importLyricsContent } from "$lib/stores/lyrics";
     import { get } from "svelte/store";
-    import { addTrackToPlaylist, importAudioFile, importAudioBytes, type Track } from "$lib/api/tauri";
+    import {
+        addTrackToPlaylist,
+        importAudioFile,
+        importAudioBytes,
+        type Track,
+    } from "$lib/api/tauri";
 
     import type { SectionKey } from "./SearchResults.svelte";
 
@@ -73,7 +78,12 @@
         playlists: "Playlists",
     };
 
-    let sectionOrder: SectionKey[] = ["tracks", "albums", "artists", "playlists"];
+    let sectionOrder: SectionKey[] = [
+        "tracks",
+        "albums",
+        "artists",
+        "playlists",
+    ];
     let hiddenSections = new Set<SectionKey>();
 
     function toggleSection(key: SectionKey) {
@@ -104,13 +114,23 @@
     // so LyricsPanel can read them and show its own overlay.
     let dropError = "";
 
-    const AUDIO_EXTENSIONS  = new Set(['mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac', 'alac']);
-    const LYRICS_EXTENSIONS = new Set(['lrc', 'ttml', 'xml', 'srt']);
-    const UNSUPPORTED_DROP_MSG = 'Unsupported file type. Drop an audio file (MP3, FLAC, WAV, OGG, M4A, AAC, ALAC).';
-    const LYRICS_DROP_MSG      = 'Drop lyrics files on the lyrics panel. Open it first with the lyrics button.';
+    const AUDIO_EXTENSIONS = new Set([
+        "mp3",
+        "flac",
+        "wav",
+        "ogg",
+        "m4a",
+        "aac",
+        "alac",
+    ]);
+    const LYRICS_EXTENSIONS = new Set(["lrc", "ttml", "xml", "srt"]);
+    const UNSUPPORTED_DROP_MSG =
+        "Unsupported file type. Drop an audio file (MP3, FLAC, WAV, OGG, M4A, AAC, ALAC).";
+    const LYRICS_DROP_MSG =
+        "Drop lyrics files on the lyrics panel. Open it first with the lyrics button.";
 
     function getExt(name: string): string {
-        return name.split('.').pop()?.toLowerCase() ?? '';
+        return name.split(".").pop()?.toLowerCase() ?? "";
     }
 
     function isAudioFile(file: File) {
@@ -180,15 +200,16 @@
 
         for (const file of incomingFiles) {
             // Extension check .it catch unsupported files before hitting the backend
-            const fileName: string = (file as any).name ?? (file as any).path ?? '';
+            const fileName: string =
+                (file as any).name ?? (file as any).path ?? "";
             if (fileName) {
                 const ext = getExt(fileName);
                 if (LYRICS_EXTENSIONS.has(ext)) {
-                    addToast(LYRICS_DROP_MSG, 'error');
+                    addToast(LYRICS_DROP_MSG, "error");
                     continue;
                 }
                 if (!isAudioFile(file as File) && !AUDIO_EXTENSIONS.has(ext)) {
-                    addToast(UNSUPPORTED_DROP_MSG, 'error');
+                    addToast(UNSUPPORTED_DROP_MSG, "error");
                     continue;
                 }
             }
@@ -214,7 +235,10 @@
                         if (overwrite) {
                             const r2 = await importAudioFile(maybePath, true);
                             if (typeof r2 === "object") {
-                                console.log("Imported (webview, overwritten)", r2.title);
+                                console.log(
+                                    "Imported (webview, overwritten)",
+                                    r2.title,
+                                );
                                 addTrackToLibrary(r2);
                                 await maybeAddToPlaylist(r2);
                             } else {
@@ -306,7 +330,8 @@
     // Add native capture-phase listeners to help when webview swallows events
     onMount(() => {
         const isOverLyricsPanel = (e: DragEvent): boolean =>
-            e.target instanceof Element && e.target.closest('.lyrics-panel') !== null;
+            e.target instanceof Element &&
+            e.target.closest(".lyrics-panel") !== null;
 
         const nativeEnter = (e: DragEvent) => {
             if (isOverLyricsPanel(e)) return;
@@ -366,10 +391,13 @@
                         );
                         const p: any = event.payload;
                         if (p.type === "enter") {
-                            dragCounter.update(n => {
+                            dragCounter.update((n) => {
                                 if (n === 0) {
                                     const view = get(currentView);
-                                    dropTargetPlaylist = view.type === "playlist-detail" ? view : null;
+                                    dropTargetPlaylist =
+                                        view.type === "playlist-detail"
+                                            ? view
+                                            : null;
                                 }
                                 return n + 1;
                             });
@@ -377,7 +405,9 @@
                             const enterPaths: string[] = p.paths || [];
                             isDraggingLyrics.set(
                                 enterPaths.length > 0 &&
-                                enterPaths.every(fp => LYRICS_EXTENSIONS.has(getExt(fp)))
+                                    enterPaths.every((fp) =>
+                                        LYRICS_EXTENSIONS.has(getExt(fp)),
+                                    ),
                             );
                             isDragging.set(true);
                         } else if (p.type === "over") {
@@ -392,44 +422,83 @@
                                 const fpExt = getExt(fp);
                                 if (LYRICS_EXTENSIONS.has(fpExt)) {
                                     try {
-                                        const { invoke } = await import("@tauri-apps/api/core");
-                                        const content = await invoke<string>("read_lyrics_file", { path: fp });
+                                        const { invoke } = await import(
+                                            "@tauri-apps/api/core"
+                                        );
+                                        const content = await invoke<string>(
+                                            "read_lyrics_file",
+                                            { path: fp },
+                                        );
                                         const fmt: "lrc" | "ttml" | "srt" =
-                                            (fpExt === "ttml" || fpExt === "xml") ? "ttml" :
-                                            fpExt === "srt" ? "srt" : "lrc";
+                                            fpExt === "ttml" || fpExt === "xml"
+                                                ? "ttml"
+                                                : fpExt === "srt"
+                                                  ? "srt"
+                                                  : "lrc";
                                         await importLyricsContent(content, fmt);
                                     } catch (e) {
-                                        console.error("[DND] lyrics import failed", fp, e);
-                                        addToast("Failed to import lyrics file.", "error");
+                                        console.error(
+                                            "[DND] lyrics import failed",
+                                            fp,
+                                            e,
+                                        );
+                                        addToast(
+                                            "Failed to import lyrics file.",
+                                            "error",
+                                        );
                                     }
                                     continue;
                                 }
                                 try {
                                     console.log("[DND] webview drop path:", fp);
-                                    const result = await importAudioFile(fp, false);
+                                    const result = await importAudioFile(
+                                        fp,
+                                        false,
+                                    );
                                     if (result === "duplicate") {
-                                        const name = fp.split(/[\\\/]/).pop() || fp;
+                                        const name =
+                                            fp.split(/[\\\/]/).pop() || fp;
                                         const overwrite = await confirm(
                                             `File '${name}' already exists. Overwrite?`,
-                                            { confirmLabel: "Overwrite", cancelLabel: "Skip" },
+                                            {
+                                                confirmLabel: "Overwrite",
+                                                cancelLabel: "Skip",
+                                            },
                                         );
                                         if (overwrite) {
-                                            const r2 = await importAudioFile(fp, true);
+                                            const r2 = await importAudioFile(
+                                                fp,
+                                                true,
+                                            );
                                             if (typeof r2 === "object") {
-                                                console.log("Imported (webview, overwritten)", r2.title);
+                                                console.log(
+                                                    "Imported (webview, overwritten)",
+                                                    r2.title,
+                                                );
                                                 addTrackToLibrary(r2);
                                                 await maybeAddToPlaylist(r2);
                                             }
                                         }
                                     } else if (typeof result === "object") {
-                                        console.log("Imported (webview)", result.title);
+                                        console.log(
+                                            "Imported (webview)",
+                                            result.title,
+                                        );
                                         addTrackToLibrary(result);
                                         await maybeAddToPlaylist(result);
                                     } else {
-                                        console.warn("Import result", result, fp);
+                                        console.warn(
+                                            "Import result",
+                                            result,
+                                            fp,
+                                        );
                                     }
                                 } catch (e) {
-                                    console.error("[DND] importAudioFile failed for", fp, e);
+                                    console.error(
+                                        "[DND] importAudioFile failed for",
+                                        fp,
+                                        e,
+                                    );
                                 }
                             }
                         } else {
@@ -442,7 +511,10 @@
                     },
                 );
             } catch (e) {
-                console.warn("[DND] getCurrentWebview.onDragDropEvent not available", e);
+                console.warn(
+                    "[DND] getCurrentWebview.onDragDropEvent not available",
+                    e,
+                );
             }
         })();
 
@@ -452,7 +524,9 @@
             window.removeEventListener("dragleave", nativeLeave, true);
             window.removeEventListener("drop", nativeDrop, true);
             if (unlistenWebview) {
-                try { unlistenWebview(); } catch (e) {}
+                try {
+                    unlistenWebview();
+                } catch (e) {}
             }
         };
     });
@@ -466,10 +540,11 @@
     function handleDragEnter(event: DragEvent) {
         if (!hasFiles(event.dataTransfer)) return;
         event.preventDefault();
-        dragCounter.update(n => {
+        dragCounter.update((n) => {
             if (n === 0) {
                 const view = get(currentView);
-                dropTargetPlaylist = view.type === "playlist-detail" ? view : null;
+                dropTargetPlaylist =
+                    view.type === "playlist-detail" ? view : null;
             }
             return n + 1;
         });
@@ -479,7 +554,7 @@
     function handleDragLeave(event: DragEvent) {
         if (!hasFiles(event.dataTransfer)) return;
         event.preventDefault();
-        dragCounter.update(n => {
+        dragCounter.update((n) => {
             const next = n - 1;
             if (next <= 0) isDragging.set(false);
             return next <= 0 ? 0 : next;
@@ -503,27 +578,54 @@
 >
     {#if $isDragging}
         <div class="drop-overlay" transition:fade={{ duration: 200 }}>
-            <div class="drop-content" in:fly={{ y: 20, duration: 400, delay: 100 }}>
+            <div
+                class="drop-content"
+                in:fly={{ y: 20, duration: 400, delay: 100 }}
+            >
                 {#if $isDraggingLyrics}
                     <div class="drop-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
                         </svg>
                     </div>
                     <div class="drop-text">Drop lyrics file</div>
                     <div class="drop-subtext">.lrc · .ttml · .srt</div>
                 {:else}
                     <div class="drop-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
                         </svg>
                     </div>
                     {#if dropTargetPlaylist}
-                        <div class="drop-text">Add to "{dropTargetPlaylist.name}"</div>
-                        <div class="drop-subtext">Track will also be added to your library</div>
+                        <div class="drop-text">
+                            Add to "{dropTargetPlaylist.name}"
+                        </div>
+                        <div class="drop-subtext">
+                            Track will also be added to your library
+                        </div>
                     {:else}
                         <div class="drop-text">Drop your music here</div>
-                        <div class="drop-subtext">MP3, FLAC, M4A, WAV, OGG, ALAC</div>
+                        <div class="drop-subtext">
+                            MP3, FLAC, M4A, WAV, OGG, ALAC
+                        </div>
                     {/if}
                 {/if}
             </div>
@@ -646,133 +748,170 @@
     {/if}
 
     <div class="view-transition-container">
-        {#key $currentView.type + ($currentView.id ?? '') + isSearching}
-            <div class="transition-wrapper" in:fade={{ duration: 200 }} out:fade={{ duration: 150 }}>
-            {#if isSearching}
-                <div class="view-container">
-                    <header class="view-header search-view-header">
-                        <h1>Search Results</h1>
-                        {#if $searchResults.hasResults}
-                            <div class="results-pills">
-                                {#each sectionOrder as key (key)}
-                                    {@const hasResults =
-                                        (key === "tracks"    && $searchResults.tracks.length > 0) ||
-                                        (key === "albums"    && $searchResults.albums.length > 0) ||
-                                        (key === "artists"   && $searchResults.artists.length > 0) ||
-                                        (key === "playlists" && ($searchResults.playlists?.length ?? 0) > 0)}
-                                    {#if hasResults}
-                                        {@const count =
-                                            key === "tracks"    ? $searchResults.tracks.length :
-                                            key === "albums"    ? $searchResults.albums.length :
-                                            key === "artists"   ? $searchResults.artists.length :
-                                            ($searchResults.playlists?.length ?? 0)}
-                                        <div class="pill-wrapper">
-                                            <button
-                                                class="section-pill"
-                                                class:pill-active={!hiddenSections.has(key)}
-                                                class:pill-inactive={hiddenSections.has(key)}
-                                                on:click={() => toggleSection(key)}
-                                            >
-                                                <span class="pill-label">{SECTION_LABELS[key]}</span>
-                                                <span class="pill-count">{count}</span>
-                                            </button>
-                                        </div>
-                                    {/if}
-                                {/each}
-                            </div>
+        {#key $currentView.type + ($currentView.id ?? "") + isSearching}
+            <div
+                class="transition-wrapper"
+                in:fade={{ duration: 200 }}
+                out:fade={{ duration: 150 }}
+            >
+                {#if isSearching}
+                    <div class="view-container">
+                        <header class="view-header search-view-header">
+                            <h1>Search Results</h1>
+                            {#if $searchResults.hasResults}
+                                <div class="results-pills">
+                                    {#each sectionOrder as key (key)}
+                                        {@const hasResults =
+                                            (key === "tracks" &&
+                                                $searchResults.tracks.length >
+                                                    0) ||
+                                            (key === "albums" &&
+                                                $searchResults.albums.length >
+                                                    0) ||
+                                            (key === "artists" &&
+                                                $searchResults.artists.length >
+                                                    0) ||
+                                            (key === "playlists" &&
+                                                ($searchResults.playlists
+                                                    ?.length ?? 0) > 0)}
+                                        {#if hasResults}
+                                            {@const count =
+                                                key === "tracks"
+                                                    ? $searchResults.tracks
+                                                          .length
+                                                    : key === "albums"
+                                                      ? $searchResults.albums
+                                                            .length
+                                                      : key === "artists"
+                                                        ? $searchResults.artists
+                                                              .length
+                                                        : ($searchResults
+                                                              .playlists
+                                                              ?.length ?? 0)}
+                                            <div class="pill-wrapper">
+                                                <button
+                                                    class="section-pill"
+                                                    class:pill-active={!hiddenSections.has(
+                                                        key,
+                                                    )}
+                                                    class:pill-inactive={hiddenSections.has(
+                                                        key,
+                                                    )}
+                                                    on:click={() =>
+                                                        toggleSection(key)}
+                                                >
+                                                    <span class="pill-label"
+                                                        >{SECTION_LABELS[
+                                                            key
+                                                        ]}</span
+                                                    >
+                                                    <span class="pill-count"
+                                                        >{count}</span
+                                                    >
+                                                </button>
+                                            </div>
+                                        {/if}
+                                    {/each}
+                                </div>
+                            {/if}
+                        </header>
+                        <div class="view-content">
+                            <SearchResults {sectionOrder} {hiddenSections} />
+                        </div>
+                    </div>
+                {:else if $currentView.type === "tracks"}
+                    <div class="view-container">
+                        <header class="view-header">
+                            <h1>All Tracks</h1>
+                            {#if $isScanning}
+                                <div class="scan-status">
+                                    Scanning... {$tracks.length} tracks found
+                                </div>
+                            {/if}
+                        </header>
+                        <div class="view-content">
+                            <TrackList
+                                tracks={$tracks}
+                                showAlbum={true}
+                                scrollKey="tracks"
+                            />
+                        </div>
+                    </div>
+                {:else if $currentView.type === "tracks-multiselect" && $currentView.id}
+                    <div class="view-container no-padding">
+                        <MultiSelectTrackView playlistId={$currentView.id} />
+                    </div>
+                {:else if $currentView.type === "albums"}
+                    <div class="view-container">
+                        <header class="view-header">
+                            <h1>Albums</h1>
+                        </header>
+                        <div class="view-content">
+                            <AlbumGrid albums={$albums} />
+                        </div>
+                    </div>
+                {:else if $currentView.type === "album-detail" && $currentView.id}
+                    <div class="view-container no-padding">
+                        <AlbumDetail albumId={$currentView.id} />
+                    </div>
+                {:else if $currentView.type === "artists"}
+                    <div class="view-container">
+                        <header class="view-header">
+                            <h1>Artists</h1>
+                        </header>
+                        <div class="view-content">
+                            <ArtistGrid artists={$artists} />
+                        </div>
+                    </div>
+                {:else if $currentView.type === "artist-detail" && $currentView.name}
+                    <div class="view-container no-padding">
+                        <ArtistDetail artistName={$currentView.name} />
+                    </div>
+                {:else if $currentView.type === "playlists"}
+                    <div class="view-container no-padding">
+                        <PlaylistView />
+                    </div>
+                {:else if $currentView.type === "playlist-detail" && $currentView.id}
+                    <div class="view-container no-padding">
+                        <PlaylistDetail playlistId={$currentView.id} />
+                    </div>
+                {:else if $currentView.type === "plugins"}
+                    <div class="view-container no-padding">
+                        <PluginManager />
+                    </div>
+                {:else if $currentView.type === "settings"}
+                    <div class="view-container no-padding">
+                        <Settings />
+                    </div>
+                {:else if $currentView.type === "home"}
+                    <div class="view-container no-padding">
+                        {#if $isMobile}
+                            <MobileHome />
+                        {:else}
+                            <DesktopHome />
                         {/if}
-                    </header>
-                    <div class="view-content">
-                        <SearchResults {sectionOrder} {hiddenSections} />
                     </div>
-                </div>
-            {:else if $currentView.type === "tracks"}
-                <div class="view-container">
-                    <header class="view-header">
-                        <h1>All Tracks</h1>
-                        {#if $isScanning}
-                            <div class="scan-status">Scanning... {$tracks.length} tracks found</div>
-                        {/if}
-                    </header>
-                    <div class="view-content">
-                        <TrackList tracks={$tracks} showAlbum={true} scrollKey="tracks" />
+                {:else if $currentView.type === "liked-songs"}
+                    <div class="view-container no-padding">
+                        <LikedSongs />
                     </div>
-                </div>
-            {:else if $currentView.type === "tracks-multiselect" && $currentView.id}
-                <div class="view-container no-padding">
-                    <MultiSelectTrackView playlistId={$currentView.id} />
-                </div>
-            {:else if $currentView.type === "albums"}
-                <div class="view-container">
-                    <header class="view-header">
-                        <h1>Albums</h1>
-                    </header>
-                    <div class="view-content">
-                        <AlbumGrid albums={$albums} />
+                {:else if $currentView.type === "listenbrainz"}
+                    <div class="view-container no-padding">
+                        <Recommendations />
                     </div>
-                </div>
-            {:else if $currentView.type === "album-detail" && $currentView.id}
-                <div class="view-container no-padding">
-                    <AlbumDetail albumId={$currentView.id} />
-                </div>
-            {:else if $currentView.type === "artists"}
-                <div class="view-container">
-                    <header class="view-header">
-                        <h1>Artists</h1>
-                    </header>
-                    <div class="view-content">
-                        <ArtistGrid artists={$artists} />
+                {:else if $currentView.type === "discover"}
+                    <div class="view-container no-padding">
+                        <MbDiscover />
                     </div>
-                </div>
-            {:else if $currentView.type === "artist-detail" && $currentView.name}
-                <div class="view-container no-padding">
-                    <ArtistDetail artistName={$currentView.name} />
-                </div>
-            {:else if $currentView.type === "playlists"}
-                <div class="view-container no-padding">
-                    <PlaylistView />
-                </div>
-            {:else if $currentView.type === "playlist-detail" && $currentView.id}
-                <div class="view-container no-padding">
-                    <PlaylistDetail playlistId={$currentView.id} />
-                </div>
-            {:else if $currentView.type === "plugins"}
-                <div class="view-container no-padding">
-                    <PluginManager />
-                </div>
-            {:else if $currentView.type === "settings"}
-                <div class="view-container no-padding">
-                    <Settings />
-                </div>
-            {:else if $currentView.type === "home"}
-                <div class="view-container no-padding">
-                    {#if $isMobile}
-                        <MobileHome />
-                    {:else}
-                        <DesktopHome />
-                    {/if}
-                </div>
-            {:else if $currentView.type === "liked-songs"}
-                <div class="view-container no-padding">
-                    <LikedSongs />
-                </div>
-            {:else if $currentView.type === "listenbrainz"}
-                <div class="view-container no-padding">
-                    <Recommendations />
-                </div>
-            {:else if $currentView.type === "discover"}
-                <div class="view-container no-padding">
-                    <MbDiscover />
-                </div>
-            {:else}
-                <div class="view-container">
-                    <div class="empty-state">
-                        <h2>Select a view from the sidebar</h2>
+                {:else}
+                    <div class="view-container">
+                        <div class="empty-state">
+                            <h2>Select a view from the sidebar</h2>
+                        </div>
                     </div>
-                </div>
-            {/if}
-        </div>
-    {/key}
+                {/if}
+            </div>
+        {/key}
     </div>
 </main>
 
@@ -956,6 +1095,7 @@
     .view-header h1 {
         font-size: 2rem;
         font-weight: var(--font-weight-bold);
+        margin: 0;
     }
 
     .view-content {
@@ -965,11 +1105,6 @@
     }
 
     @media (max-width: 768px) {
-        .view-content {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset, 130px) + var(--spacing-md)
-            );
-        }
     }
 
     .empty-state {
@@ -1020,7 +1155,11 @@
         font-size: 0.9375rem;
         font-weight: var(--font-weight-medium);
         cursor: pointer;
-        transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+        transition:
+            background-color 0.15s,
+            color 0.15s,
+            border-color 0.15s,
+            opacity 0.15s;
     }
 
     .pill-active {
@@ -1036,7 +1175,10 @@
         opacity: 0.6;
     }
 
-    .pill-inactive:hover { opacity: 1; color: var(--text-secondary); }
+    .pill-inactive:hover {
+        opacity: 1;
+        color: var(--text-secondary);
+    }
 
     .pill-count {
         font-size: var(--font-size-xs);

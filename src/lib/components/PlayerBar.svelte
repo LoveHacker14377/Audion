@@ -17,6 +17,7 @@
         toggleShuffle,
         cycleRepeat,
         isStreaming,
+        activeBackend,
     } from "$lib/stores/player";
     import { lyricsVisible, toggleLyrics } from "$lib/stores/lyrics";
     import {
@@ -496,6 +497,12 @@
             <div class="plugin-slot" bind:this={slotEnd}></div>
 
             <div class="utility-controls">
+                <!-- Backend indicator -->
+                {#if $activeBackend === 'native'}
+                    <span class="backend-badge native" title="Native audio (Rust/rodio)">N</span>
+                {:else if $activeBackend === 'html5'}
+                    <span class="backend-badge html5" title="HTML5 audio (WebAudio)">H</span>
+                {/if}
                 <!-- Connect button moved into utility group -->
                 <button
                     class="icon-btn connect-btn"
@@ -1039,6 +1046,37 @@
     .volume-bar:hover .volume-thumb {
         transform: translateX(-50%) scale(1.25);
         box-shadow: 0 0 12px var(--accent-primary);
+    }
+
+
+    /* Backend indicator badge */
+    .backend-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        line-height: 1;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+    .backend-badge:hover {
+        opacity: 1;
+    }
+    .backend-badge.native {
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.12);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+    .backend-badge.html5 {
+        color: #60a5fa;
+        background: rgba(96, 165, 250, 0.12);
+        border: 1px solid rgba(96, 165, 250, 0.3);
     }
 
     /* LIVE badge */

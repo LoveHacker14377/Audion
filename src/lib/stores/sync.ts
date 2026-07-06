@@ -167,6 +167,25 @@ export async function initSync(): Promise<void> {
             for (const url of urls) {
                 if (url.startsWith('audion://auth/callback')) {
                     await handleDeepLinkCallback(url);
+                } else if (url.includes('install-plugin')) {
+                    try {
+                        const parsed = new URL(url);
+                        const repoUrl = parsed.searchParams.get('url') || parsed.searchParams.get('repo');
+                        if (repoUrl) {
+                            console.log('[Sync] Deep link plugin install request:', repoUrl);
+                            const { confirm } = await import('./dialogs');
+                            const confirmed = await confirm(
+                                `Do you want to install the plugin from repository:\n\n${repoUrl}?`,
+                                { title: 'Install Plugin', confirmLabel: 'Install', cancelLabel: 'Cancel' }
+                            );
+                            if (confirmed) {
+                                const { pluginStore } = await import('./plugin-store');
+                                await pluginStore.installPluginFromRepo(repoUrl);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('[Sync] Failed to handle plugin install deep link:', err);
+                    }
                 }
             }
         });
@@ -182,16 +201,35 @@ export async function initSync(): Promise<void> {
         const { getCurrent } = await import('@tauri-apps/plugin-deep-link');
         const currentUrls = await getCurrent();
         if (currentUrls && currentUrls.length > 0) {
-            const currentAuth = await invoke<AuthState>('sync_get_auth_state');
-            if (!currentAuth.is_logged_in) {
-                console.log('[Sync] App cold-started with deep link:', currentUrls);
-                for (const url of currentUrls) {
-                    if (url.startsWith('audion://auth/callback')) {
+            console.log('[Sync] App cold-started with deep link:', currentUrls);
+            for (const url of currentUrls) {
+                if (url.startsWith('audion://auth/callback')) {
+                    const currentAuth = await invoke<AuthState>('sync_get_auth_state');
+                    if (!currentAuth.is_logged_in) {
                         await handleDeepLinkCallback(url);
+                    } else {
+                        console.log('[Sync] Skipping getCurrent() deep link — user already logged in');
+                    }
+                } else if (url.includes('install-plugin')) {
+                    try {
+                        const parsed = new URL(url);
+                        const repoUrl = parsed.searchParams.get('url') || parsed.searchParams.get('repo');
+                        if (repoUrl) {
+                            console.log('[Sync] Cold-start plugin install request:', repoUrl);
+                            const { confirm } = await import('./dialogs');
+                            const confirmed = await confirm(
+                                `Do you want to install the plugin from repository:\n\n${repoUrl}?`,
+                                { title: 'Install Plugin', confirmLabel: 'Install', cancelLabel: 'Cancel' }
+                            );
+                            if (confirmed) {
+                                const { pluginStore } = await import('./plugin-store');
+                                await pluginStore.installPluginFromRepo(repoUrl);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('[Sync] Failed to handle cold-start plugin install deep link:', err);
                     }
                 }
-            } else {
-                console.log('[Sync] Skipping getCurrent() deep link — user already logged in');
             }
         }
     } catch (error) {

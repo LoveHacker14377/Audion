@@ -6,7 +6,7 @@
     import { addToast } from "$lib/stores/toast";
     import { buildLikedSongsContextMenu } from "$lib/menus/contextMenus";
     import { _ } from "svelte-i18n";
-    import TrackList from "./TrackList.svelte";
+    import TrackList from "./track-list/TrackList.svelte";
 
     let tracks: Track[] = [];
     let loading = true;
@@ -427,9 +427,6 @@
         }
 
         .liked-body {
-            padding-bottom: calc(
-                var(--mobile-bottom-inset) + var(--spacing-md)
-            );
         }
     }
 </style>
