@@ -437,17 +437,23 @@
               {$currentTrack?.artist || "Unknown Artist"}
             </button>
             {#if $currentTrack?.album}
-              <button
-                class="track-album"
-                on:click={() => {
-                  if ($currentTrack?.album_id) {
-                    toggleFullScreen();
-                    goToAlbumDetail($currentTrack.album_id);
-                  }
-                }}
-              >
-                {$currentTrack.album}
-              </button>
+              {#if $currentTrack?.album_id}
+                <button
+                  class="track-album"
+                  on:click={() => {
+                    if ($currentTrack?.album_id) {
+                      toggleFullScreen();
+                      goToAlbumDetail($currentTrack.album_id);
+                    }
+                  }}
+                >
+                  {$currentTrack.album}
+                </button>
+              {:else}
+                <span class="track-album track-album--static">
+                  {$currentTrack.album}
+                </span>
+              {/if}
             {/if}
           </div>
         {:else}
@@ -772,16 +778,22 @@
               </div>
 
               {#if $currentTrack?.album}
-                <button
-                  class="desktop-album-context"
-                  on:click={() => {
-                    $currentTrack?.album_id &&
-                      (toggleFullScreen(),
-                      goToAlbumDetail($currentTrack.album_id));
-                  }}
-                >
-                  {$currentTrack.album}
-                </button>
+                {#if $currentTrack?.album_id}
+                  <button
+                    class="desktop-album-context"
+                    on:click={() => {
+                      $currentTrack?.album_id &&
+                        (toggleFullScreen(),
+                        goToAlbumDetail($currentTrack.album_id));
+                    }}
+                  >
+                    {$currentTrack.album}
+                  </button>
+                {:else}
+                  <span class="desktop-album-context desktop-album-context--static">
+                    {$currentTrack.album}
+                  </span>
+                {/if}
               {/if}
 
               <div class="action-buttons">
@@ -1111,6 +1123,15 @@
 
   .desktop-album-context:hover {
     color: #fff;
+  }
+
+  .desktop-album-context--static {
+    display: block;
+    cursor: default;
+  }
+
+  .desktop-album-context--static:hover {
+    color: rgba(255, 255, 255, 0.64);
   }
 
   .track-info-header {
@@ -1562,6 +1583,11 @@
     padding: 0;
     margin-top: 2px;
     cursor: pointer;
+  }
+
+  .mobile-view .track-album--static {
+    display: block;
+    cursor: default;
   }
 
   .mobile-view .player-controls {

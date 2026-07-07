@@ -7,6 +7,17 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
+
+/// true if path is folder itself or lives under it, matching on path separators
+fn path_is_within(path: &str, folder: &str) -> bool {
+    let folder = folder.trim_end_matches(['/', '\\']);
+    if path == folder {
+        return true;
+    }
+    path.strip_prefix(folder)
+        .map(|rest| rest.starts_with('/') || rest.starts_with('\\'))
+        .unwrap_or(false)
+}
 use tauri::Emitter;
 use tauri::State;
 
@@ -842,13 +853,13 @@ pub async fn rescan_music(
 
     for (playlist_id, folder_path) in &folder_playlists {
         let already_covered = folders.iter().any(|f| {
-            folder_path.starts_with(f.as_str())
+            path_is_within(folder_path, f.as_str())
         });
     
         if already_covered {
             // Reuse files already collected from the music folder scan above 
             // no need to walk the filesystem again.
-            for file_path in all_files.iter().filter(|p| p.starts_with(folder_path.as_str())) {
+            for file_path in all_files.iter().filter(|p| path_is_within(p, folder_path.as_str())) {
                 file_playlist_map
                     .entry(file_path.clone())
                     .or_default()
@@ -936,7 +947,7 @@ pub async fn scan_folder(
         let folder_playlists = queries::get_folder_playlists(&conn)
             .unwrap_or_default()
             .into_iter()
-            .filter(|(_, p)| p.starts_with(folder_str.as_str()))
+            .filter(|(_, p)| path_is_within(p, folder_str.as_str()))
             .collect::<Vec<_>>();
 
         (folder_playlists, tracks_deleted)
@@ -963,7 +974,7 @@ pub async fn scan_folder(
         } else {
             for file_path in all_files
                 .iter()
-                .filter(|p| p.starts_with(folder_playlist_path.as_str()))
+                .filter(|p| path_is_within(p, folder_playlist_path.as_str()))
             {
                 file_playlist_map
                     .entry(file_path.clone())

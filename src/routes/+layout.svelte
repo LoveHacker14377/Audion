@@ -46,6 +46,7 @@
 
   let handleVisibilityChange: (() => void) | null = null;
   let unlistenRequestLastView: (() => void) | null = null;
+  let unlistenGoToArtist: (() => void) | null = null;
   let migrationStatus = "";
   let showMigrationBanner = false;
   let showPermissionBanner = false;
@@ -118,7 +119,11 @@
     // tray artist click => focus window + navigate to artist detail
     listen<string>("tray://go-to-artist", ({ payload: artist }) => {
       if (artist) goToArtistDetail(artist);
-    }).catch(() => { });
+    })
+      .then((unlisten) => {
+        unlistenGoToArtist = unlisten;
+      })
+      .catch(() => { });
 
     // backend asks the frontend to react right before it actually closes the window
     // see CloseRequested in lib.rs
@@ -269,6 +274,11 @@
     // cleanup the backend's current view request
     if (unlistenRequestLastView) {
       unlistenRequestLastView();
+    }
+
+    // cleanup the tray artist click listener
+    if (unlistenGoToArtist) {
+      unlistenGoToArtist();
     }
 
     // Cleanup Android back handler

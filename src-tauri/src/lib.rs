@@ -915,6 +915,7 @@ pub fn run() {
                     commands::create_playlist,
                     commands::get_playlists,
                     commands::get_playlist_tracks,
+                    commands::get_playlist_track_counts,
                     commands::add_track_to_playlist,
                     commands::remove_track_from_playlist,
                     commands::delete_playlist,
@@ -1123,6 +1124,7 @@ pub fn run() {
                     commands::create_playlist,
                     commands::get_playlists,
                     commands::get_playlist_tracks,
+                    commands::get_playlist_track_counts,
                     commands::add_track_to_playlist,
                     commands::remove_track_from_playlist,
                     commands::delete_playlist,
@@ -1262,26 +1264,25 @@ pub fn run() {
                 }
 
                 // real quit path
-                // only intercept if the frontend explicitly
-                // armed the gate (user picked Later on a downloaded OTA
-                // update)
-                let gate = window.app_handle().state::<OtaExitGate>();
-                if !gate.intercept.load(Ordering::SeqCst) || gate.confirmed.load(Ordering::SeqCst) {
-                    return;
-                }
-
-                api.prevent_close();
-                if !gate.notified.swap(true, Ordering::SeqCst) {
-                    tracing::info!("Close requested, notifying frontend for OTA install-on-close");
-                    let _ = window.emit(OTA_BEFORE_EXIT_EVENT, ());
-                }
 
                 // if we already confirmed the close and are closing for real
                 // (see confirm_close), let this CloseRequested through
+                // regardless of the OTA gate below
                 let confirmed = window
                     .app_handle()
                     .state::<commands::window::CloseConfirmed>();
                 if confirmed.0.load(std::sync::atomic::Ordering::SeqCst) {
+                    return;
+                }
+
+                // only intercept for OTA reasons if the frontend armed the gate
+                let gate = window.app_handle().state::<OtaExitGate>();
+                if gate.intercept.load(Ordering::SeqCst) && !gate.confirmed.load(Ordering::SeqCst) {
+                    api.prevent_close();
+                    if !gate.notified.swap(true, Ordering::SeqCst) {
+                        tracing::info!("Close requested, notifying frontend for OTA install-on-close");
+                        let _ = window.emit(OTA_BEFORE_EXIT_EVENT, ());
+                    }
                     return;
                 }
 

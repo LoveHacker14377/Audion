@@ -220,6 +220,14 @@
       folderListSuccess = false;
       folderListMessage = `Failed to rescan folders: ${error}`;
       console.error("Failed to rescan all folders:", error);
+      // startScan(true) already cleared the library store for the "clean
+      // repopulation" banner; reload from the db so the ui doesn't get
+      // stuck showing an empty library after a failed rescan
+      try {
+        await loadLibrary();
+      } catch (reloadError) {
+        console.error("Failed to reload library after rescan failure:", reloadError);
+      }
     } finally {
       isRescanningAll = false;
       setTimeout(() => {

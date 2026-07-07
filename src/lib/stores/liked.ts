@@ -65,9 +65,15 @@ export async function unlikeAll(): Promise<number> {
     // optimistic clear
     likedTrackIds.set(new Set());
 
-    const results = await Promise.allSettled(
-        idsToUnlike.map((id) => unlikeTrack(id)),
-    );
+    // chunk requests instead of firing hundreds/thousands of concurrent IPC
+    // calls at once for a large liked-songs library
+    const CHUNK_SIZE = 25;
+    const results: PromiseSettledResult<unknown>[] = [];
+    for (let i = 0; i < idsToUnlike.length; i += CHUNK_SIZE) {
+        const chunk = idsToUnlike.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.allSettled(chunk.map((id) => unlikeTrack(id)));
+        results.push(...chunkResults);
+    }
 
     const failedIds = idsToUnlike.filter((_, i) => results[i].status === 'rejected');
 

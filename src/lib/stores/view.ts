@@ -35,6 +35,29 @@ let isNavigating = false;
 
 const LAST_VIEW_STORAGE_KEY = 'audion_last_view_cache';
 
+const KNOWN_VIEW_TYPES: ReadonlySet<ViewType> = new Set<ViewType>([
+    'home',
+    'tracks',
+    'tracks-multiselect',
+    'albums',
+    'album-detail',
+    'artists',
+    'artist-detail',
+    'playlists',
+    'playlist-detail',
+    'liked-songs',
+    'plugins',
+    'settings',
+    'listenbrainz',
+    'discover',
+]);
+
+function isValidViewState(value: unknown): value is ViewState {
+    if (!value || typeof value !== 'object') return false;
+    const type = (value as { type?: unknown }).type;
+    return typeof type === 'string' && KNOWN_VIEW_TYPES.has(type as ViewType);
+}
+
 /**
  * resolves the view to show on launch, synchronously, before any component mounts
  *
@@ -58,7 +81,7 @@ function getInitialView(): ViewState {
             const raw = localStorage.getItem(LAST_VIEW_STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw) as ViewState;
-                if (parsed && parsed.type) return parsed;
+                if (isValidViewState(parsed)) return parsed;
             }
         } catch (error) {
             console.warn('[View] Failed to read cached last view:', error);

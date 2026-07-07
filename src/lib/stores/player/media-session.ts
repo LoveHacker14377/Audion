@@ -365,6 +365,13 @@ function _startTaskbarProgressInterval(): void {
     _taskbarProgressInterval = setInterval(_pushTaskbarProgress, 1000);
 }
 
+function _stopTaskbarProgressInterval(): void {
+    if (_taskbarProgressInterval !== null) {
+        clearInterval(_taskbarProgressInterval);
+        _taskbarProgressInterval = null;
+    }
+}
+
 export function updateSmtcPlaybackState(state: 'playing' | 'paused' | 'none'): void {
     invoke('smtc_set_playback', {
         status: state === 'none' ? 'stopped' : state,
@@ -380,6 +387,7 @@ export function updateSmtcPlaybackState(state: 'playing' | 'paused' | 'none'): v
 
     // taskbar icon progress overlay
     if (state === 'none') {
+        _stopTaskbarProgressInterval();
         invoke('windows_clear_taskbar_progress', {}).catch(() => { });
     } else {
         _pushTaskbarProgress();

@@ -33,11 +33,13 @@
       if (ok) {
         priorityChanged = false;
         priorityError = "";
-        addToast("Lyrics source priority saved", "success");
+        addToast($_('settings.lyricsPrioritySaved', { default: 'Lyrics source priority saved' }), "success");
       } else {
-        priorityError =
-          'Invalid format — lowercase letters and single "/" separators only, e.g. apple/imported/genius. Unknown tokens are also rejected.';
-        addToast("Invalid lyrics priority format", "error");
+        priorityError = $_('settings.lyricsPriorityInvalidFormat', {
+          values: { example: 'apple/imported/genius' },
+          default: 'Invalid format — lowercase letters and single "/" separators only, e.g. apple/imported/genius. Unknown tokens are also rejected.',
+        });
+        addToast($_('settings.lyricsPriorityInvalidToast', { default: 'Invalid lyrics priority format' }), "error");
       }
     }
   
@@ -57,26 +59,28 @@
     function tokenDisplayLabel(token: string): string {
       const t = token.trim().toLowerCase();
       if (!t) return "";
-      if (t === "all") return "All";
+      if (t === "all") return $_('settings.lyricsTokenAll', { default: 'All' });
       return t.charAt(0).toUpperCase() + t.slice(1);
     }
   
     async function handleBulkDeleteLyrics() {
       const token = deleteToken.trim().toLowerCase();
       if (!token) {
-        addToast("Type a source token first", "error");
+        addToast($_('settings.lyricsDeleteEmptyToken', { default: 'Type a source token first' }), "error");
         return;
       }
   
       const label = tokenDisplayLabel(token);
       const message =
         token === "all"
-          ? "Delete ALL cached lyrics — every source, including imported files — for every track in your library? This cannot be undone."
-          : `Delete all "${label}" lyrics for every track in your library? This cannot be undone.`;
+          ? $_('settings.lyricsDeleteAllConfirm', { default: 'Delete ALL cached lyrics — every source, including imported files — for every track in your library? This cannot be undone.' })
+          : $_('settings.lyricsDeleteTokenConfirm', { values: { label }, default: `Delete all "${label}" lyrics for every track in your library? This cannot be undone.` });
   
       const ok = await confirm(message, {
-        title: token === "all" ? "Delete All Lyrics" : `Delete ${label} Lyrics`,
-        confirmLabel: "Delete",
+        title: token === "all"
+          ? $_('settings.lyricsDeleteAllConfirmTitle', { default: 'Delete All Lyrics' })
+          : $_('settings.lyricsDeleteTokenConfirmTitle', { values: { label }, default: `Delete ${label} Lyrics` }),
+        confirmLabel: $_('settings.lyricsDeleteConfirmLabel', { default: 'Delete' }),
         danger: true,
       });
       if (!ok) return;
@@ -86,14 +90,14 @@
         const count = await lyricsStore.deleteLyricsByToken(token);
         addToast(
           count > 0
-            ? `Deleted ${count} ${label} lyrics file${count === 1 ? "" : "s"}`
-            : `No cached ${label} lyrics found to delete`,
+            ? $_('settings.lyricsDeleteSuccess', { values: { count, label, plural: count === 1 ? '' : 's' }, default: `Deleted ${count} ${label} lyrics file${count === 1 ? "" : "s"}` })
+            : $_('settings.lyricsDeleteNoneFound', { values: { label }, default: `No cached ${label} lyrics found to delete` }),
           count > 0 ? "success" : "error",
         );
         if (count > 0) deleteToken = "";
       } catch (err) {
         console.error("[Settings] Bulk lyrics delete failed:", err);
-        addToast(`Failed to delete ${label} lyrics`, "error");
+        addToast($_('settings.lyricsDeleteFailed', { values: { label }, default: `Failed to delete ${label} lyrics` }), "error");
       } finally {
         isBulkDeletingLyrics = false;
       }
@@ -121,11 +125,12 @@
   
           <!-- source priority -->
           <div class="inner-section">
-            <span class="setting-title">Auto-fetch source priority</span>
+            <span class="setting-title">{$_('settings.lyricsPriorityTitle', { default: 'Auto-fetch source priority' })}</span>
             <span class="setting-description">
-              Controls the order sources are tried automatically, e.g. <code>apple/imported/genius</code>.
-              Lowercase letters and single "/" separators only. Leave blank to use the default order.
-              Manual source selection in the lyrics panel is unaffected.
+              {$_('settings.lyricsPriorityDesc', {
+                values: { example: 'apple/imported/genius' },
+                default: 'Controls the order sources are tried automatically, e.g. apple/imported/genius. Lowercase letters and single "/" separators only. Leave blank to use the default order. Manual source selection in the lyrics panel is unaffected.',
+              })}
             </span>
             <div class="lyrics-priority-row">
               <input
@@ -134,15 +139,15 @@
                 bind:value={priorityInput}
                 on:input={handlePriorityInput}
                 on:keydown={(e) => e.key === 'Enter' && priorityChanged && handlePrioritySave()}
-                placeholder="apple/imported/genius"
-                aria-label="Lyrics source priority"
+                placeholder={$_('settings.lyricsPriorityPlaceholder', { default: 'apple/imported/genius' })}
+                aria-label={$_('settings.lyricsPriorityInputLabel', { default: 'Lyrics source priority' })}
               />
               {#if priorityChanged}
-                <button class="btn-outline-compact" on:click={handlePrioritySave}>Save</button>
+                <button class="btn-outline-compact" on:click={handlePrioritySave}>{$_('settings.save', { default: 'Save' })}</button>
               {/if}
             </div>
             {#if priorityInput.trim() !== '' && priorityChanged}
-              <button class="lyrics-priority-clear" on:click={handlePriorityReset}>Reset to default</button>
+              <button class="lyrics-priority-clear" on:click={handlePriorityReset}>{$_('settings.lyricsPriorityResetToDefault', { default: 'Reset to default' })}</button>
             {/if}
             {#if priorityError}
               <p class="error-message" role="alert">{priorityError}</p>
@@ -153,28 +158,30 @@
   
           <!-- bulk delete by token -->
           <div class="inner-section">
-            <span class="setting-title">Delete cached lyrics</span>
+            <span class="setting-title">{$_('settings.lyricsDeleteTitle', { default: 'Delete cached lyrics' })}</span>
             <span class="setting-description">
-              Permanently delete every cached lyrics file for a given source, across your whole library.
-              Type a source token (e.g. <code>apple</code>, <code>imported</code>, or <code>all</code> for everything).
+              {$_('settings.lyricsDeleteDesc', {
+                values: { apple: 'apple', imported: 'imported', all: 'all' },
+                default: 'Permanently delete every cached lyrics file for a given source, across your whole library. Type a source token (e.g. apple, imported, or all for everything).',
+              })}
             </span>
             <div class="lyrics-delete-row">
-              <span class="lyrics-delete-label">Delete all</span>
+              <span class="lyrics-delete-label">{$_('settings.lyricsDeleteAllLabel', { default: 'Delete all' })}</span>
               <input
                 type="text"
                 class="lyrics-text-input lyrics-token-input"
                 bind:value={deleteToken}
-                placeholder="token"
-                aria-label="Lyrics source token to delete"
+                placeholder={$_('settings.lyricsDeleteTokenPlaceholder', { default: 'token' })}
+                aria-label={$_('settings.lyricsDeleteTokenInputLabel', { default: 'Lyrics source token to delete' })}
                 disabled={isBulkDeletingLyrics}
               />
-              <span class="lyrics-delete-label">lyrics</span>
+              <span class="lyrics-delete-label">{$_('settings.lyricsDeleteLyricsLabel', { default: 'lyrics' })}</span>
               <button
                 class="lyrics-delete-btn"
                 on:click={handleBulkDeleteLyrics}
                 disabled={isBulkDeletingLyrics || !deleteToken.trim()}
-                aria-label="Delete lyrics for this source"
-                title="Delete all cached lyrics for this source"
+                aria-label={$_('settings.lyricsDeleteButtonLabel', { default: 'Delete lyrics for this source' })}
+                title={$_('settings.lyricsDeleteButtonTitle', { default: 'Delete all cached lyrics for this source' })}
               >
                 {#if isBulkDeletingLyrics}
                   <div class="lyrics-delete-spinner"></div>

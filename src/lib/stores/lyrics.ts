@@ -816,7 +816,7 @@ export async function switchLyricsSource(sourceId: string): Promise<void> {
 
         if (result) {
             lyricsData.set(result);
-            await refreshAvailableSources(track.path);
+            await refreshAvailableSources(track.path, !!track.source_type);
             addToast(`Switched to ${label}`, 'success');
         } else {
             selectedSource.set(previousSource);
@@ -938,7 +938,7 @@ export const lyricsStore = {
         } catch { /* non-fatal */ }
         lyricsData.set(null);
         lyricsError.set(null);
-        await refreshAvailableSources(track.path);
+        await refreshAvailableSources(track.path, !!track.source_type);
         await fetchLyricsForTrack();
     },
 
@@ -949,7 +949,7 @@ export const lyricsStore = {
         try {
             await invoke('delete_source_lyrics_file', { musicPath: track.path, sourceId });
         } catch { /* non-fatal */ }
-        await refreshAvailableSources(track.path);
+        await refreshAvailableSources(track.path, !!track.source_type);
         if (get(lyricsData)?.source === sourceId) {
             lyricsData.set(null);
             await fetchLyricsForTrack();
@@ -993,24 +993,33 @@ export const lyricsStore = {
     async clearAllLyricsForTrack(): Promise<void> {
         const track = get(currentTrack);
         if (!track) return;
+        const isStream = !!track.source_type;
 
         // get_cached_sources only reports registered api sources
         // so user is deleted separately (it's a virtual source outside the registry)
-        const cachedIds = await refreshAvailableSources(track.path);
+        const cachedIds = await refreshAvailableSources(track.path, isStream);
         const idsToDelete = new Set<string>(cachedIds.filter(id => id !== 'embedded'));
         idsToDelete.add('user');
 
-        await Promise.all(
+        const results = await Promise.allSettled(
             Array.from(idsToDelete).map(id =>
                 id === 'user'
-                    ? invoke('delete_user_lyrics_file', { musicPath: track.path }).catch(() => {})
-                    : invoke('delete_source_lyrics_file', { musicPath: track.path, sourceId: id }).catch(() => {})
+                    ? invoke('delete_user_lyrics_file', { musicPath: track.path })
+                    : invoke('delete_source_lyrics_file', { musicPath: track.path, sourceId: id })
             )
         );
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+            console.error(
+                `[Lyrics] Failed to delete ${failed.length} of ${results.length} cached lyrics files:`,
+                failed,
+            );
+            addToast(`Failed to delete ${failed.length} cached lyrics file${failed.length === 1 ? '' : 's'}`, 'error');
+        }
 
         lyricsData.set(null);
         lyricsError.set(null);
-        await refreshAvailableSources(track.path);
+        await refreshAvailableSources(track.path, isStream);
         await fetchLyricsForTrack();
     },
 

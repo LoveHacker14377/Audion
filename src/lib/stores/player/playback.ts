@@ -183,7 +183,7 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
 
     console.log('[Player] Preparing MediaSession metadata for:', trackForPlugins.title);
     await updateMediaSessionMetadata(trackForPlugins);
-    await updateSmtcMetadata(trackForPlugins);
+    await updateSmtcMetadata(trackForPlugins).catch(e => console.warn('[Player] SMTC metadata update failed:', e));
 
     if (!track.track_cover_path && !track.cover_url) {
         fetchTrackCover(track).then(async (newCoverUrl) => {
@@ -304,20 +304,13 @@ export async function playTrack(track: Track, skipLocalSrc = false, startTime = 
                 if (_nativeAudioUsed) {
                     html5Stop();
 
-                    console.log('[Player] Invoking nativeAudioPlay');
-                    console.log('[Player] audioPath:', audioPath);
-                    console.log('[Player] track.id:', track.id);
-                    console.log('[Player] track.source_type:', (track as any).source_type);
-                    console.log('[Player] track.local_src:', (track as any).local_src);
-                    console.log('[Player] track.path:', track.path);
+                    console.log('[Player] Invoking nativeAudioPlay for track:', track.id);
 
                     try {
                         await nativeAudioPlay(audioPath, track.id, (track as any).replay_gain_db ?? null);
                         console.log('[Player] nativeAudioPlay resolved OK');
                     } catch (nativeErr) {
-                        console.error('[Player] nativeAudioPlay rejected:', nativeErr);
-                        console.error('[Player] nativeAudioPlay error type:', typeof nativeErr);
-                        console.error('[Player] nativeAudioPlay error JSON:', JSON.stringify(nativeErr));
+                        console.error('[Player] nativeAudioPlay rejected for track:', track.id, nativeErr);
                         throw nativeErr;
                     }
                     activeBackend.set('native');
@@ -812,7 +805,7 @@ async function _advanceUiToTrack(track: Track): Promise<void> {
     await updateMediaSessionMetadata(trackForPlugins);
     updateMediaSessionPlaybackState('playing');
     updateMediaSessionPosition();
-    await updateSmtcMetadata(trackForPlugins);
+    await updateSmtcMetadata(trackForPlugins).catch(e => console.warn('[Player] SMTC metadata update failed:', e));
     updateSmtcPlaybackState('playing');
     broadcastState(true);
 

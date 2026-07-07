@@ -491,6 +491,12 @@ export async function getPlaylistTracks(playlistId: number): Promise<Track[]> {
     return await invoke('get_playlist_tracks', { playlistId });
 }
 
+/** batched track counts for the given playlist ids
+ * playlists with zero tracks are absent from the returned map */
+export async function getPlaylistTrackCounts(playlistIds: number[]): Promise<Record<number, number>> {
+    return await invoke('get_playlist_track_counts', { playlistIds });
+}
+
 export async function addTrackToPlaylist(playlistId: number, trackId: number): Promise<void> {
     return await invoke('add_track_to_playlist', { playlistId, trackId });
 }
@@ -545,7 +551,12 @@ async function exportZip(
 
         // 3: copy finished zip to the user-picked URI (kotlin cleans up tempPath either way)
         const ok = await commitAndroidSave(tempPath, uri);
-        if (!ok) return null;
+        if (!ok) {
+            // distinct from user cancelled: the compression succeeded but
+            // the final copy to the picked URI failed, so surface this as a
+            // real error
+            throw new Error('Failed to copy exported file to the selected location');
+        }
 
         return result;
     }
@@ -752,10 +763,23 @@ async function _saveFileDesktop(
     return selected ?? null;
 }
 
+// serialize all Android native save/commit calls through
+// this queue so only one round-trip to native code is ever in flight
+let _androidSaveQueue: Promise<unknown> = Promise.resolve();
+function _queueAndroidNativeCall<T>(fn: () => Promise<T>): Promise<T> {
+    const run = () => fn();
+    const result = _androidSaveQueue.then(run, run);
+    _androidSaveQueue = result.then(
+        () => undefined,
+        () => undefined,
+    );
+    return result;
+}
+
 function _saveFileAndroid(
     options: Extract<SaveFileOptions, { platform: 'android' }>,
 ): Promise<string | null> {
-    return new Promise((resolve) => {
+    return _queueAndroidNativeCall(() => new Promise<string | null>((resolve) => {
         const finish = (uri: string | null) => {
             delete (window as any).__onAndroidFileSaved;
             resolve(uri);
@@ -772,7 +796,7 @@ function _saveFileAndroid(
         // native bridge unavailable
         delete (window as any).__onAndroidFileSaved;
         resolve(null);
-    });
+    }));
 }
 
 /**
@@ -800,7 +824,7 @@ export async function saveFile(options: SaveFileOptions): Promise<string | null>
  * returns true on success, false if the copy failed
  */
 export function commitAndroidSave(tempPath: string, uri: string): Promise<boolean> {
-    return new Promise((resolve) => {
+    return _queueAndroidNativeCall(() => new Promise<boolean>((resolve) => {
         const finish = (ok: boolean) => {
             delete (window as any).__onAndroidFileCopied;
             resolve(ok);
@@ -816,7 +840,7 @@ export function commitAndroidSave(tempPath: string, uri: string): Promise<boolea
 
         delete (window as any).__onAndroidFileCopied;
         resolve(false);
-    });
+    }));
 }
 
 // Ensure the correct path for downloaded files

@@ -184,41 +184,64 @@ fn write_zip(
 
     let json_bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
 
-    // open destination file and wrap in BufWriter => one syscall per 8 KB
-    let dest_file = std::fs::File::create(dest)
-        .map_err(|e| format!("Cannot create {}: {e}", dest.display()))?;
-    let dest_writer = std::io::BufWriter::new(dest_file);
-    let mut zip = ZipWriter::new(dest_writer);
+    // write to a temp file in the same directory first, then rename into place
+    let tmp_dest = dest.with_extension("part");
+    // cleanup of a stale temp file from a previous failed attempt
+    let _ = std::fs::remove_file(&tmp_dest);
 
-    let options = SimpleFileOptions::default()
-    .compression_method(CompressionMethod::Stored);
-    // playlist.json
-    zip.start_file("playlist.json", options).map_err(|e| e.to_string())?;
-    zip.write_all(&json_bytes).map_err(|e| e.to_string())?;
+    let result = (|| -> Result<ExportSummary, String> {
+        let dest_file = std::fs::File::create(&tmp_dest)
+            .map_err(|e| format!("Cannot create {}: {e}", tmp_dest.display()))?;
+        let dest_writer = std::io::BufWriter::new(dest_file);
+        let mut zip = ZipWriter::new(dest_writer);
 
-    zip.add_directory("files/", options).map_err(|e| e.to_string())?;
+        let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Stored);
+        // playlist.json
+        zip.start_file("playlist.json", options).map_err(|e| e.to_string())?;
+        zip.write_all(&json_bytes).map_err(|e| e.to_string())?;
 
-    for entry in &entries {
-        let (file_path, zip_name) = match (&entry.local_path, &entry.export.zip_path) {
-            (Some(p), Some(n)) => (p, n),
-            _ => continue, // no local file — skip
-        };
+        zip.add_directory("files/", options).map_err(|e| e.to_string())?;
 
-        zip.start_file(zip_name, options).map_err(|e| e.to_string())?;
+        for entry in &entries {
+            let (file_path, zip_name) = match (&entry.local_path, &entry.export.zip_path) {
+                (Some(p), Some(n)) => (p, n),
+                _ => continue, // no local file — skip
+            };
 
-        let f = std::fs::File::open(file_path)
-            .map_err(|e| format!("Cannot open {}: {e}", file_path.display()))?;
+            zip.start_file(zip_name, options).map_err(|e| e.to_string())?;
 
-        // BufReader pulls 8 KB at a time; io::copy feeds it into
-        // the ZipWriter => BufWriter => file
-        let mut reader = BufReader::new(f);
-        std::io::copy(&mut reader, &mut zip)
-            .map_err(|e| format!("IO error writing {}: {e}", file_path.display()))?;
+            let f = std::fs::File::open(file_path)
+                .map_err(|e| format!("Cannot open {}: {e}", file_path.display()))?;
+
+            // BufReader pulls 8 KB at a time; io::copy feeds it into
+            // the ZipWriter => BufWriter => file
+            let mut reader = BufReader::new(f);
+            std::io::copy(&mut reader, &mut zip)
+                .map_err(|e| format!("IO error writing {}: {e}", file_path.display()))?;
+        }
+
+        zip.finish().map_err(|e| e.to_string())?;
+
+        Ok(ExportSummary { track_count, skipped_count })
+    })();
+
+    // only touch the real destination once everything above succeeded
+    match result {
+        Ok(summary) => {
+            std::fs::rename(&tmp_dest, dest).map_err(|e| {
+                format!(
+                    "Export succeeded but failed to finalize {}: {e}",
+                    dest.display()
+                )
+            })?;
+            Ok(summary)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_dest);
+            Err(e)
+        }
     }
-
-    zip.finish().map_err(|e| e.to_string())?;
-
-    Ok(ExportSummary { track_count, skipped_count })
 }
 
 // liked songs: load tracks (call with lock held) ================================================
@@ -348,7 +371,13 @@ pub async fn get_export_temp_path(
         .app_cache_dir()
         .map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
-    Ok(cache_dir.join(&name).to_string_lossy().into_owned())
+
+    // only allow a bare filename: strip any directory components
+    let safe_name = Path::new(&name)
+        .file_name()
+        .ok_or_else(|| "Invalid file name".to_string())?;
+
+    Ok(cache_dir.join(safe_name).to_string_lossy().into_owned())
 }
 
 #[tauri::command]

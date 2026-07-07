@@ -59,13 +59,17 @@ function createProgressiveScanStore() {
 
             const trackUpdateStart = performance.now();
             // dedupe by id before merging: a batch can contain tracks that
-            // already exist in the store
-            // could happen when scanning a single folder
+            // already exist in the store (could happen when scanning a
+            // single folder), and the batch itself can contain duplicate
+            // ids, so dedupe both against the store and within the batch
             let mergedLength = 0;
             tracks.update(existing => {
-                const batchIds = new Set(batchTracks.map(t => t.id));
+                const dedupedBatch = Array.from(
+                    new Map(batchTracks.map(t => [t.id, t])).values(),
+                );
+                const batchIds = new Set(dedupedBatch.map(t => t.id));
                 const deduped = existing.filter(t => !batchIds.has(t.id));
-                const merged = [...deduped, ...batchTracks];
+                const merged = [...deduped, ...dedupedBatch];
                 mergedLength = merged.length;
                 return merged;
             });

@@ -434,6 +434,9 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
         ];
     }
 
+    // delete is only enabled for local tracks (used by both player and full variants below)
+    const isDeletable = !track.source_type || track.source_type === 'local' || track.source_type === 'server';
+
     // player (FullscreenPlayer full menu) ======================================================
     if (variant === 'player') {
         return [
@@ -451,7 +454,9 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
             {
                 label: t('contextMenu.deleteFromLibrary'),
                 danger: true,
+                disabled: !isDeletable,
                 action: async () => {
+                    if (!isDeletable) return;
                     const ok = await confirm(
                         `Are you sure you want to delete "${track.title}" from your library?`,
                         { title: 'Delete Track', confirmLabel: 'Delete', danger: true },
@@ -471,8 +476,6 @@ export function buildTrackContextMenu(opts: TrackMenuOptions): ContextMenuItem[]
 
     // full (TrackList, SearchResults)========================================================================
     //
-    // delete is only enabled for local tracks
-    const isDeletable = !track.source_type || track.source_type === 'local' || track.source_type === 'server';
 
     const items: ContextMenuItem[] = [
         { label: t('contextMenu.play'), action: doPlay, disabled: isUnavailable },
@@ -668,8 +671,20 @@ export function buildArtistContextMenu<A extends Artist | { name: string } = Art
         try {
             const tracks = await getTracksByArtist(artist.name);
             if (tracks.length === 0) return;
-            await Promise.all(tracks.map((track) => addTrackToPlaylist(pid, track.id)));
-            adjustPlaylistTrackCount(pid, tracks.length);
+            const results = await Promise.allSettled(
+                tracks.map((track) => addTrackToPlaylist(pid, track.id)),
+            );
+            const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+            if (succeeded > 0) {
+                adjustPlaylistTrackCount(pid, succeeded);
+            }
+            const failed = results.length - succeeded;
+            if (failed > 0) {
+                console.error(
+                    `[contextMenus] addArtistToPlaylist: ${failed} of ${results.length} tracks failed to add`,
+                    results.filter((r) => r.status === 'rejected'),
+                );
+            }
         } catch (err) {
             console.error('[contextMenus] addArtistToPlaylist failed:', err);
         }

@@ -59,11 +59,23 @@ pub fn remove_music_folder(conn: &Connection, path: &str) -> Result<()> {
 /// a single transaction with one bulk DELETE
 /// returns the number of tracks deleted
 pub fn remove_folder_with_tracks(conn: &Connection, folder_path: &str) -> Result<usize> {
-    let pattern = format!("{}%", folder_path);
+    // escape existing SQL LIKE wildcards in the folder path itself
+    // then match either the folder exactly or anything under it via a path separator boundary
+    fn escape_like(s: &str) -> String {
+        s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+    }
+    let escaped = escape_like(folder_path);
+    let pattern_children = format!("{}/%", escaped);
+    let pattern_children_win = format!("{}\\%", escaped);
 
     let tx = conn.unchecked_transaction()?;
 
-    let deleted = tx.execute("DELETE FROM tracks WHERE path LIKE ?1", params![pattern])?;
+    let deleted = tx.execute(
+        "DELETE FROM tracks WHERE path = ?1 \
+         OR path LIKE ?2 ESCAPE '\\' \
+         OR path LIKE ?3 ESCAPE '\\'",
+        params![folder_path, pattern_children, pattern_children_win],
+    )?;
 
     tx.execute(
         "DELETE FROM music_folders WHERE path = ?1",

@@ -291,7 +291,7 @@
                             {/each}
                             {#if $searchResults.tracks.length > visibleTracks}
                                 <button class="load-more" on:click={() => visibleTracks += 10}>
-                                    Load more ({$searchResults.tracks.length - visibleTracks} left)
+                                    {$_('search.loadMore', { values: { count: $searchResults.tracks.length - visibleTracks }, default: `Load more (${$searchResults.tracks.length - visibleTracks} left)` })}
                                 </button>
                             {/if}
                         </div>
@@ -362,7 +362,7 @@
                         </div>
                         {#if $searchResults.albums.length > visibleAlbums}
                             <button class="load-more" on:click={() => visibleAlbums += 6}>
-                                Load more ({$searchResults.albums.length - visibleAlbums} left)
+                                {$_('search.loadMore', { values: { count: $searchResults.albums.length - visibleAlbums }, default: `Load more (${$searchResults.albums.length - visibleAlbums} left)` })}
                             </button>
                         {/if}
                     </section>
@@ -402,7 +402,7 @@
                         </div>
                         {#if $searchResults.artists.length > visibleArtists}
                             <button class="load-more" on:click={() => visibleArtists += 6}>
-                                Load more ({$searchResults.artists.length - visibleArtists} left)
+                                {$_('search.loadMore', { values: { count: $searchResults.artists.length - visibleArtists }, default: `Load more (${$searchResults.artists.length - visibleArtists} left)` })}
                             </button>
                         {/if}
                     </section>
@@ -440,7 +440,7 @@
                         </div>
                         {#if $searchResults.playlists.length > visiblePlaylists}
                             <button class="load-more" on:click={() => visiblePlaylists += 6}>
-                                Load more ({$searchResults.playlists.length - visiblePlaylists} left)
+                                {$_('search.loadMore', { values: { count: $searchResults.playlists.length - visiblePlaylists }, default: `Load more (${$searchResults.playlists.length - visiblePlaylists} left)` })}
                             </button>
                         {/if}
                     </section>

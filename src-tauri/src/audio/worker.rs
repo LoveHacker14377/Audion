@@ -70,6 +70,11 @@ impl PlaybackStateSync {
         let device_list_clone = Arc::clone(&device_list);
 
         std::thread::spawn(move || {
+            // retry a bounded number of times with fresh engine state
+            const MAX_RESTARTS: u32 = 5;
+            let mut restarts = 0u32;
+
+            'restart: loop {
             let mut engine_opt: Option<AudioEngine> = None;
             let mut eq_settings = EqSettings::default();
 
@@ -401,19 +406,43 @@ impl PlaybackStateSync {
                 }
             }})); // closes: loop, AssertUnwindSafe closure, catch_unwind
 
-            if let Err(payload) = result {
-                let msg = payload
-                    .downcast_ref::<&str>()
-                    .copied()
-                    .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
-                    .unwrap_or("(non-string panic payload)");
-                tracing::error!("[AUDIO] Command thread panicked: {}", msg);
-                if let Err(e) = app_handle.emit("audio://event", &AudioEvent::Error {
-                    message: format!("Audio engine crashed: {}", msg),
-                }) {
-                    tracing::warn!("[AUDIO] Failed to emit panic error event: {}", e);
+            match result {
+                // rx disconnected (app shutting down) or an explicit break: exit for real.
+                Ok(()) => break 'restart,
+                Err(payload) => {
+                    let msg = payload
+                        .downcast_ref::<&str>()
+                        .copied()
+                        .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
+                        .unwrap_or("(non-string panic payload)");
+                    tracing::error!("[AUDIO] Command thread panicked: {}", msg);
+
+                    restarts += 1;
+                    if restarts > MAX_RESTARTS {
+                        tracing::error!(
+                            "[AUDIO] Command thread panicked {} times, giving up",
+                            restarts
+                        );
+                        if let Err(e) = app_handle.emit("audio://event", &AudioEvent::Error {
+                            message: format!(
+                                "Audio engine crashed repeatedly and could not recover: {}",
+                                msg
+                            ),
+                        }) {
+                            tracing::warn!("[AUDIO] Failed to emit panic error event: {}", e);
+                        }
+                        break 'restart;
+                    }
+
+                    if let Err(e) = app_handle.emit("audio://event", &AudioEvent::Error {
+                        message: format!("Audio engine crashed, recovering: {}", msg),
+                    }) {
+                        tracing::warn!("[AUDIO] Failed to emit panic error event: {}", e);
+                    }
+                    // loop back around and rebuild engine_opt/event_rx from scratch
                 }
             }
+            } // restart loop
         });
 
         Self {

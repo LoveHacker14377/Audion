@@ -30,6 +30,15 @@ pub async fn get_playlist_tracks(
 }
 
 #[tauri::command]
+pub async fn get_playlist_track_counts(
+    playlist_ids: Vec<i64>,
+    sync_state: State<'_, crate::sync::SyncState>,
+) -> Result<std::collections::HashMap<i64, i64>, String> {
+    let provider = sync_state.active_provider();
+    provider.get_playlist_track_counts(&playlist_ids).await
+}
+
+#[tauri::command]
 pub async fn add_track_to_playlist(
     playlist_id: i64,
     track_id: i64,

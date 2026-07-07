@@ -1,7 +1,7 @@
 // Library store - manages music library state
 import { writable, derived, get } from 'svelte/store';
 import type { Track, Album, Artist, Playlist, ScanBatchEvent } from '$lib/api/tauri';
-import { getLibrary, getPlaylists, getPlaylistTracks, getAlbumCoverSrc, getAlbumArtSrc, getTracksPaginated, getAlbumsPaginated, searchLibrary, convertFileSrc } from '$lib/api/tauri';
+import { getLibrary, getPlaylists, getPlaylistTracks, getPlaylistTrackCounts, getAlbumCoverSrc, getAlbumArtSrc, getTracksPaginated, getAlbumsPaginated, searchLibrary, convertFileSrc } from '$lib/api/tauri';
 import { customArtworks, getCustomArtworkSync } from './customArtwork';
 import { playlistCovers, getPlaylistCoverSync } from './playlistCovers';
 
@@ -221,18 +221,40 @@ export const playlistTrackCounts = writable<Record<number, number>>({});
  * called once from loadPlaylists
  * don't call after every single track mutation
  * use adjustPlaylistTrackCount for that instead
+ *
+ * skipped entirely when the set of playlist ids
+ * hasn't changed since the last successful fetch (e.g. a rename or a
+ * playlist-metadata-only reload)
+ * any real track mutation goes through adjustPlaylistTrackCount instead
+ *
+ * generation token guards against a slower call finishing after a
+ * newer one (or after adjustPlaylistTrackCount/setPlaylistTrackCount
+ * landed while this was in flight) and clobbering fresher state
  */
+let _trackCountsGeneration = 0;
+let _lastCountedPlaylistIds = '';
 async function loadPlaylistTrackCounts(playlistList: Playlist[]): Promise<void> {
+    const ids = playlistList.map(p => p.id).sort((a, b) => a - b);
+    const idsKey = ids.join(',');
+    if (idsKey === _lastCountedPlaylistIds) return;
+
+    const generation = ++_trackCountsGeneration;
+    let fetched: Record<number, number>;
+    try {
+        fetched = await getPlaylistTrackCounts(ids);
+    } catch (error) {
+        console.error('[Library] Failed to get playlist track counts:', error);
+        return;
+    }
+    // a newer call started (or finished) while we were fetching =>
+    // don't stomp on more recent state with this stale result
+    if (generation !== _trackCountsGeneration) return;
+
+    // playlists absent from the response have zero tracks
     const counts: Record<number, number> = {};
-    await Promise.all(playlistList.map(async (playlist) => {
-        try {
-            const tracks = await getPlaylistTracks(playlist.id);
-            counts[playlist.id] = tracks.length;
-        } catch (error) {
-            console.error(`[Library] Failed to get track count for playlist ${playlist.id}:`, error);
-            counts[playlist.id] = 0;
-        }
-    }));
+    for (const id of ids) counts[id] = fetched[id] ?? 0;
+
+    _lastCountedPlaylistIds = idsKey;
     playlistTrackCounts.set(counts);
 }
 
@@ -841,6 +863,7 @@ export async function clearLibrary(): Promise<void> {
     artists.set([]);
     playlists.set([]);
     playlistTrackCounts.set({});
+    _lastCountedPlaylistIds = '';
     lastError.set(null);
 
     // Revoke all blob URLs before clearing caches

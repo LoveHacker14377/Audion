@@ -271,11 +271,25 @@ pub struct CachedSourceInfo {
 /// token == all matches any recognised lyrics file regardless of source
 /// purely structural => never checks against a list of known source ids, so new sources added later need no maintainenence
 fn filename_matches_token(filename: &str, token: &str) -> bool {
-    let parts: Vec<&str> = filename.split('.').collect();
-    match parts.len() {
-        2 => KNOWN_FORMATS.contains(&parts[1]) && (token == "all" || token == "user"),
-        3 => KNOWN_FORMATS.contains(&parts[2]) && (token == "all" || parts[1].to_lowercase() == token),
-        _ => false,
+    // match from the right
+    let mut rsplit = filename.rsplitn(3, '.');
+    let ext = match rsplit.next() {
+        Some(e) => e,
+        None => return false,
+    };
+    if !KNOWN_FORMATS.contains(&ext) {
+        return false;
+    }
+    let middle = match rsplit.next() {
+        Some(m) => m,
+        None => return false,
+    };
+    // if there's nothing left before middle, then middle is the stem
+    // (no source segment) => user-imported file
+    if rsplit.next().is_none() {
+        token == "all" || token == "user"
+    } else {
+        token == "all" || middle.to_lowercase() == token
     }
 }
 

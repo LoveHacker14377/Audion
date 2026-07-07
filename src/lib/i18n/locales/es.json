@@ -236,7 +236,34 @@
     "shortcutsHint": "Consejo: también puedes abrir esto en cualquier momento pulsando",
     "shortcutsDisabledHint": "Activa los atajos de teclado para usar la ayuda rápida con Shift + /",
     "otaEnabled": "Actualizaciones automáticas",
-    "otaEnabledDesc": "Descarga e instala las actualizaciones dentro de la app en lugar de mediante GitHub releases"
+    "otaEnabledDesc": "Descarga e instala las actualizaciones dentro de la app en lugar de mediante GitHub releases",
+    "lyricsPriorityTitle": "Prioridad de fuentes de obtención automática",
+    "lyricsPriorityDesc": "Controla el orden en que se prueban las fuentes automáticamente, p. ej. {example}. Solo letras minúsculas y separadores \"/\" simples. Déjelo en blanco para usar el orden predeterminado. La selección manual de la fuente en el panel de letras no se ve afectada.",
+    "lyricsPriorityPlaceholder": "apple/imported/genius",
+    "lyricsPriorityInputLabel": "Prioridad de fuentes de letras",
+    "save": "Guardar",
+    "lyricsPriorityResetToDefault": "Restablecer al valor predeterminado",
+    "lyricsPrioritySaved": "Prioridad de fuentes de letras guardada",
+    "lyricsPriorityInvalidFormat": "Formato inválido — solo letras minúsculas y separadores \"/\" simples, p. ej. {example}. Los tokens desconocidos también se rechazan.",
+    "lyricsPriorityInvalidToast": "Formato de prioridad de letras inválido",
+    "lyricsDeleteTitle": "Eliminar letras en caché",
+    "lyricsDeleteDesc": "Elimina permanentemente cada archivo de letras en caché para una fuente determinada, en toda tu biblioteca. Escribe un token de fuente (p. ej. {apple}, {imported}, o {all} para todo).",
+    "lyricsDeleteAllLabel": "Eliminar todo",
+    "lyricsDeleteLyricsLabel": "letras",
+    "lyricsDeleteTokenPlaceholder": "token",
+    "lyricsDeleteTokenInputLabel": "Token de fuente de letras a eliminar",
+    "lyricsDeleteButtonLabel": "Eliminar letras de esta fuente",
+    "lyricsDeleteButtonTitle": "Eliminar todas las letras en caché de esta fuente",
+    "lyricsDeleteEmptyToken": "Escribe primero un token de fuente",
+    "lyricsDeleteAllConfirm": "¿Eliminar TODAS las letras en caché — todas las fuentes, incluidos los archivos importados — de cada pista de tu biblioteca? Esto no se puede deshacer.",
+    "lyricsDeleteTokenConfirm": "¿Eliminar todas las letras \"{label}\" de cada pista de tu biblioteca? Esto no se puede deshacer.",
+    "lyricsDeleteAllConfirmTitle": "Eliminar todas las letras",
+    "lyricsDeleteTokenConfirmTitle": "Eliminar letras de {label}",
+    "lyricsDeleteConfirmLabel": "Eliminar",
+    "lyricsDeleteSuccess": "Se eliminó {count} archivo{plural} de letras de {label}",
+    "lyricsDeleteNoneFound": "No se encontraron letras de {label} en caché para eliminar",
+    "lyricsDeleteFailed": "Error al eliminar las letras de {label}",
+    "lyricsTokenAll": "Todas"
   },
   "updatePopup": {
     "restartToUpdate": "Reiniciar para actualizar",
@@ -287,5 +314,8 @@
     "installedSuccess": "¡Instalado!",
     "failed": "Falló",
     "grantAndInstall": "Otorgar e Instalar"
+  },
+  "search": {
+    "loadMore": "Cargar más ({count} restantes)"
   }
 }
