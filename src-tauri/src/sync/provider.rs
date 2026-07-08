@@ -414,11 +414,12 @@ impl LibraryProvider for LocalProvider {
     ) -> Result<std::collections::HashMap<i64, i64>, String> {
         let conn = self.db.conn.lock().map_err(|e| e.to_string())?;
         let all_counts = queries::get_playlist_track_counts(&conn).map_err(|e| e.to_string())?;
+        let requested_ids: std::collections::HashSet<i64> = playlist_ids.iter().copied().collect();
         // only return counts for the requested ids (playlists not in
         // all_counts have zero tracks and are omitted)
         Ok(all_counts
             .into_iter()
-            .filter(|(id, _)| playlist_ids.contains(id))
+            .filter(|(id, _)| requested_ids.contains(id))
             .collect())
     }
 

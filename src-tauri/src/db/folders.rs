@@ -66,7 +66,10 @@ pub fn remove_folder_with_tracks(conn: &Connection, folder_path: &str) -> Result
     }
     let escaped = escape_like(folder_path);
     let pattern_children = format!("{}/%", escaped);
-    let pattern_children_win = format!("{}\\%", escaped);
+    // under ESCAPE '\', a bare "\%" is read as an escaped literal
+    // percent sign, not "backslash + wildcard" => so the separator
+    // backslash itself must be escaped (\\) to keep % as a wildcard
+    let pattern_children_win = format!("{}\\\\%", escaped);
 
     let tx = conn.unchecked_transaction()?;
 
@@ -82,10 +85,7 @@ pub fn remove_folder_with_tracks(conn: &Connection, folder_path: &str) -> Result
         params![folder_path],
     )?;
 
-    tx.execute(
-        "DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks WHERE album_id IS NOT NULL)",
-        [],
-    )?;
+    cleanup_empty_albums(&tx)?;
 
     tx.commit()?;
 
