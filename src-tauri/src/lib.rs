@@ -458,6 +458,8 @@ pub fn run() {
 
             // Focus the existing window
             if let Some(window) = app.get_webview_window("main") {
+                // the window may be hidden (minimized-to-tray via window.hide())
+                window.show().ok();
                 window.unminimize().ok();
                 window.set_focus().ok();
             }
