@@ -57,6 +57,7 @@
         <button class="segment-btn" class:active={$locale === 'en'} on:click={() => changeLanguage('en')}>English</button>
         <button class="segment-btn" class:active={$locale === 'es'} on:click={() => changeLanguage('es')}>Español</button>
         <button class="segment-btn" class:active={$locale === 'fr'} on:click={() => changeLanguage('fr')}>Français</button>
+        <button class="segment-btn" class:active={$locale === 'ru'} on:click={() => changeLanguage('ru')}>Русский</button>
       </div>
     </div>
 
