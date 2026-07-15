@@ -17,7 +17,7 @@
     "goToAlbum": "Перейти к альбому"
   },
   "trackList": {
-    "title": "Наименование",
+    "title": "Название",
     "album": "Альбом",
     "duration": "Длительность",
     "dateAdded": "Дата добавления",
@@ -60,7 +60,7 @@
     "loadingDiscography": "Загрузка дискографии…",
     "albumsAndSingles": "Альбомы и синглы",
     "showAll": "Показать все ({count})",
-    "noDiscography": "Дискографии не найденf."
+    "noDiscography": "Дискография не найдена."
   },
   "home": {
     "goodMorning": "Доброе утро",
@@ -186,7 +186,6 @@
     "resonateButton": "Кнопка Resonate",
     "openResonate": "Открыть Resonate",
     "appearance": "Внешний вид",
-    "language": "Внешний вид",
     "appearanceSubtitle": "Тема оформления, язык и масштаб приложения",
     "closeToTray": "Сворачивать в трей",
     "closeToTrayDesc": "Скрывать окно в системный трей при закрытии",

@@ -41,7 +41,7 @@
       <path d="M2 12h20" />
     </svg>
     <div class="accordion-header-info">
-      <span class="accordion-title">{$_('settings.language', { default: 'Appearance' })}</span>
+      <span class="accordion-title">{$_('settings.appearance', { default: 'Appearance' })}</span>
       <span class="accordion-subtitle">{$_('settings.appearanceSubtitle', { default: 'Customize application theme, language, and scaling' })}</span>
     </div>
     <svg class="accordion-chevron" class:rotated={open} viewBox="0 0 24 24" width="16" height="16">
