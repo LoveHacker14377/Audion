@@ -26,10 +26,21 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
-            storePassword = keystoreProperties.getProperty("storePassword")
+            val storeFilePath = keystoreProperties.getProperty("storeFile")
+            val keyAlias = keystoreProperties.getProperty("keyAlias")
+            val keyPassword = keystoreProperties.getProperty("keyPassword")
+            val storePassword = keystoreProperties.getProperty("storePassword")
+            
+            // Only configure signing if all properties are present
+            if (!storeFilePath.isNullOrEmpty() && !keyAlias.isNullOrEmpty() && 
+                !keyPassword.isNullOrEmpty() && !storePassword.isNullOrEmpty()) {
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+                this.storeFile = rootProject.file(storeFilePath)
+                this.storePassword = storePassword
+            } else {
+                logger.warn("⚠️  Signing config incomplete. Keystore properties may be missing.")
+            }
         }
     }
 
@@ -56,7 +67,15 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            
+            // Only apply signing config if it's properly configured
+            val storeFilePath = keystoreProperties.getProperty("storeFile")
+            if (!storeFilePath.isNullOrEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                logger.warn("⚠️  Release build without signing config — keystore properties missing")
+            }
+            
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
