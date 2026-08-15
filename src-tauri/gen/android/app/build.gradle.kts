@@ -26,14 +26,14 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = keystoreProperties.getProperty("storeFile")
-            val keyAlias = keystoreProperties.getProperty("keyAlias")
-            val keyPassword = keystoreProperties.getProperty("keyPassword")
-            val storePassword = keystoreProperties.getProperty("storePassword")
+            val storeFilePath = keystoreProperties.getProperty("storeFile", "").toString()
+            val keyAlias = keystoreProperties.getProperty("keyAlias", "").toString()
+            val keyPassword = keystoreProperties.getProperty("keyPassword", "").toString()
+            val storePassword = keystoreProperties.getProperty("storePassword", "").toString()
             
             // Only configure signing if all properties are present
-            if (!storeFilePath.isNullOrEmpty() && !keyAlias.isNullOrEmpty() && 
-                !keyPassword.isNullOrEmpty() && !storePassword.isNullOrEmpty()) {
+            if (storeFilePath.isNotEmpty() && keyAlias.isNotEmpty() && 
+                keyPassword.isNotEmpty() && storePassword.isNotEmpty()) {
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
                 this.storeFile = rootProject.file(storeFilePath)
@@ -69,8 +69,8 @@ android {
             isMinifyEnabled = true
             
             // Only apply signing config if it's properly configured
-            val storeFilePath = keystoreProperties.getProperty("storeFile")
-            if (!storeFilePath.isNullOrEmpty()) {
+            val storeFilePath = keystoreProperties.getProperty("storeFile", "").toString()
+            if (storeFilePath.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 logger.warn("⚠️  Release build without signing config — keystore properties missing")
@@ -84,7 +84,7 @@ android {
         }
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
     buildFeatures {
         buildConfig = true
